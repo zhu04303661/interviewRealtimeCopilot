@@ -1,0 +1,14 @@
+[1.1s] signed in
+[1.4s] material prepared — AccelerComm_SEM_Interview_Prep.md
+[1.8s] practice session started
+[11.4s] interviewer asked (spoken) — Hi, I’m your interviewer for the Software Engineering Manager role at AccelerComm.
+[16.2s] translation shown — 你好，我是 AccelerComm 软件工程经理职位的面试官。
+
+首先，你能解释一下你在比特精确的 LTE Layer-1 系统模型方面的经验，以及你会如何确保不同实现之间的正确性和可重复性吗？
+
+我先停在这里，听你回答。
+[25.1s] bilingual hint streamed — 1738 chars on screen
+[28.1s] answering out loud with macOS say
+[42.3s] candidate transcript — Okay, I build 20 engineers building the LTE layer one software. I introduced continuous integration on the target hardware and we cut the release cycle from three months to four weeks.
+[42.3s] interviewer follow-up (spoken) — Hearing interviewer…
+[42.4s] session ended

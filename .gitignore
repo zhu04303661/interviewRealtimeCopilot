@@ -1,0 +1,29 @@
+# Recovered vendor app content: proprietary, never published.
+/asar-exact/
+/package/
+/readable-js/
+/wakaru-derived/
+/native/
+/evidence/
+/analysis/
+/method/
+
+# App bundles, build output, backups and runtime data.
+/launch/Final Round Recovered.app/
+/launch/pre-*/
+/launch/profile/
+/launch/build/out/
+/launch/legacy/
+
+# Python
+/launch/backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets and local files
+.env
+*.p12
+*.pem
+.DS_Store

@@ -1,0 +1,38 @@
+[project]
+name = "frlocal"
+version = "0.1.0"
+description = "Local backend for Final Round Recovered: accounts, workspace, document preparation and the live interview engine."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "aiohttp>=3.14.5",
+    "aiohttp-socks>=0.12.0",
+    "pypdfium2>=5.14.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Only resolve releases that have been public for at least a week.
+exclude-newer = "2026-10-31T00:00:00Z"
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "RUF"]
+# Chinese text and long prompt strings are intentional; the rest are style preferences.
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "RUF005", "UP035", "SIM105", "SIM108", "SIM115", "B008"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
