@@ -202,6 +202,8 @@ class FakeOpenAI:
         """Speech-to-speech Realtime session: scripted interviewer turns, server-VAD-style candidate turns."""
         heard_bytes = 0
         turn = 0
+        silent_bytes = 24000
+        turn_reported = False
 
         async def respond() -> None:
             nonlocal turn
@@ -238,18 +240,21 @@ class FakeOpenAI:
                 audio = base64.b64decode(event["audio"])
                 if any(audio):
                     self.live_audio_nonzero += len(audio)
-                    if heard_bytes == 0:
+                    if silent_bytes >= 24000:  # like server VAD: a new turn needs 0.5 s of silence first
                         await socket.send_json({"type": "input_audio_buffer.speech_started"})
-                    heard_bytes += len(audio)
+                    silent_bytes = 0
+                    heard_bytes += 0 if turn_reported else len(audio)
                 else:
+                    silent_bytes += len(audio)
+                    if silent_bytes >= 24000:
+                        turn_reported = False  # one transcription per turn; the next starts after 0.5 s of silence
                     self.live_audio_zero += len(audio)
                 if heard_bytes >= 9600 and self.live_answers:
-                    heard_bytes = 0
+                    heard_bytes, turn_reported = 0, True
                     answer = self.live_answers.popleft()
                     await socket.send_json({"type": "conversation.item.input_audio_transcription.completed",
                                             "item_id": "item_user", "transcript": answer})
-                    await asyncio.sleep(0.3)
-                    await respond()
+                    # create_response is off: the backend decides when the interviewer replies.
         return socket
 
     def realtime_of(self, kind: str) -> list[dict[str, Any]]:

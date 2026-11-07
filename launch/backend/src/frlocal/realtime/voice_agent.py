@@ -47,7 +47,7 @@ class RealtimeVoiceAgent:
                  greeting: str, limits: Limits, barge_in: bool, on_audio: Callable[[str], None],
                  on_audio_cleared: Callable[[], None], on_interviewer_text: Callable[[str], None],
                  on_interviewer_done: Callable[[str], None], on_candidate_done: Callable[[str], None],
-                 on_closed: Callable[[str | None], None]) -> None:
+                 on_closed: Callable[[str | None], None], on_candidate_started: Callable[[], None] = lambda: None) -> None:
         self._openai, self._key, self._model, self._limits, self._barge_in = openai, key, model, limits, barge_in
         self._session = {
             "type": "realtime",
@@ -71,6 +71,7 @@ class RealtimeVoiceAgent:
         self._on_audio, self._on_audio_cleared = on_audio, on_audio_cleared
         self._on_interviewer, self._on_interviewer_done = on_interviewer_text, on_interviewer_done
         self._on_candidate_done, self._on_closed = on_candidate_done, on_closed
+        self._on_candidate_started = on_candidate_started
         self._socket: aiohttp.ClientWebSocketResponse | None = None
         self._tasks: list[asyncio.Task] = []
         self._send_lock = asyncio.Lock()
@@ -196,8 +197,10 @@ class RealtimeVoiceAgent:
             transcript = (event.get("transcript") or "").strip()
             if transcript:
                 self._on_candidate_done(transcript)
-        elif kind == "input_audio_buffer.speech_started" and self._barge_in and self.interviewer_speaking:
-            self._interrupt()
+        elif kind == "input_audio_buffer.speech_started":
+            self._on_candidate_started()
+            if self._barge_in and self.interviewer_speaking:
+                self._interrupt()
         elif kind == "error":
             error = event.get("error") or {}
             log.warning("Realtime voice agent error: %s %s", error.get("code"), error.get("message"))

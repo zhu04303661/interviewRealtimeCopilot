@@ -48,6 +48,14 @@ async def speak_for(client: LiveClient, seconds: float) -> None:
         await asyncio.sleep(0.1)
 
 
+async def silence_for(client: LiveClient, seconds: float) -> None:
+    """Stream silent microphone frames, as the app does while the candidate pauses."""
+    for _ in range(round(seconds / 0.1)):
+        await client.socket.send_bytes(audio_frame(CANDIDATE, client.sequence[CANDIDATE], value=0))
+        client.sequence[CANDIDATE] += 1
+        await asyncio.sleep(0.1)
+
+
 async def test_session_starts_with_topics_from_the_materials(signed_in, fake_openai, tmp_path):
     _, client = await practice(signed_in, tmp_path)
     await client.wait_type("say")

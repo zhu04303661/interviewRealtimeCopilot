@@ -147,6 +147,7 @@ class InterviewSession:
         self._bank: list[dict[str, str]] | None = None
         self._bank_index = 0          # the prepared question being discussed
         self._follow_up_next = False  # the next interviewer turn is this question's one follow-up
+        self._reply_timer: asyncio.TimerHandle | None = None
 
     # ── frames ──────────────────────────────────────────────────────────────
 
@@ -532,7 +533,8 @@ class InterviewSession:
                 on_audio_cleared=lambda: self.emit("say.audio.clear", {}),
                 on_interviewer_text=self._live_interviewer_text,
                 on_interviewer_done=lambda _text: self._finish_live_say(),
-                on_candidate_done=self._realtime_candidate_done, on_closed=self._live_closed)
+                on_candidate_done=self._realtime_candidate_done, on_closed=self._live_closed,
+                on_candidate_started=self._cancel_reply)
         else:
             live = LiveConversation(
                 self.openai, self.key, model=self.settings.models.live, voice=self.settings.models.live_voice,
@@ -608,8 +610,21 @@ class InterviewSession:
         self._finish_live_answer()
         if is_filler(text) or not isinstance(self._live, RealtimeVoiceAgent):
             return
-        instructions = self._next_turn() or coach.UNPLANNED_TURN
-        self._spawn(self._live.respond(instructions))
+        # Voice activity detection ends a turn at every short pause; reply only
+        # after the candidate has been quiet for a while (speaking again cancels).
+        self._cancel_reply()
+        self._reply_timer = asyncio.get_running_loop().call_later(self.settings.limits.practice_reply_pause_s, self._reply)
+
+    def _cancel_reply(self) -> None:
+        if self._reply_timer:
+            self._reply_timer.cancel()
+            self._reply_timer = None
+
+    def _reply(self) -> None:
+        self._reply_timer = None
+        if self.ended or not isinstance(self._live, RealtimeVoiceAgent):
+            return
+        self._spawn(self._live.respond(self._next_turn() or coach.UNPLANNED_TURN))
 
     def _finish_live_answer(self) -> None:
         answer, self._live_answer = self._live_answer, None

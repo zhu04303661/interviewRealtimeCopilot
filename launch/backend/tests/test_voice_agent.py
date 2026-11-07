@@ -10,7 +10,7 @@ import pytest
 
 from frlocal.config import Limits
 
-from .test_practice_live import practice, speak_for
+from .test_practice_live import practice, silence_for, speak_for
 
 
 @pytest.fixture
@@ -129,3 +129,22 @@ def test_hesitation_sounds_are_not_answers_and_echoed_translations_are_hidden():
     assert not useful_translation("To start, tell me about it?", "To start, tell me about it?")
     assert not useful_translation("  ", "anything")
     assert useful_translation("首先，请谈谈它。", "To start, tell me about it?")
+
+
+async def test_interviewer_waits_until_the_candidate_has_finished(signed_in, fake_openai, tmp_path):
+    """Regression: a pause mid-answer used to trigger the next question immediately."""
+    fake_openai.live_answers.extend(["and then we measured it on hardware."])
+    _, client = await practice(signed_in, tmp_path, documents=False)
+    first = await client.wait_type("say")
+    before = len(fake_openai.realtime_of("response.create"))
+    await asyncio.sleep(2.0)                # after the echo gate has reopened
+    await speak_for(client, 0.5)            # first part of the answer
+    await client.wait_for(lambda f: f["type"] == "transcript" and f["data"]["role"] == "interviewee" and f["data"]["final"])
+    await silence_for(client, 1.0)          # a thinking pause, shorter than the reply pause
+    assert len(fake_openai.realtime_of("response.create")) == before
+    await speak_for(client, 0.5)            # the answer continues
+    await silence_for(client, 1.0)
+    assert len(fake_openai.realtime_of("response.create")) == before
+    await client.wait_for(lambda f: f["type"] == "say" and f["seq"] > first["seq"], timeout=8)
+    assert len(fake_openai.realtime_of("response.create")) == before + 1
+    await client.close()
