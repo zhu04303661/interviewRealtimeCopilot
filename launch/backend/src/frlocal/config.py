@@ -72,7 +72,6 @@ class Limits:
     live_silence_interval_s: float = 0.1 # send silence when the microphone is quiet this long
     practice_reply_pause_s: float = 2.5  # candidate silence before the practice interviewer replies
     live_echo_margin_s: float = 0.8      # keep the microphone muted this long after playback ends (covers playback lag)
-    max_topic_source_chars: int = 40_000   # prepared Q&A documents plus a resume excerpt
 
 
 @dataclass(frozen=True)

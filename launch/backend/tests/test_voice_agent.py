@@ -180,3 +180,42 @@ def test_practice_modes_pick_unasked_questions_or_improvise_without_repeats():
     assert "different point from every question already asked" in turn and "How did you tune PDSCH scheduling?" in turn
     session._practice_mode, session._asked = "sequential", {0, 1, 2, 3}
     assert "completes the practice questions" in session._next_turn()
+
+
+def test_every_prepared_question_is_read_in_parts_without_a_cap():
+    from frlocal.realtime import coach
+    document = "\n\n".join(f"## Q{i}. How does feature {i} work?\nPrepared answer {i}. " + "detail " * 300 for i in range(60))
+    parts = coach.question_chunks(document, size=24_000)
+    assert len(parts) > 3 and all(len(p) <= 24_000 for p in parts)
+    assert "".join(parts).count("How does feature") == 60          # nothing dropped at part boundaries
+    many = json.dumps({"questions": [{"topic": "t", "question": f"Question {i}?", "prepared_answer": "a"} for i in range(40)]})
+    assert len(coach.parse_question_bank(many)) == 40               # no 15-question cap
+
+
+async def test_question_parts_are_appended_in_order_and_cached(signed_in, fake_openai, tmp_path):
+    long_prep = "\n\n".join(f"## Q{i}. Question {i}?\n" + "answer " * 4000 for i in range(3))  # three parts
+    calls = []
+
+    def bank(body):
+        text = json.loads(body["input"])["document"]["text"]
+        calls.append(text[:12])
+        return {"questions": [{"topic": "t", "question": q, "prepared_answer": "a"}
+                              for q in (f"Question {i}?" for i in range(3)) if q in text]}
+
+    fake_openai.handlers["topics"] = bank
+    _, client = await practice(signed_in, tmp_path, documents=False, material=long_prep)
+    full = await client.wait_for(lambda f: f["type"] == "practice.plan" and len(f["data"]["questions"]) == 3, timeout=10)
+    assert [q["question"] for q in full["data"]["questions"]] == ["Question 0?", "Question 1?", "Question 2?"]
+    await client.close()
+    first_calls = len(calls)
+    _, client = await practice(signed_in, tmp_path, documents=False, material=long_prep)
+    await client.wait_for(lambda f: f["type"] == "practice.plan" and len(f["data"]["questions"]) == 3, timeout=10)
+    assert len(calls) == first_calls                                   # second session reads the disk cache
+    await client.close()
+
+
+def test_parallel_chinese_titles_are_not_spoken():
+    from frlocal.realtime.coach import spoken_question
+    assert spoken_question("Dealing with an under-performer / 如何处理绩效差的工程师") == "Dealing with an under-performer"
+    assert spoken_question("请介绍一下你自己 / Tell me about yourself") == "请介绍一下你自己 / Tell me about yourself"
+    assert spoken_question("TDD / FDD trade-offs?") == "TDD / FDD trade-offs?"

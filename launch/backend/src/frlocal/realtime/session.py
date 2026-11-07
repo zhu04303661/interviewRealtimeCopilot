@@ -17,6 +17,8 @@ Timing goals (each step starts as soon as the previous one finishes):
 from __future__ import annotations
 
 import asyncio
+import json
+import hashlib
 import logging
 import random
 import re
@@ -146,6 +148,7 @@ class InterviewSession:
         self._live_timer: asyncio.TimerHandle | None = None
         # Practice plan: questions prepared in the materials, asked in order without repeats.
         self._bank: list[dict[str, str]] | None = None
+        self._bank_keys: set[str] = set()
         self._bank_index = 0          # the prepared question being discussed
         self._follow_up_next = False  # the next interviewer turn is this question's one follow-up
         self._asked: set[int] = set()  # prepared questions already asked
@@ -472,27 +475,66 @@ class InterviewSession:
     # ── spoken practice (GPT-Live) ──────────────────────────────────────────
 
     async def _practice_plan(self) -> tuple[list[dict[str, str]], str]:
-        """The question bank prepared in the knowledge sources, plus resume text for follow-ups."""
+        """The questions prepared in the knowledge sources, plus resume text for follow-ups.
+
+        Every material is read in parts, extracted in parallel and cached on disk
+        per part. The plan is returned once the first part is ready; later parts
+        are appended in document order as they finish (indices never shift).
+        """
         sources = await (self._sources or asyncio.get_running_loop().create_task(self._load_sources()))
         resume = next((s.text for s in sources if s.kind == "resume"), "")
         if self._bank is not None:
             return self._bank, resume
-        budget = self.settings.limits.max_topic_source_chars
-        documents = []
-        for source in sorted(sources, key=lambda s: s.kind == "resume"):  # prepared Q&A material first
-            share = min(budget, 4000 if source.kind == "resume" else 36000)
-            if share <= 0:
-                break
-            documents.append({"kind": source.kind, "filename": source.filename, "text": source.text[:share]})
-            budget -= share
-        try:
-            text = await self.openai.respond(coach.question_bank_request(self.settings.models.understanding, self.config["goal"], documents),
-                                             timeout=self.settings.limits.understanding_timeout_s * 4, key=self.key)
-            self._bank = coach.parse_question_bank(text)
-        except (ProviderError, TimeoutError) as error:
-            log.info("Could not read the prepared questions: %s", error)
-            self._bank = []
+        materials = [s for s in sources if s.kind != "resume"]
+        generate = not materials
+        jobs = [(s.filename, part) for s in (materials or sources[:1]) for part in coach.question_chunks(s.text)]
+        if not jobs:  # no documents at all: questions from the goal and job description
+            jobs = [("goal", json.dumps(self.config["goal"], ensure_ascii=False))]
+        limit = asyncio.Semaphore(4)
+        tasks = [asyncio.get_running_loop().create_task(self._extract_part(name, part, generate, limit)) for name, part in jobs]
+        self._bank, self._bank_keys = [], set()
+        self._add_questions(await tasks[0])
+        if len(tasks) > 1:
+            self._spawn(self._append_parts(tasks[1:]))
         return self._bank, resume
+
+    async def _extract_part(self, filename: str, text: str, generate: bool, limit: asyncio.Semaphore) -> list[dict[str, str]]:
+        model = self.settings.models.understanding
+        digest = hashlib.sha256(json.dumps([model, coach.QUESTION_BANK_INSTRUCTIONS, generate, text]).encode()).hexdigest()
+        cache = self.settings.workspace_dir / self.username / "practice-questions" / f"{digest}.json"
+        try:
+            return [dict(q, question=coach.spoken_question(q["question"])) for q in json.loads(cache.read_text())]
+        except (OSError, ValueError, TypeError, KeyError):
+            pass
+        async with limit:
+            try:
+                body = coach.question_bank_request(model, self.config["goal"], {"filename": filename, "text": text}, generate=generate)
+                questions = coach.parse_question_bank(await self.openai.respond(
+                    body, timeout=self.settings.limits.understanding_timeout_s * 8, key=self.key))
+            except (ProviderError, TimeoutError) as error:
+                log.info("Could not read prepared questions from %s: %s", filename, error)
+                return []
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps(questions, ensure_ascii=False))
+        except OSError as error:
+            log.info("Could not cache prepared questions: %s", error)
+        return questions
+
+    def _add_questions(self, questions: list[dict[str, str]]) -> bool:
+        added = False
+        for question in questions:
+            key = coach.question_key(question["question"])
+            if key not in self._bank_keys:
+                self._bank_keys.add(key)
+                self._bank.append(question)
+                added = True
+        return added
+
+    async def _append_parts(self, tasks: list[asyncio.Task]) -> None:
+        for task in tasks:  # in document order
+            if self._add_questions(await task) and not self.ended:
+                self._emit_plan()
 
     @property
     def _prepared_answer(self) -> str | None:

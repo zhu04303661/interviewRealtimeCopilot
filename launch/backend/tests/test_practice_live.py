@@ -25,9 +25,13 @@ def limits() -> Limits:
     return replace(Limits(), live_say_gap_s=0.25, live_candidate_gap_s=0.25, live_silence_interval_s=0.05, live_echo_margin_s=0.2)
 
 
-async def practice(b, tmp_path, *, documents: bool = True) -> tuple[str, LiveClient]:
+async def practice(b, tmp_path, *, documents: bool = True, material: str | None = None) -> tuple[str, LiveClient]:
     ids = []
-    if documents:
+    if material is not None:
+        (tmp_path / "long-prep.md").write_text(material)
+        ids = [(await b.documents.import_file("admin", "material", str(tmp_path / "long-prep.md"), "long-prep.md", None))["document_id"]]
+        await b.documents.wait_idle()
+    elif documents:
         (tmp_path / "cv.txt").write_text("Jane Doe. Tuned the LTE PDSCH scheduler, cutting latency by 30%.")
         (tmp_path / "prep.md").write_text("# Prepared topics\n1. PDSCH scheduling\n2. HARQ timing\n")
         ids = [(await b.documents.import_file("admin", kind, str(tmp_path / name), name, None))["document_id"]
@@ -69,7 +73,7 @@ async def test_session_starts_with_topics_from_the_materials(signed_in, fake_ope
     greeting = fake_openai.live_of("session.commentary.append")[0]["content"]
     assert "first question about: PDSCH scheduling" in greeting
     topic_input = json.loads(fake_openai.bodies("topics")[0]["input"])
-    assert {d["filename"] for d in topic_input["documents"]} == {"cv.txt", "prep.md"}
+    assert topic_input["document"]["filename"] == "prep.md"  # questions come from the materials, not the resume
     await client.close()
 
 

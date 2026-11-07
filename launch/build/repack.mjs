@@ -427,13 +427,14 @@ cockpit.replace('const CockpitConversationFeed = ({', lines(
   '  const asked = new Set(plan.asked ?? []);',
   '  const jsx = jsxRuntimeExports.jsx, jsxs = jsxRuntimeExports.jsxs;',
   '  const send = (intent, utterance, gateSeq) => void requestAnswer({ utterance, intent, ...(gateSeq !== void 0 ? { gateSeq } : {}) });',
-  '  return jsxs("div", { className: "border-hairline bg-surface-1 sticky top-0 z-10 border-b px-4 py-2", children: [',
+  '  return jsxs("div", { className: "no-drag border-hairline bg-bg shrink-0 border-b px-4 py-2", children: [',
   '    jsxs("button", { type: "button", onClick: () => setOpen(!open), className: "text-text-2 flex w-full items-center justify-between font-mono text-xs", children: [',
   '      jsx("span", { children: `Practice questions · 练习题  ${asked.size}/${plan.questions.length}` }),',
   '      jsx("span", { children: open ? "▾" : "▸" }),',
   '    ] }),',
   '    open && jsx("div", { className: "mt-2 flex gap-1", children: PRACTICE_MODES.map(([mode, label]) => jsx(Button, { variant: plan.mode === mode ? "secondary" : "ghost", size: "xs", onClick: () => send("practice.mode", mode), className: "font-mono", children: label }, mode)) }),',
-  '    open && jsx("ol", { className: "mt-2 max-h-48 space-y-0.5 overflow-y-auto", children: plan.questions.map((q) => jsx("li", { children: jsxs("button", {',
+  // Inline sizing: the app's stylesheet only ships the utility classes the original UI uses.
+  '    open && jsx("ol", { className: "mt-2", style: { maxHeight: "28vh", overflowY: "auto" }, children: plan.questions.map((q) => jsx("li", { children: jsxs("button", {',
   '      type: "button", title: q.question, onClick: () => send("practice.goto", "", q.index),',
   '      className: `w-full truncate rounded px-1.5 py-1 text-left text-xs ${plan.current === q.index ? "bg-surface-2 text-text-1" : asked.has(q.index) ? "text-text-3" : "text-text-2"} hover:bg-surface-2`,',
   '      children: [jsx("span", { className: "mr-1 font-mono", children: plan.current === q.index ? "▶" : asked.has(q.index) ? "✓" : `${q.index + 1}.` }), q.topic ? `${q.topic} — ${q.question}` : q.question],',
@@ -442,18 +443,9 @@ cockpit.replace('const CockpitConversationFeed = ({', lines(
   '};',
   'const CockpitConversationFeed = ({',
 ));
-cockpit.replace(lines(
-  '  if (entries.length === 0 && pendingContent == null && transientContent == null) {',
-  '    return emptyContent;',
-  '  }',
-), lines(
-  '  const practicePlan = useConversationStore((s) => s.practicePlan);',
-  '  if (entries.length === 0 && pendingContent == null && transientContent == null && !practicePlan) {',
-  '    return emptyContent;',
-  '  }',
-));
-cockpit.replace('    earlierConversationHidden ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-hairline flex justify-center border-b px-4 py-2"',
-  '    /* @__PURE__ */ jsxRuntimeExports.jsx(PracticePanel, {}),\n    earlierConversationHidden ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-hairline flex justify-center border-b px-4 py-2"');
+// Rendered in the window's fixed area between the header and the scrolling feed.
+cockpit.replace('          headerContent,\n          guideContent,\n          singlePane ?',
+  '          headerContent,\n          /* @__PURE__ */ jsxRuntimeExports.jsx(PracticePanel, {}),\n          guideContent,\n          singlePane ?');
 
 // ── assemble the archive ────────────────────────────────────────────────────
 const patched = new Map([
