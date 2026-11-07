@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import re
 import time
 import uuid
@@ -147,6 +148,8 @@ class InterviewSession:
         self._bank: list[dict[str, str]] | None = None
         self._bank_index = 0          # the prepared question being discussed
         self._follow_up_next = False  # the next interviewer turn is this question's one follow-up
+        self._asked: set[int] = set()  # prepared questions already asked
+        self._practice_mode = "sequential"  # sequential | random | ai (improvised, never repeating)
         self._reply_timer: asyncio.TimerHandle | None = None
 
     # ── frames ──────────────────────────────────────────────────────────────
@@ -435,11 +438,11 @@ class InterviewSession:
         async def run() -> None:
             try:
                 bank, _ = await self._practice_plan()
-                asked = sum(1 for q in self.questions if q.get("planned"))
-                if asked < len(bank):
-                    # Ask the prepared questions in order, one each turn.
-                    self._bank_index = asked
-                    text = bank[asked]["question"]
+                index = self._pick_next()
+                if index is not None:
+                    # Ask the prepared questions (order per the practice mode), one each turn.
+                    self._mark_asked(index)
+                    text = bank[index]["question"]
                 else:
                     query = " ".join(filter(None, [self.config["goal"].get("role"), *(s.text for s in self.segments[-3:])]))
                     context, _ = await self._context(query)
@@ -453,14 +456,18 @@ class InterviewSession:
                 return
             if self.ended or not self.connected:
                 return
-            say_id = str(uuid.uuid4())
-            seq = self.emit("say", {"say_id": say_id, "text": text})
-            self._mock_started = True
-            self.segments.append(Segment(seq, "interviewer", text, say_id))
-            self.questions.append({"seq": seq, "text": text, "planned": bool(self._bank) and self._bank_index < len(self._bank)})
-            self._spawn(self._translate_say(say_id, text))
+            self._say_text(text)
 
         self._interviewer_task = self._spawn(run())
+
+    def _say_text(self, text: str, planned: bool = False) -> None:
+        """Show a text interviewer question (no voice) and translate it."""
+        say_id = str(uuid.uuid4())
+        seq = self.emit("say", {"say_id": say_id, "text": text})
+        self._mock_started = True
+        self.segments.append(Segment(seq, "interviewer", text, say_id))
+        self.questions.append({"seq": seq, "text": text})
+        self._spawn(self._translate_say(say_id, text))
 
     # ── spoken practice (GPT-Live) ──────────────────────────────────────────
 
@@ -493,17 +500,58 @@ class InterviewSession:
             return self._bank[self._bank_index]["prepared_answer"] or None
         return None
 
-    def _next_turn(self) -> str | None:
-        """Instructions for the interviewer's next spoken turn, advancing the plan."""
-        if not self._bank:
+    def _emit_plan(self) -> None:
+        """Send the question list, the mode and progress to the practice sidebar."""
+        if self._bank is None:
+            return
+        current = self._bank_index if self._bank_index in self._asked else None
+        self.emit("practice.plan", {
+            "mode": self._practice_mode, "current": current, "asked": sorted(self._asked),
+            "questions": [{"index": i, "topic": q["topic"], "question": q["question"]} for i, q in enumerate(self._bank)],
+        })
+
+    def _pick_next(self) -> int | None:
+        """The next prepared question for the current mode, or None (improvised or finished)."""
+        remaining = [i for i in range(len(self._bank or [])) if i not in self._asked]
+        if self._practice_mode == "ai" or not remaining:
             return None
+        return random.choice(remaining) if self._practice_mode == "random" else remaining[0]
+
+    def _mark_asked(self, index: int) -> None:
+        self._bank_index, self._follow_up_next = index, True
+        self._asked.add(index)
+        self._emit_plan()
+
+    def _next_turn(self) -> str:
+        """Instructions for the interviewer's next spoken turn, advancing the plan."""
         language = coach.spoken_language(self.config.get("language"))
-        if self._follow_up_next and self._bank_index < len(self._bank):
+        if self._follow_up_next and self._bank and self._bank_index < len(self._bank):
             self._follow_up_next = False
             return coach.next_turn_instructions(self._bank, self._bank_index, follow_up=True, language=language)
-        self._bank_index += 1
-        self._follow_up_next = self._bank_index < len(self._bank)
-        return coach.next_turn_instructions(self._bank, self._bank_index, follow_up=False, language=language)
+        index = self._pick_next()
+        if index is not None:
+            self._mark_asked(index)
+            return coach.next_turn_instructions(self._bank, index, follow_up=False, language=language)
+        if self._practice_mode == "ai" or not self._bank:
+            self._emit_plan()
+            asked = [q["text"] for q in self.questions][-20:]
+            return coach.improvised_turn(language, asked)
+        return coach.next_turn_instructions(self._bank, len(self._bank), follow_up=False, language=language)
+
+    def practice_control(self, action: str, value: Any) -> None:
+        """Sidebar commands: jump to a prepared question or change the mode."""
+        if action == "practice.mode" and value in ("sequential", "random", "ai"):
+            self._practice_mode = value
+            self._emit_plan()
+        elif action == "practice.goto" and isinstance(value, int) and self._bank and 0 <= value < len(self._bank):
+            self._cancel_reply()
+            self._mark_asked(value)
+            language = coach.spoken_language(self.config.get("language"))
+            instructions = coach.jump_to_question(self._bank[value]["question"], language)
+            if isinstance(self._live, RealtimeVoiceAgent):
+                self._spawn(self._live.respond(instructions))
+            elif self._live is None:
+                self._say_text(self._bank[value]["question"], planned=True)
 
     async def _start_live(self) -> None:
         """Start the spoken interviewer; fall back to the text interviewer if voice is unavailable."""
@@ -521,9 +569,9 @@ class InterviewSession:
         topics = [{"title": q["topic"] or q["question"][:60], "focus": q["question"]} for q in bank]
         instructions = coach.live_instructions(goal, topics, resume, language, self.config.get("persona"))
         greeting = coach.live_greeting(goal, topics, language)
-        if bank:
-            self._bank_index, self._follow_up_next = 0, True
-            greeting += coach.first_question_line(bank[0]["question"])
+        first = self._pick_next()
+        if first is not None:
+            greeting += coach.first_question_line(bank[first]["question"])
         on_audio = lambda audio: self.emit("say.audio", {"audio": audio})  # noqa: E731
         if mode == "realtime":
             live = RealtimeVoiceAgent(
@@ -554,6 +602,11 @@ class InterviewSession:
             return
         self._mock_started = True
         self.config["practice_topics"] = topics
+        # Marked only now: if voice failed, the text interviewer asks this question instead.
+        if first is not None:
+            self._mark_asked(first)
+        else:
+            self._emit_plan()
 
     def _live_closed(self, reason: str | None) -> None:
         if reason and self.connected and not self.ended:
@@ -624,7 +677,7 @@ class InterviewSession:
         self._reply_timer = None
         if self.ended or not isinstance(self._live, RealtimeVoiceAgent):
             return
-        self._spawn(self._live.respond(self._next_turn() or coach.UNPLANNED_TURN))
+        self._spawn(self._live.respond(self._next_turn()))
 
     def _finish_live_answer(self) -> None:
         answer, self._live_answer = self._live_answer, None

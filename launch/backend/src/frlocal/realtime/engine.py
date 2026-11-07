@@ -132,6 +132,11 @@ class RealtimeEngine:
                         interview.emit("pong", {})
                     elif kind == "finalize":
                         interview.end_of_turn(frame.get("stream"))
+                    elif kind == "answer_request" and str(frame.get("intent", "")).startswith("practice."):
+                        # The practice sidebar reuses the answer-request channel: the
+                        # intent names the command, utterance/gate_seq carry its value.
+                        value = frame.get("gate_seq") if frame["intent"] == "practice.goto" else frame.get("utterance")
+                        interview.practice_control(frame["intent"], value)
                     elif kind == "answer_request" and isinstance(frame.get("utterance"), str):
                         gate_seq = frame.get("gate_seq")
                         interview.answer(frame["utterance"], gate_seq if isinstance(gate_seq, int) else None)

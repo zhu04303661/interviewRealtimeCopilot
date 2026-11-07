@@ -148,3 +148,35 @@ async def test_interviewer_waits_until_the_candidate_has_finished(signed_in, fak
     await client.wait_for(lambda f: f["type"] == "say" and f["seq"] > first["seq"], timeout=8)
     assert len(fake_openai.realtime_of("response.create")) == before + 1
     await client.close()
+
+
+async def test_practice_sidebar_lists_questions_tracks_progress_and_jumps(signed_in, fake_openai, tmp_path):
+    fake_openai.live_turns.extend(["Let's move on. How did you budget HARQ timing?"])
+    _, client = await practice(signed_in, tmp_path, documents=False)
+    plan = await client.wait_type("practice.plan")
+    assert [q["question"] for q in plan["data"]["questions"]] == ["How did you tune PDSCH scheduling?", "How did you budget HARQ timing?"]
+    assert plan["data"]["mode"] == "sequential" and plan["data"]["current"] == 0 and plan["data"]["asked"] == [0]
+    await client.wait_type("say")
+    await client.send("answer_request", utterance="", intent="practice.goto", gate_seq=1)
+    jumped = await client.wait_for(lambda f: f["type"] == "practice.plan" and f["data"]["current"] == 1)
+    assert jumped["data"]["asked"] == [0, 1]
+    await client.wait_for(lambda f: f["type"] == "say" and "HARQ" in f["data"]["text"], timeout=5)
+    assert "How did you budget HARQ timing?" in fake_openai.realtime_of("response.create")[-1]["response"]["instructions"]
+    await client.close()
+
+
+def test_practice_modes_pick_unasked_questions_or_improvise_without_repeats():
+    from frlocal.realtime.session import InterviewSession
+    session = InterviewSession.__new__(InterviewSession)
+    session.config, session.questions, session.emit = {"language": "en-US"}, [{"text": "How did you tune PDSCH scheduling?"}], lambda *a: 0
+    session._bank = [{"topic": t, "question": f"Q{t}?", "prepared_answer": ""} for t in "abcd"]
+    session._asked, session._bank_index, session._follow_up_next = {0}, 0, False
+    session._practice_mode = "sequential"
+    assert session._pick_next() == 1
+    session._practice_mode = "random"
+    assert {session._pick_next() for _ in range(40)} == {1, 2, 3}
+    session._practice_mode = "ai"
+    turn = session._next_turn()
+    assert "different point from every question already asked" in turn and "How did you tune PDSCH scheduling?" in turn
+    session._practice_mode, session._asked = "sequential", {0, 1, 2, 3}
+    assert "completes the practice questions" in session._next_turn()
