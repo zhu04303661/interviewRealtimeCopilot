@@ -1,6 +1,6 @@
 {
   "archive": "launch/build/out/local-workspace.asar",
-  "headerSha256": "25cb8911d92148d517e174d5f5c9d32b8054c78c03bfc51eb7c7a699163d080b",
+  "headerSha256": "f264c2cb0a8b4a9c413926a02fb8c47af4bc5e55a84f2770c32b4802a03dae2a",
   "unchangedOriginalFiles": 5786,
   "patched": [
     "package.json",

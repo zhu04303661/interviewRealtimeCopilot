@@ -139,7 +139,11 @@ class RealtimeEngine:
                         interview.practice_control(frame["intent"], value)
                     elif kind == "answer_request" and isinstance(frame.get("utterance"), str):
                         gate_seq = frame.get("gate_seq")
-                        interview.answer(frame["utterance"], gate_seq if isinstance(gate_seq, int) else None)
+                        gate_seq = gate_seq if isinstance(gate_seq, int) else None
+                        if frame.get("intent") == "continue":  # "Expand answer" on the candidate's own line
+                            interview.continue_answer(frame["utterance"], gate_seq)
+                        else:
+                            interview.answer(frame["utterance"], gate_seq)
                 elif message.type == WSMsgType.BINARY and accepted:
                     audio = parse_audio_frame(message.data)
                     if audio:

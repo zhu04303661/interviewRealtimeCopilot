@@ -265,22 +265,25 @@ class InterviewSession:
 
     # ── transcript ──────────────────────────────────────────────────────────
 
-    def _echoes_interviewer(self, text: str) -> bool:
-        """Whether microphone text is mostly the interviewer's recent words (speaker echo)."""
+    def _echoes(self, text: str, other: str) -> bool:
+        """Whether ``text`` is mostly words the ``other`` speaker just said (audio leaking between lanes)."""
         words = re.findall(r"\w+", text.lower())
         if not words:
             return False
         now = self._seq
-        recent = {w for s in self.segments[-6:] if s.role == "interviewer" and now - s.seq < 400
+        recent = {w for s in self.segments[-6:] if s.role == other and now - s.seq < 400
                   for w in re.findall(r"\w+", s.text.lower())}
         return bool(recent) and sum(w in recent for w in words) / len(words) >= ECHO_OVERLAP
 
     def _on_text(self, role: str, item_id: str, text: str, final: bool) -> None:
-        if role == "interviewee" and self.topology == "general" and (
-                is_filler(text) or (final and self._echoes_interviewer(text))):
-            if final:
-                log.info("Ignored microphone text that echoes the interviewer or is a filler: %r", text[:80])
-            return
+        if self.topology == "general" and role in ("interviewer", "interviewee"):
+            # The microphone hears the speakers, and calls can loop the candidate's
+            # voice back into computer audio; drop a lane's copy of the other's words.
+            other = "interviewer" if role == "interviewee" else "interviewee"
+            if (role == "interviewee" and is_filler(text)) or (final and self._echoes(text, other)):
+                if final:
+                    log.info("Ignored %s text that echoes the %s or is a filler: %r", role, other, text[:80])
+                return
         lane = next((lane for lane in self.lanes if lane.role == role), None)
         seq = self.emit("transcript", {"segment_id": item_id, "role": role, "text": text, "final": final,
                                        "source": lane.source if lane else ""})
@@ -376,8 +379,13 @@ class InterviewSession:
         documents = [item for item in loaded if isinstance(item, tuple) and isinstance(item[1], str)]
         return prepare_sources(documents, self.settings.limits)
 
-    def answer(self, question: str, gate_seq: int | None, *, source: str = "spoken") -> None:
-        """Stream an answer hint; supersedes any unfinished one."""
+    def continue_answer(self, said: str, gate_seq: int | None) -> None:
+        """Hint for what the candidate can add to what they just said (the "Expand answer" button)."""
+        question = self.questions[-1]["text"] if self.questions else ""
+        self.answer(question or said, gate_seq, said=said, source="manual")
+
+    def answer(self, question: str, gate_seq: int | None, *, source: str = "spoken", said: str | None = None) -> None:
+        """Stream an answer hint (or, with ``said``, a continuation); supersedes any unfinished one."""
         if self.ended or not question.strip():
             return
         self._cancel_turn(announce=True)
@@ -386,10 +394,10 @@ class InterviewSession:
 
         async def run() -> None:
             try:
-                context, refs = await self._context(question)
+                context, refs = await self._context(f"{question} {said}" if said else question)
                 if self._prepared_answer:
                     context["prepared_answer_for_current_question"] = self._prepared_answer
-                body = coach.answer_request(self.settings.models.coaching, context, question, self.settings.limits)
+                body = coach.answer_request(self.settings.models.coaching, context, question, self.settings.limits, said=said)
                 produced = False
                 async for delta in self.openai.stream(body, timeout=self.settings.limits.answer_timeout_s, key=self.key):
                     produced = True

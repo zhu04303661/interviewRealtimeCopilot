@@ -307,7 +307,7 @@ cockpit.replace(lines(
   '      }',
 ), lines(
   '        if (role === "interviewee" && data?.["final"] === true) {',
-  '          store.appendUtterance(str(data, "segment_id"), "me", str(data, "text"));',
+  '          store.appendUtterance(str(data, "segment_id"), "me", str(data, "text"), frame.seq);',
   '          return;',
   '        }',
   '        if (role === "unknown" && data?.["final"] === true) {',
@@ -375,7 +375,7 @@ cockpit.replace('const SayBubble = ({ text: text2, personaName, onSuggestAnswer,
 cockpit.replace('  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-question text-text-2 mt-1.5 break-words whitespace-pre-wrap", children: text2 || "(no transcript)" }),\n  onSuggestAnswer &&',
   '  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-question text-text-2 mt-1.5 break-words whitespace-pre-wrap", children: text2 || "(no transcript)" }),\n  ' + translationLine + ',\n  onSuggestAnswer &&');
 cockpit.replace('const NoticeLine = ({ text: text2 }) =>', lines(
-  'const UtteranceBubble = ({ speaker, text: text2, translation, onSuggestAnswer, busy }) => speaker === "interviewer" ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(InterviewerVoice, { children: [',
+  'const UtteranceBubble = ({ speaker, text: text2, translation, onSuggestAnswer, onExpandAnswer, busy }) => speaker === "interviewer" ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(InterviewerVoice, { children: [',
   '  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsx(TaxonomyStamp, { children: "Interviewer · 面试官" }) }),',
   '  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-question text-text-2 mt-1.5 break-words whitespace-pre-wrap", children: text2 }),',
   '  ' + translationLine + ',',
@@ -383,7 +383,9 @@ cockpit.replace('const NoticeLine = ({ text: text2 }) =>', lines(
   '  onSuggestAnswer && /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "ghost", disabled: busy, onClick: onSuggestAnswer, className: "text-status mt-2 h-7 rounded-md px-2 font-mono font-medium", children: "Suggest answer · 生成回答" })',
   '] }) }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-3", children: [',
   '  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsx(TaxonomyStamp, { children: "You · 我" }) }),',
-  '  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-question text-text-3 mt-1.5 break-words whitespace-pre-wrap", children: text2 })',
+  '  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-question text-text-3 mt-1.5 break-words whitespace-pre-wrap", children: text2 }),',
+  // Continue the candidate's own answer with what the materials add.
+  '  onExpandAnswer && /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "ghost", disabled: busy, onClick: onExpandAnswer, className: "text-status mt-2 h-7 rounded-md px-2 font-mono font-medium", children: "Expand answer · 补充回答" })',
   '] });',
   'const NoticeLine = ({ text: text2 }) =>',
 ));
@@ -397,7 +399,8 @@ cockpit.replace('            text: entry.text,\n            personaName,', '    
 cockpit.replace('      if (entry.kind === "notice") {\n        return /* @__PURE__ */ jsxRuntimeExports.jsx(NoticeLine', lines(
   '      if (entry.kind === "utterance") {',
   '        return /* @__PURE__ */ jsxRuntimeExports.jsx(UtteranceBubble, { speaker: entry.speaker, text: entry.text, translation: entry.translation, busy: answerStreaming,',
-  '          ...entry.speaker === "interviewer" && entry.seq !== void 0 && !attemptedGateSeqs.has(entry.seq) ? { onSuggestAnswer: () => onSuggestAnswer(entry) } : {} }, entry.key);',
+  '          ...entry.speaker === "interviewer" && entry.seq !== void 0 && !attemptedGateSeqs.has(entry.seq) ? { onSuggestAnswer: () => onSuggestAnswer(entry) } : {},',
+  '          ...entry.speaker === "me" && entry.seq !== void 0 ? { onExpandAnswer: () => void requestAnswer({ utterance: entry.text, intent: "continue", gateSeq: entry.seq }) } : {} }, entry.key);',
   '      }',
   '      if (entry.kind === "notice") {\n        return /* @__PURE__ */ jsxRuntimeExports.jsx(NoticeLine',
 ));

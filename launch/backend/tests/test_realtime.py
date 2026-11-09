@@ -397,3 +397,33 @@ async def test_obvious_question_missed_by_the_model_is_still_answered(signed_in,
     answer = fake_openai.bodies("answer")[0]
     assert "under one minute" in answer["instructions"] and answer["max_output_tokens"] == 700
     await client.close()
+
+
+async def test_expand_answer_continues_what_the_candidate_said(signed_in, fake_openai):
+    fake_openai.script_transcripts("What are the key PHY challenges in 5G NTN?")
+    _, client = await interview(signed_in)
+    await client.speak(INTERVIEWER)
+    await client.wait_type("turn.done")
+    said = "NTN needs more advanced timing advance and uplink synchronization."
+    await client.send("answer_request", utterance=said, intent="continue", gate_seq=42)
+    started = await client.wait_for(lambda f: f["type"] == "turn.started" and f["data"].get("gate_seq") == 42)
+    await client.wait_for(lambda f: f["type"] == "turn.done" and f["data"]["turn_id"] == started["data"]["turn_id"])
+    body = fake_openai.bodies("answer")[-1]
+    payload = json.loads(body["input"])
+    assert payload["candidate_said"] == said
+    assert payload["question"] == client.of("gate.verdict")[-1]["data"]["utterance"]  # the latest extracted question
+    assert "Do not repeat anything already said" in body["instructions"]
+    await client.close()
+
+
+async def test_computer_audio_copy_of_the_candidate_is_ignored(signed_in, fake_openai):
+    said = "Compared with terrestrial networks NTN requires more advanced timing advance and uplink synchronization."
+    fake_openai.script_transcripts(said, said)
+    _, client = await interview(signed_in)
+    await client.speak(CANDIDATE)
+    await client.wait_type("transcript", final=True, role="interviewee")
+    await client.speak(INTERVIEWER)
+    await asyncio.sleep(0.5)
+    assert [f for f in client.of("transcript") if f["data"]["role"] == "interviewer" and f["data"]["final"]] == []
+    assert client.of("gate.verdict") == []
+    await client.close()
