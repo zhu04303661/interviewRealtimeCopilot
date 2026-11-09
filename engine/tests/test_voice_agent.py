@@ -245,3 +245,9 @@ async def test_slow_question_extraction_does_not_delay_the_greeting(signed_in, f
     await client.wait_for(lambda f: f["type"] == "practice.plan" and f["data"]["current"] == 0, timeout=8)
     assert "How did you tune PDSCH scheduling?" in fake_openai.realtime_of("response.create")[-1]["response"]["instructions"]
     await client.close()
+
+
+def test_self_introduction_pattern():
+    from frlocal.realtime.session import SELF_INTRODUCTION
+    assert all(SELF_INTRODUCTION.search(q) for q in ("Tell me about yourself.", "Could you introduce yourself?", "请做一下自我介绍"))
+    assert not SELF_INTRODUCTION.search("Why do you want to work at AccelerComm?")

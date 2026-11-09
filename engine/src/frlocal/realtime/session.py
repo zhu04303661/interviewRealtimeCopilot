@@ -69,6 +69,8 @@ def useful_translation(translation: str, original: str) -> bool:
 # just before, marks it as the speakers' echo rather than the candidate.
 ECHO_OVERLAP = 0.7
 
+SELF_INTRODUCTION = re.compile(r"tell me about yourself|introduce yourself|walk me through your (?:background|cv|resume)|自我介绍|介绍一下(?:你)?自己", re.I)
+
 # How long the Realtime practice interviewer waits for the question plan before greeting anyway.
 PLAN_WAIT_S = 2.5
 
@@ -645,7 +647,13 @@ class InterviewSession:
             greeting += coach.first_question_line(bank[first]["question"])
         elif not ready:
             greeting = coach.introduction_greeting(goal, language)
-            self._plan_task.add_done_callback(lambda _task: self._emit_plan())
+
+            def plan_ready(_task: asyncio.Task) -> None:
+                # The greeting already asked for a self-introduction: do not ask it again.
+                self._asked.update(i for i, q in enumerate(self._bank or []) if SELF_INTRODUCTION.search(q["question"]))
+                self._emit_plan()
+
+            self._plan_task.add_done_callback(plan_ready)
         on_audio = lambda audio: self.emit("say.audio", {"audio": audio})  # noqa: E731
         if mode == "realtime":
             live = RealtimeVoiceAgent(
