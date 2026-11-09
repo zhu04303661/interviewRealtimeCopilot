@@ -11,6 +11,7 @@ const api = {
   permissions: () => ipcRenderer.invoke('permissions:status'),
   requestMicrophone: () => ipcRenderer.invoke('permissions:request-microphone'),
   openScreenSettings: () => ipcRenderer.invoke('permissions:open-screen-settings'),
+  testImportPaths: (kind: 'resume' | 'material', paths: string[]) => ipcRenderer.invoke('test:import-paths', kind, paths),
 };
 
 contextBridge.exposeInMainWorld('copilot', api);

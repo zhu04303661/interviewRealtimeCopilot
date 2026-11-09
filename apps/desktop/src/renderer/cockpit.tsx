@@ -80,6 +80,7 @@ function createVoice() {
       const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
       const samples = new Int16Array(bytes.buffer, 0, bytes.length >> 1);
       if (!samples.length) return;
+      document.body.dataset.voiceChunks = String(Number(document.body.dataset.voiceChunks ?? 0) + 1);
       const buffer = context.createBuffer(1, samples.length, 24000);
       const channel = buffer.getChannelData(0);
       for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
@@ -94,6 +95,19 @@ function createVoice() {
     },
     stop() { for (const s of playing) { try { s.stop(); } catch { /* already stopped */ } } playing.clear(); next = 0; },
   };
+}
+
+/** Automated tests: plays a WAV (base64) into a stream, once, 2 s after it is requested. */
+async function testAudioStream(base64: string): Promise<MediaStream> {
+  const context = new AudioContext();
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const buffer = await context.decodeAudioData(bytes.buffer);
+  const destination = context.createMediaStreamDestination();
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(destination);
+  source.start(context.currentTime + 2);
+  return destination.stream;
 }
 
 /** Streams a MediaStream's audio as 100 ms PCM16 frames on lane ``stream``. */
@@ -142,7 +156,9 @@ function Cockpit() {
         try {
           const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
           stops.push(await captureLane(mic, 0, send));
-          if (general) {
+          if (general && session.testSystemAudio) {
+            stops.push(await captureLane(await testAudioStream(session.testSystemAudio), 1, send));
+          } else if (general) {
             const display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
             display.getVideoTracks().forEach((t) => t.stop());
             if (!display.getAudioTracks().length) throw new Error('No system audio. Allow Screen & System Audio Recording. · 无系统声音，请授权屏幕与系统录音。');

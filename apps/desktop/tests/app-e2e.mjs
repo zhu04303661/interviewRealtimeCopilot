@@ -1,0 +1,192 @@
+// Full end-to-end check of the built desktop app against real OpenAI.
+//
+//   npm run build && node tests/app-e2e.mjs [resume] [material ...]
+//
+// Never opens the real microphone or computer audio: the microphone is
+// tests/fixtures/answer.wav (Chromium's fake device, looped) and Live-mode
+// computer audio is tests/fixtures/question.wav. Uses a temporary data folder
+// that is deleted afterwards. Each step prints what it observed; the first
+// failing step stops the run.
+import { spawn } from 'node:child_process';
+import { mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { setTimeout as pause } from 'node:timers/promises';
+
+const here = import.meta.dirname;
+const [resume, ...materials] = process.argv.slice(2);
+const port = 19671;
+const data = mkdtempSync(join(tmpdir(), 'irc-app-e2e-'));
+const logFile = join(data, 'app.log');
+const env = { ...process.env, IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'fixtures/answer.wav'),
+  IRC_TEST_SYSTEM_AUDIO: join(here, 'fixtures/question.wav') };
+delete env.ELECTRON_RUN_AS_NODE;
+const out = openSync(logFile, 'a');
+const app = spawn(join(here, '../node_modules/.bin/electron'), ['.', `--remote-debugging-port=${port}`], { cwd: join(here, '..'), env, stdio: ['ignore', out, out] });
+const t0 = Date.now();
+const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1).padStart(5)}s]`, ...a);
+const check = (condition, message) => { if (!condition) throw new Error(message); };
+
+async function find(match, timeout = 30000) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    try {
+      const page = (await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json())).find((p) => p.type === 'page' && match(p.url));
+      if (page) return connect(page.webSocketDebuggerUrl);
+    } catch { /* not listening yet */ }
+    await pause(200);
+  }
+  throw new Error('Window did not open');
+}
+
+async function connect(url) {
+  const ws = new WebSocket(url);
+  await new Promise((resolve) => { ws.onopen = resolve; });
+  let id = 0;
+  const pending = new Map();
+  ws.onmessage = ({ data: raw }) => { const m = JSON.parse(raw); pending.get(m.id)?.(m); };
+  const evaluate = async (expression) => {
+    const n = ++id;
+    const m = await new Promise((resolve) => { pending.set(n, resolve); ws.send(JSON.stringify({ id: n, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } })); });
+    if (m.result?.exceptionDetails) throw new Error(m.result.exceptionDetails.exception?.description ?? 'evaluation failed');
+    return m.result.result.value;
+  };
+  const waitFor = async (expression, timeout = 60000, what = expression) => {
+    const end = Date.now() + timeout;
+    while (Date.now() < end) {
+      const value = await evaluate(expression).catch(() => null);
+      if (value) return value;
+      await pause(300);
+    }
+    throw new Error(`Timed out waiting for ${what}`);
+  };
+  return { evaluate, waitFor, close: () => ws.close() };
+}
+
+// Cockpit helpers (evaluated in the page).
+const entries = (who) => `[...document.querySelectorAll('.entry')].filter((e) => e.querySelector('.who')?.textContent.startsWith('${who}'))`;
+const answers = `[...document.querySelectorAll('.entry.answer')]`;
+const clickButton = (selector, label) => `(() => { const b = [...${selector}].flatMap((e) => [...e.querySelectorAll('button')]).find((x) => x.textContent.includes('${label}') && !x.disabled); if (!b) return false; b.click(); return true; })()`;
+const finishedAnswers = `${answers}.filter((a) => a.innerText.includes('中文') && a.innerText.length > 60).length`;
+
+let failed = false;
+try {
+  const main = await find((u) => u.endsWith('/index.html'));
+
+  // ── account ───────────────────────────────────────────────────────────
+  await main.waitFor(`document.body.innerText.includes('Sign in')`, 30000, 'sign-in screen');
+  const auth = (path, body) => main.evaluate(`window.copilot.request('POST', '/local/auth/${path}', ${JSON.stringify({ owner: 'main', ...body })})`);
+  check((await auth('register', { username: 'tester', password: 'irc-test-password-1' })).ok, 'register failed');
+  check((await auth('register', { username: 'tester', password: 'irc-test-password-1' })).error?.includes('already'), 'duplicate username accepted');
+  await auth('sign-out', {});
+  await pause(2100); // the engine pauses briefly after a failed attempt
+  const wrong = await auth('sign-in', { username: 'tester', password: 'wrong-password-123' });
+  check(!wrong.ok && /incorrect/.test(wrong.error), 'wrong password accepted');
+  await pause(2100);
+  check((await auth('sign-in', { username: 'tester', password: 'irc-test-password-1' })).ok, 'sign-in failed');
+  await main.evaluate('location.reload()');
+  await pause(1500);
+  await main.waitFor(`document.body.innerText.includes('Knowledge sources')`, 20000, 'workspace screen');
+  log('account: register, duplicate rejected, sign out, wrong password rejected, sign in, workspace shown');
+
+  // ── goal and knowledge sources ────────────────────────────────────────
+  const goal = await main.evaluate(`window.copilot.request('POST', '/api/v3/goals', { role: 'Software Engineering Manager', company: 'AccelerComm',
+    job_description: 'Lead L1 software teams building 5G NR and NTN physical-layer IP.' })`);
+  const imported = [
+    ...(resume ? await main.evaluate(`window.copilot.testImportPaths('resume', ${JSON.stringify([resume])})`) : []),
+    ...(materials.length ? await main.evaluate(`window.copilot.testImportPaths('material', ${JSON.stringify(materials)})`) : []),
+  ];
+  const ids = imported.map((d) => d.document_id);
+  const docs = await main.waitFor(`window.copilot.request('GET', '/api/v3/documents').then((r) => r.documents.every((d) => d.status !== 'preparing') && r.documents)`, 180000, 'document preparation');
+  for (const d of docs) log(`document: ${d.filename} → ${d.status}${d.text_chars ? ` (${d.text_chars} chars)` : ''}${d.failure_reason ? ` ${d.failure_reason}` : ''}`);
+  check(docs.length === ids.length && docs.every((d) => d.status === 'ready'), 'a document did not prepare');
+  await main.evaluate('location.reload()');
+  await pause(1500);
+  check(await main.waitFor(`document.body.innerText.includes(${JSON.stringify(docs[0]?.filename ?? 'Knowledge sources')})`, 10000, 'documents listed'), 'documents not listed');
+  log('goal created; documents imported, prepared and listed');
+
+  // ── practice ──────────────────────────────────────────────────────────
+  await main.evaluate(`window.copilot.startSession({ topology: 'mock', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: ${JSON.stringify(ids)}, language: 'en-US' })`);
+  let cockpit = await find((u) => u.endsWith('/cockpit.html'));
+  const sessionStarted = Date.now();
+  const total = Number(await cockpit.waitFor(`(document.body.innerText.match(/练习题 \\d+\\/(\\d+)/) || [])[1]`, 120000, 'practice question panel'));
+  const first = await cockpit.waitFor(`${entries('Interviewer')}[0]?.querySelector('.text')?.textContent`, 60000, 'first spoken question');
+  log(`practice: first question after ${((Date.now() - sessionStarted) / 1000).toFixed(1)} s; ${total} prepared questions so far; interviewer: "${first.slice(0, 120)}"`);
+  check(Number(await cockpit.waitFor(`Number(document.body.dataset.voiceChunks ?? 0) > 3 && document.body.dataset.voiceChunks`, 20000, 'interviewer voice')) > 3, 'no voice');
+  log(`practice: interviewer voice played (${await cockpit.evaluate('document.body.dataset.voiceChunks')} audio chunks)`);
+  const practiceZh = await cockpit.waitFor(`${entries('Interviewer')}[0]?.querySelector('.zh')?.textContent`, 30000, 'translation');
+  check(/[\u4e00-\u9fff]/.test(practiceZh), `practice translation is not Chinese: ${practiceZh}`);
+  log(`practice: translation "${practiceZh.slice(0, 80)}"`);
+  const heard = await cockpit.waitFor(`${entries('You')}[0]?.querySelector('.text')?.textContent`, 60000, 'candidate answer');
+  log(`practice: candidate heard "${heard.slice(0, 100)}"`);
+  const followUp = await cockpit.waitFor(`${entries('Interviewer')}.length >= 2 && ${entries('Interviewer')}.at(-1).querySelector('.text').textContent`, 60000, 'follow-up');
+  log(`practice: follow-up "${followUp.slice(0, 120)}"`);
+  // Buttons are disabled while a hint streams; wait for each click to be possible and for its hint.
+  const answeredBefore = await cockpit.waitFor(`!document.querySelector('.feed button:disabled') && String(${finishedAnswers})`, 60000, 'idle hints');
+  check(await cockpit.evaluate(clickButton(entries('You'), 'Expand answer')), 'no Expand answer button');
+  await cockpit.waitFor(`${finishedAnswers} > ${answeredBefore} && !document.querySelector('.feed button:disabled')`, 60000, 'expand-answer hint');
+  log(`practice: Expand answer → hint "${(await cockpit.evaluate(`${answers}.at(-1).innerText`)).replace(/\n+/g, ' ').slice(0, 140)}"`);
+  const before = await cockpit.evaluate(finishedAnswers);
+  check(await cockpit.evaluate(clickButton(entries('Interviewer'), 'Suggest answer')), 'no Suggest answer button');
+  await cockpit.waitFor(`${finishedAnswers} > ${before} && !document.querySelector('.feed button:disabled')`, 60000, 'suggested answer');
+  log('practice: Suggest answer → bilingual hint');
+  const target = Math.min(5, total - 1);
+  await cockpit.evaluate(`document.querySelectorAll('.plan li button')[${target}].click()`);
+  await cockpit.waitFor(`document.querySelectorAll('.plan li button')[${target}].classList.contains('current')`, 10000, 'jump marker');
+  const title = await cockpit.evaluate(`document.querySelectorAll('.plan li button')[${target}].title`);
+  const jumped = await cockpit.waitFor(`(() => { const t = ${entries('Interviewer')}.at(-1).querySelector('.text').textContent; return /move on|next|let's/i.test(t) && t; })()`, 40000, 'jumped question');
+  log(`practice: jumped to #${target + 1} "${title.slice(0, 80)}" → interviewer "${jumped.slice(0, 120)}"`);
+  for (const mode of ['random', 'ai', 'sequential']) {
+    await cockpit.evaluate(`[...document.querySelectorAll('.plan button')].find((b) => b.textContent.toLowerCase().startsWith(${JSON.stringify(mode === 'sequential' ? 'order' : mode)}))?.click()`);
+    await cockpit.waitFor(`[...document.querySelectorAll('.plan button.active')].some((b) => b.textContent.toLowerCase().startsWith(${JSON.stringify(mode === 'sequential' ? 'order' : mode)}))`, 10000, `${mode} mode`);
+  }
+  log('practice: random, AI and order modes switch');
+  check(!/Disconnected|断开/.test(await cockpit.evaluate(`document.querySelector('.status')?.textContent ?? ''`)), 'practice disconnected');
+  await main.evaluate('window.copilot.endSession()');
+  cockpit.close();
+  log('practice: ended');
+
+  // ── Live ──────────────────────────────────────────────────────────────
+  await pause(1000);
+  await main.evaluate(`window.copilot.startSession({ topology: 'general', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: ${JSON.stringify(ids)}, language: 'en-US' })`);
+  cockpit = await find((u) => u.endsWith('/cockpit.html'));
+  const said = await cockpit.waitFor(`${entries('Interviewer')}[0]?.querySelector('.text')?.textContent`, 60000, 'interviewer transcript');
+  log(`live: interviewer transcript "${said}"`);
+  const question = await cockpit.waitFor(`document.querySelector('.entry.question .text')?.textContent`, 30000, 'question card');
+  log(`live: question card "${question}"`);
+  await cockpit.waitFor(`${finishedAnswers} >= 1`, 60000, 'automatic hint');
+  log(`live: automatic hint "${(await cockpit.evaluate(`${answers}[0].innerText`)).replace(/\n+/g, ' ').slice(0, 160)}"`);
+  const liveZh = await cockpit.waitFor(`${entries('Interviewer')}[0]?.querySelector('.zh')?.textContent`, 30000, 'live translation');
+  check(/[\u4e00-\u9fff]/.test(liveZh), `live translation is not Chinese: ${liveZh}`);
+  log(`live: translation "${liveZh.slice(0, 80)}"`);
+  const mine = await cockpit.waitFor(`${entries('You')}[0]?.querySelector('.text')?.textContent`, 60000, 'candidate line');
+  log(`live: candidate line "${mine.slice(0, 100)}"`);
+  check(await cockpit.evaluate(`${entries('Interviewer')}.every((e) => e.querySelector('.text').textContent !== ${JSON.stringify(mine)})`), 'candidate echoed as interviewer');
+  check(!/Disconnected|断开/.test(await cockpit.evaluate(`document.querySelector('.status')?.textContent ?? ''`)), 'live disconnected');
+  await main.evaluate('window.copilot.endSession()');
+  cockpit.close();
+  log('live: ended');
+
+  // ── history and Debrief ───────────────────────────────────────────────
+  await main.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.startsWith('History'))?.click()`);
+  const sessions = await main.waitFor(`window.copilot.request('GET', '/api/v3/sessions').then((r) => r.sessions.length === 2 && r.sessions.every((s) => s.status !== 'preparing') && r.sessions)`, 180000, 'reports');
+  for (const s of sessions) log(`history: ${s.topology} → ${s.status}${s.headline ? ` "${s.headline}"` : ''}${s.failure_reason ? ` (${s.failure_reason})` : ''}`);
+  check(sessions.every((s) => s.status === 'ready'), 'a Debrief was not generated');
+  await main.evaluate(`window.location.reload()`);
+  await pause(1500);
+  await main.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.startsWith('History'))?.click()`);
+  await main.waitFor(`document.querySelectorAll('.list li').length === 2`, 10000, 'history list');
+  await main.evaluate(`document.querySelector('.list li').click()`);
+  log(`history: report shown "${(await main.waitFor(`(() => { const t = document.querySelectorAll('.card')[1].innerText; return t.includes('Strengths') && t; })()`, 10000, 'report view')).replace(/\n+/g, ' ').slice(0, 160)}"`);
+  log('PASS');
+} catch (error) {
+  failed = true;
+  log('FAIL', error.message);
+} finally {
+  app.kill('SIGTERM');
+  await pause(2000);
+  console.log('--- app log (filtered) ---');
+  console.log(readFileSync(logFile, 'utf8').split('\n').filter((l) => l.trim() && !/_TIProperty|imkxpc|aiohttp\.access|TSM Adjust|DevTools listening/.test(l)).slice(-25).join('\n'));
+  rmSync(data, { recursive: true, force: true });
+  process.exit(failed ? 1 : 0);
+}

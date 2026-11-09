@@ -10,8 +10,9 @@
 ## Commands
 - Engine tests: `cd engine && uv run pytest -q` (fake OpenAI, no network); lint: `uvx ruff check src tests`.
 - Desktop: `cd apps/desktop && npm run typecheck && npm run build`; run: `npx electron .` (unset `ELECTRON_RUN_AS_NODE`).
-- Desktop e2e (real OpenAI from `~/.env`, never the real microphone):
-  `IRC_FAKE_AUDIO=$PWD/tests/fixtures/answer.wav node tests/practice-e2e.mjs` (or without the variable: media denied).
+- Desktop e2e (real OpenAI from `~/.env`, never the real microphone; fixtures replace mic and computer audio):
+  `node tests/app-e2e.mjs <resume> <material…>` — account, goal, documents, practice, Live, history/Debrief.
+  `node tests/practice-e2e.mjs` is the quick practice-only check (media denied).
 - Electron binary download: GitHub may time out via the proxy; `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node node_modules/electron/install.js`.
 
 ## Gotchas

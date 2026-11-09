@@ -4,6 +4,7 @@
 // cockpit window shown during an interview. Renderers reach the engine only
 // through the narrow IPC surface in ../preload/preload.ts.
 import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, systemPreferences } from 'electron';
+import { readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { Engine } from './engine';
 
@@ -69,6 +70,11 @@ function registerIpc(): void {
     }
     return imported;
   });
+  // Automated tests only (IRC_E2E=1): import files without the file dialog.
+  ipcMain.handle('test:import-paths', async (_event, kind: 'resume' | 'material', paths: string[]) => {
+    if (process.env.IRC_E2E !== '1') throw new Error('Unavailable.');
+    return Promise.all(paths.map((filePath) => engine.request('POST', '/local/documents/import', { kind, filePath, filename: basename(filePath) })));
+  });
   ipcMain.handle('session:start', async (_event, request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string }) => {
     const started = await engine.request('POST', '/api/v3/sessions', {
       topology: request.topology, goal_id: request.goalId, config: { language: request.language, document_ids: request.documentIds },
@@ -83,7 +89,10 @@ function registerIpc(): void {
     const url = new URL(current.wsUrl, await engine.baseUrl());
     url.protocol = 'ws:';
     url.searchParams.set('token', engine.token);
-    return { ...current, wsUrl: url.toString(), jwt: signedIn?.value?.token ?? '' };
+    // Automated tests: a WAV file replaces the computer-audio capture in Live mode.
+    const testAudio = process.env.IRC_E2E === '1' && process.env.IRC_TEST_SYSTEM_AUDIO;
+    const testSystemAudio = testAudio ? readFileSync(testAudio).toString('base64') : undefined;
+    return { ...current, wsUrl: url.toString(), jwt: signedIn?.value?.token ?? '', testSystemAudio };
   });
   ipcMain.handle('session:end', async () => {
     if (current) await engine.request('POST', `/api/v3/sessions/${current.sessionId}/end`, {}).catch(() => undefined);

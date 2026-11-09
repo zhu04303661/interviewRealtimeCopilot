@@ -50,7 +50,59 @@ function SignIn({ onSignedIn }: { onSignedIn: (name: string) => void }) {
   );
 }
 
+type SessionRow = { session_id: string; role: string; company: string; topology: string; created_at: string; duration_seconds: number | null;
+  status: string; headline?: string; failure_reason?: string | null };
+
+/** Past sessions and their Debriefs (generated after each session ends). */
+function History() {
+  const [rows, setRows] = useState<SessionRow[]>([]);
+  const [open, setOpen] = useState<{ id: string; report: any } | null>(null);
+  const load = useCallback(async () => setRows((await window.copilot.request('GET', '/api/v3/sessions')).sessions), []);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {  // reports are prepared in the background
+    if (!rows.some((r) => r.status === 'preparing')) return;
+    const timer = setTimeout(() => void load(), 2000);
+    return () => clearTimeout(timer);
+  }, [rows, load]);
+  const show = async (id: string) => setOpen({ id, report: (await window.copilot.request('GET', `/api/v3/sessions/${id}/report`)).report });
+  const r = open?.report;
+  return (
+    <div className="grid">
+      <div className="card">
+        <h2>Sessions · 历史会话</h2>
+        {rows.length === 0 && <p className="muted">No sessions yet. · 还没有会话。</p>}
+        <ul className="list">
+          {rows.map((row) => (
+            <li key={row.session_id} className="row" style={{ cursor: 'pointer' }} onClick={() => show(row.session_id)}>
+              <span style={{ flex: 1 }}>{row.role} · {row.company}<br /><span className="muted small">{new Date(row.created_at).toLocaleString()} · {row.topology === 'mock' ? 'Practice · 练习' : 'Live · 实时'}{row.duration_seconds != null ? ` · ${Math.round(row.duration_seconds / 60)} min` : ''}</span></span>
+              <span className="badge">{row.status === 'ready' ? 'Report · 报告' : row.status === 'preparing' ? 'Preparing · 生成中' : row.failure_reason === 'no_content' ? 'No answers · 无回答' : 'No report · 无报告'}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="card">
+        <h2>Debrief · 面试复盘</h2>
+        {!open && <p className="muted">Choose a session. · 选择一个会话。</p>}
+        {open && !r && <p className="muted">No report for this session. · 这个会话没有报告。</p>}
+        {r && (
+          <div>
+            <p><strong>{r.overall?.headline}</strong></p>
+            <p>{r.overall?.summary}</p>
+            {r.strengths?.length > 0 && <><h2>Strengths · 优势</h2><ul>{r.strengths.map((x: any, i: number) => <li key={i}><strong>{x.label}</strong> — {x.evidence}</li>)}</ul></>}
+            {r.improvements?.length > 0 && <><h2>To improve · 待改进</h2><ul>{r.improvements.map((x: any, i: number) => <li key={i}><strong>{x.label}</strong> — {x.evidence}<br /><span className="muted small">{x.practice_action}</span></li>)}</ul></>}
+            {r.questions?.length > 0 && <><h2>Questions · 逐题点评</h2>{r.questions.map((q: any, i: number) => (
+              <div key={i} style={{ marginBottom: 10 }}><span className="badge">{q.quality}</span> {q.answer_summary}<br /><span className="muted small">{q.feedback}</span>
+                {q.stronger_version && <p className="small">Stronger · 更好的回答: {q.stronger_version}</p>}</div>))}</>}
+            {r.action_plan?.length > 0 && <><h2>Action plan · 行动计划</h2><ul>{r.action_plan.map((x: any, i: number) => <li key={i}><strong>{x.title}</strong> — {x.how}</li>)}</ul></>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Workspace({ username, onSignOut }: { username: string; onSignOut: () => void }) {
+  const [tab, setTab] = useState<'prepare' | 'history'>('prepare');
   const [goals, setGoals] = useState<Goal[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [goalId, setGoalId] = useState('');
@@ -104,8 +156,13 @@ function Workspace({ username, onSignOut }: { username: string; onSignOut: () =>
     <div className="page">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h1>Interview Realtime Copilot</h1>
-        <div className="row"><span className="muted">{username}</span><button className="ghost" onClick={onSignOut}>Sign out · 退出</button></div>
+        <div className="row">
+          <button className={`ghost ${tab === 'prepare' ? 'active' : ''}`} onClick={() => setTab('prepare')}>Prepare · 准备</button>
+          <button className={`ghost ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History · 历史</button>
+          <span className="muted">{username}</span><button className="ghost" onClick={onSignOut}>Sign out · 退出</button>
+        </div>
       </div>
+      {tab === 'history' ? <History /> : <>
       <div className="grid">
         <div className="card">
           <h2>Goal · 目标</h2>
@@ -156,6 +213,7 @@ function Workspace({ username, onSignOut }: { username: string; onSignOut: () =>
         </p>
         {error && <p className="error">{error}</p>}
       </div>
+      </>}
     </div>
   );
 }

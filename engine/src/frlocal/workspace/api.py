@@ -159,6 +159,11 @@ class WorkspaceApi:
             return await self.document(workspace, request, rest)
         if root == "v3" and resource == "playbooks":
             return await self.playbook(workspace, request, rest)
+        if root == "v3" and resource == "sessions" and not rest and method == "GET":
+            # History: every session, newest first, with its Debrief status (no report bodies).
+            rows = [{k: v for k, v in self._report(workspace.username, state, session).items() if k != "report"}
+                    for session in state["sessions"].values()]
+            return raw({"sessions": sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True)})
         if root == "v3" and resource == "sessions":
             return await self.session(workspace, request, rest)
         if root == "v3" and resource == "voice-sample":

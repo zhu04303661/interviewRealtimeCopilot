@@ -187,7 +187,7 @@ def test_every_prepared_question_is_read_in_parts_without_a_cap():
     from frlocal.realtime import coach
     document = "\n\n".join(f"## Q{i}. How does feature {i} work?\nPrepared answer {i}. " + "detail " * 300 for i in range(60))
     parts = coach.question_chunks(document, size=24_000)
-    assert len(parts) > 3 and all(len(p) <= 24_000 for p in parts)
+    assert len(parts) > 3 and len(parts[0]) <= 6_000 and all(len(p) <= 24_000 for p in parts)
     assert "".join(parts).count("How does feature") == 60          # nothing dropped at part boundaries
     many = json.dumps({"questions": [{"topic": "t", "question": f"Question {i}?", "prepared_answer": "a"} for i in range(40)]})
     assert len(coach.parse_question_bank(many)) == 40               # no 15-question cap
@@ -220,3 +220,28 @@ def test_parallel_chinese_titles_are_not_spoken():
     assert spoken_question("Dealing with an under-performer / 如何处理绩效差的工程师") == "Dealing with an under-performer"
     assert spoken_question("请介绍一下你自己 / Tell me about yourself") == "请介绍一下你自己 / Tell me about yourself"
     assert spoken_question("TDD / FDD trade-offs?") == "TDD / FDD trade-offs?"
+
+
+def test_translations_must_be_in_the_other_language():
+    from frlocal.realtime.session import useful_translation
+    question = "How did CFO estimation work, and what are its limits?"
+    assert not useful_translation("CFO estimation worked how, and what were its limits?", question)  # reworded English
+    assert useful_translation("CFO 估计是如何工作的？它有哪些局限？", question)
+    assert useful_translation("How does the scheduler work?", "调度器是如何工作的？")
+    assert not useful_translation("调度器怎么工作？", "调度器是如何工作的？")
+
+
+async def test_slow_question_extraction_does_not_delay_the_greeting(signed_in, fake_openai, tmp_path):
+    fake_openai.topics_delay = 4.0  # first-time extraction of a large document
+    _, client = await practice(signed_in, tmp_path, documents=False)
+    await client.wait_type("say", timeout=4)  # greeted before the plan exists
+    greeting = fake_openai.realtime_of("response.create")[0]["response"]["instructions"]
+    assert "introduce themselves" in greeting
+    plan = await client.wait_for(lambda f: f["type"] == "practice.plan" and f["data"]["questions"], timeout=6)
+    assert all(f["data"]["questions"] for f in client.of("practice.plan"))  # no empty plan first
+    assert plan["data"]["asked"] == [] and len(plan["data"]["questions"]) == 2
+    await asyncio.sleep(0.5)
+    await speak_for(client, 0.5)  # the self-introduction
+    await client.wait_for(lambda f: f["type"] == "practice.plan" and f["data"]["current"] == 0, timeout=8)
+    assert "How did you tune PDSCH scheduling?" in fake_openai.realtime_of("response.create")[-1]["response"]["instructions"]
+    await client.close()
