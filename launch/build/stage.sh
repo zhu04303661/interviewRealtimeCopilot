@@ -14,7 +14,9 @@ report="$here/../reports/repack.json"
 contents="$bundle/Contents"
 cp "$archive" "$contents/Resources/app.asar.new"
 mv "$contents/Resources/app.asar.new" "$contents/Resources/app.asar"
-plutil -replace 'ElectronAsarIntegrity.Resources/app\.asar.hash' -string "$(jq -r .headerSha256 "$report")" "$contents/Info.plist"
+hash=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["headerSha256"])' "$report")
+[ -n "$hash" ] || { echo "No headerSha256 in $report; run build.sh first." >&2; exit 1; }
+plutil -replace 'ElectronAsarIntegrity.Resources/app\.asar.hash' -string "$hash" "$contents/Info.plist"
 # Sign with the local certificate when it exists: macOS then ties permissions
 # (microphone, screen and system audio recording) to the certificate instead
 # of the build's hash, so they survive rebuilds. Otherwise sign ad hoc.
@@ -26,4 +28,4 @@ else
   codesign --force --deep --sign - "$bundle" 2>&1 | tail -1
 fi
 codesign --verify --deep --strict "$bundle"
-echo "Staged $(jq -r .headerSha256 "$report") into $bundle"
+echo "Staged $hash into $bundle"
