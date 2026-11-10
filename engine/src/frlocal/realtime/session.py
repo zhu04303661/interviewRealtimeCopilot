@@ -165,7 +165,9 @@ class InterviewSession:
         self._bank_index = 0          # the prepared question being discussed
         self._follow_up_next = False  # the next interviewer turn is this question's one follow-up
         self._asked: set[int] = set()  # prepared questions already asked
-        self._practice_mode = "sequential"  # sequential | random | ai (improvised, never repeating)
+        # sequential | random | ai (improvised, never repeating); Preflight may choose the starting mode.
+        mode = self.config.get("practice_mode")
+        self._practice_mode = mode if mode in ("sequential", "random", "ai") else "sequential"
         self._reply_timer: asyncio.TimerHandle | None = None
         self._plan_task: asyncio.Task | None = None
 

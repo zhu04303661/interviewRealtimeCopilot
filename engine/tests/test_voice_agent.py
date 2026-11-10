@@ -252,3 +252,12 @@ def test_self_introduction_pattern():
     assert all(SELF_INTRODUCTION.search(q) for q in ("Tell me about yourself.", "Could you introduce yourself?", "请做一下自我介绍",
                                                       "Can you walk me through your one-line career story?"))
     assert not SELF_INTRODUCTION.search("Why do you want to work at AccelerComm?")
+
+
+async def test_preflight_chooses_the_starting_practice_mode(signed_in, fake_openai):
+    from .conftest import connect, start_interview
+    session_id, ws_url = await start_interview(signed_in, topology="mock", config={"language": "en-US", "practice_mode": "ai"})
+    client = await connect(signed_in, session_id, ws_url, topology="mock")
+    plan = await client.wait_type("practice.plan", timeout=8)
+    assert plan["data"]["mode"] == "ai"
+    await client.close()

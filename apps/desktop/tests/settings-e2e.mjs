@@ -175,8 +175,32 @@ try {
   // Cockpit applies the device appearance live.
   await main.evaluate(`window.copilot.setSettings({ opacity: 0.85, background: '#101820' })`);
   const goal = await main.evaluate(`window.copilot.request('POST', '/api/v3/goals', { role: 'Engineer', company: 'Example' })`);
-  await main.evaluate(`window.copilot.startSession({ topology: 'mock', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: [], language: 'en-US' })`);
+  // Preflight: opened from the goal page, choices apply to this session only.
+  await main.evaluate('location.reload()');
+  await main.waitFor(`document.querySelectorAll('.side-goal').length > 0`, 15000, 'goal in sidebar');
+  await main.evaluate(`document.querySelector('.side-goal').click()`);
+  await main.waitFor(`document.body.innerText.includes('Goal context')`, 10000, 'goal page');
+  check(await main.evaluate(clickText('Practice · 练习')), 'no Practice button');
+  await main.waitFor(`!!document.querySelector('.preflight')`, 5000, 'preflight');
+  const sections = await main.evaluate(`[...document.querySelectorAll('.preflight .setting-group')].map((h) => h.textContent.split(' · ')[0]).join(', ')`);
+  check(sections === 'Practice scenario, Knowledge sources, Answers, Audio check', `practice preflight sections: ${sections}`);
+  await main.evaluate(clickText('Live interview', "document.querySelector('.preflight')"));
+  await pause(200);
+  const liveSections = await main.evaluate(`[...document.querySelectorAll('.preflight .setting-group')].map((h) => h.textContent.split(' · ')[0]).join(', ')`);
+  check(liveSections === 'Interview setup, Knowledge sources, Answers, Audio check', `live preflight sections: ${liveSections}`);
+  check(await main.evaluate(`document.querySelector('.preflight').innerText.includes('Computer audio')`), 'no computer-audio check');
+  await shot(main, 's8-preflight-live');
+  await main.evaluate(clickText('Practice', "document.querySelector('.preflight .segmented')"));
+  await main.evaluate(clickText('AI improvises'));
+  await pause(200);
+  await shot(main, 's8-preflight-practice');
+  await main.waitFor(`![...document.querySelectorAll('.preflight button')].find((b) => b.textContent.startsWith('Start practice')).disabled`, 5000, 'start enabled');
+  await main.evaluate(clickText('Start practice session'));
   const cockpit = await find((u) => u.endsWith('/cockpit.html'));
+  const mode = await cockpit.waitFor(`document.querySelector('.c-modes button.active')?.textContent`, 30000, 'practice plan');
+  check(mode.startsWith('AI'), `practice did not start in the chosen mode: ${mode}`);
+  check(!(await main.evaluate(`!!document.querySelector('.preflight')`)), 'preflight stayed open');
+  log(`Preflight: practice sections [${sections}], live sections [${liveSections}], started in "${mode}" mode`);
   const bg = await cockpit.waitFor(`(() => { const c = document.querySelector('.cockpit'); return c && getComputedStyle(c).backgroundColor !== 'rgba(12, 13, 16, 0.8)' && getComputedStyle(c).backgroundColor; })()`, 10000, 'cockpit appearance');
   check(bg === 'rgba(16, 24, 32, 0.85)', `cockpit background ${bg}`);
   await main.evaluate(`window.copilot.setSettings({ opacity: 0.75 })`);

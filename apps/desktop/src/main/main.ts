@@ -165,10 +165,13 @@ function registerIpc(): void {
     if (process.env.IRC_E2E !== '1') throw new Error('Unavailable.');
     return Promise.all(paths.map((filePath) => engine.request('POST', '/local/documents/import', { kind, filePath, filename: basename(filePath) })));
   });
-  ipcMain.handle('session:start', async (_event, request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string }) => {
-    const started = await engine.request('POST', '/api/v3/sessions', {
-      topology: request.topology, goal_id: request.goalId, config: { language: request.language, document_ids: request.documentIds },
-    }) as { session_id: string; ws_url: string };
+  ipcMain.handle('session:start', async (_event, request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string;
+    codingLanguage?: string | null; playbookId?: string | null; practiceMode?: string }) => {
+    const config: Record<string, unknown> = { language: request.language, document_ids: request.documentIds };
+    if (request.codingLanguage) config.coding_language = request.codingLanguage;
+    if (request.playbookId) config.playbook_id = request.playbookId;
+    if (request.practiceMode) config.practice_mode = request.practiceMode;
+    const started = await engine.request('POST', '/api/v3/sessions', { topology: request.topology, goal_id: request.goalId, config }) as { session_id: string; ws_url: string };
     current = { sessionId: started.session_id, wsUrl: started.ws_url, topology: request.topology };
     openCockpit();
     return current;
@@ -195,7 +198,8 @@ function registerIpc(): void {
   ipcMain.handle('settings:defaults', () => DEFAULTS);
   ipcMain.handle('settings:set', (_event, patch: unknown) => { const value = settings.update(patch); applySettings(value); return value; });
   ipcMain.handle('screen:solve', (_event, origin: 'manual' | 'automatic') => solveScreen(origin === 'automatic' ? 'automatic' : 'manual'));
-  ipcMain.handle('app:info', () => ({ version: app.getVersion(), electron: process.versions.electron, platform: process.platform }));
+  ipcMain.handle('app:info', () => ({ version: app.getVersion(), electron: process.versions.electron, platform: process.platform,
+    systemAudio: process.platform === 'darwin' ? existsSync(systemAudioHelper) : process.platform === 'win32' }));
   ipcMain.handle('permissions:status', () => ({
     microphone: systemPreferences.getMediaAccessStatus('microphone'),
     screen: process.platform === 'darwin' ? systemPreferences.getMediaAccessStatus('screen') : 'granted',

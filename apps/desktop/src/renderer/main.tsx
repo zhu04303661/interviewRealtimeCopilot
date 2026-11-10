@@ -523,6 +523,147 @@ function SettingsPage({ username, role, signOut }: { username: string; role: str
   );
 }
 
+// ── preflight ─────────────────────────────────────────────────────────────
+const LANGUAGES: [string, string][] = [['en-US', 'English'], ['zh-CN', '中文（普通话）'], ['ja-JP', '日本語'], ['ko-KR', '한국어'], ['de-DE', 'Deutsch'], ['fr-FR', 'Français'], ['es-ES', 'Español']];
+const CODING = ['Python', 'C++', 'C', 'Java', 'JavaScript', 'TypeScript', 'Go', 'Rust', 'MATLAB'];
+
+/** Microphone level test, only while the user asks for it. */
+function MicTest() {
+  const [level, setLevel] = useState<number | null>(null);
+  const [error, setError] = useState('');
+  const stop = useMemo(() => ({ current: () => {} }), []);
+  useEffect(() => () => stop.current(), [stop]);
+  const start = async () => {
+    setError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const context = new AudioContext();
+      const analyser = context.createAnalyser();
+      context.createMediaStreamSource(stream).connect(analyser);
+      const data = new Uint8Array(analyser.fftSize);
+      let frame = 0;
+      const tick = () => { analyser.getByteTimeDomainData(data); let peak = 0; for (const v of data) peak = Math.max(peak, Math.abs(v - 128)); setLevel(Math.min(1, peak / 64)); frame = requestAnimationFrame(tick); };
+      tick();
+      stop.current = () => { cancelAnimationFrame(frame); stream.getTracks().forEach((t) => t.stop()); void context.close(); setLevel(null); };
+    } catch (e) { setError((e as Error).message); }
+  };
+  return (
+    <span className="row" style={{ gap: 8 }}>
+      {level === null ? <button className="btn sm" onClick={start}>Test microphone · 测试麦克风</button>
+        : <><span className="level"><span style={{ width: `${Math.round(level * 100)}%` }} /></span><button className="btn ghost sm" onClick={() => stop.current()}>Stop · 停止</button></>}
+      {error && <span className="error">{error}</span>}
+    </span>
+  );
+}
+
+function Preflight({ goal, docs, initial, onClose, onStarted }: { goal: Goal; docs: Doc[]; initial: 'general' | 'mock'; onClose: () => void; onStarted: () => void }) {
+  const [topology, setTopology] = useState(initial);
+  const [setup, setSetup] = useState<'computer' | 'room'>('computer');
+  const [practiceMode, setPracticeMode] = useState('sequential');
+  const [chosen, setChosen] = useState(() => chosenSources(goal.goal_id, docs));
+  const [prefs, setPrefs] = useState<Record<string, any> | null>(null);
+  const [language, setLanguage] = useState('');
+  const [coding, setCoding] = useState('');
+  const [playbook, setPlaybook] = useState('');
+  const [playbooks, setPlaybooks] = useState<{ playbook_id: string; name: string }[]>([]);
+  const [permissions, setPermissions] = useState({ microphone: '', screen: '' });
+  const [systemAudio, setSystemAudio] = useState(true);
+  const [error, setError] = useState('');
+  const [starting, setStarting] = useState(false);
+  useEffect(() => {
+    void window.copilot.request('GET', '/api/v3/me/prefs').then(setPrefs);
+    void window.copilot.request('GET', '/api/v3/playbooks').then((r) => setPlaybooks(r.playbooks ?? []));
+    void window.copilot.permissions().then(setPermissions);
+    void window.copilot.appInfo().then((i) => setSystemAudio(i.systemAudio));
+  }, []);
+  const ready = docs.filter((d) => d.status === 'ready');
+  const toggle = (id: string) => setChosen((c) => c.includes(id) ? c.filter((x) => x !== id) : [...c, id]);
+  const defaultLanguage = prefs?.default_language || (navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US');
+  const micOk = permissions.microphone === 'granted';
+  const live = topology === 'general';
+  const blocked = !micOk ? 'Microphone access is required for this session. · 本次会话需要麦克风权限。'
+    : live && !systemAudio ? 'Computer audio capture is not available on this computer. · 本机无法采集电脑声音。' : '';
+  const start = async () => {
+    setError('');
+    setStarting(true);
+    localStorage.setItem(sourcesKey(goal.goal_id), JSON.stringify(chosen));
+    try {
+      await window.copilot.startSession({ topology, goalId: goal.goal_id, documentIds: chosen, language: language || defaultLanguage,
+        codingLanguage: coding || prefs?.default_coding_language || null, playbookId: playbook || prefs?.default_playbook_id || null,
+        ...(topology === 'mock' ? { practiceMode } : {}) });
+      onStarted();
+    } catch (e) { setError((e as Error).message); setStarting(false); }
+  };
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal preflight" onClick={(e) => e.stopPropagation()}>
+        <div className="eyebrow">Preflight · 开始前检查</div>
+        <h2 style={{ margin: '8px 0 4px' }}>{goal.company} · {goal.role}</h2>
+        <p className="muted small" style={{ marginTop: 0 }}>These choices apply to this session only; your goal and defaults stay as they are. · 只影响本次会话，不改目标和默认设置。</p>
+        <div className="segmented" style={{ margin: '6px 0 4px' }}>
+          <button className={live ? 'active' : ''} onClick={() => setTopology('general')}>Live interview · 实时面试</button>
+          <button className={!live ? 'active' : ''} onClick={() => setTopology('mock')}>Practice · 语音练习</button>
+        </div>
+
+        {live ? <>
+          <h4 className="setting-group">Interview setup · 面试方式</h4>
+          <div className="choice-grid">
+            <button className={`choice ${setup === 'computer' ? 'active' : ''}`} onClick={() => setSetup('computer')}>
+              <Monitor size={18} /><b>This computer · 本机通话</b><span>Zoom, Teams, Meet… Captures your microphone and the meeting audio. · 采集你的麦克风和会议声音。</span></button>
+            <button className="choice" disabled title="Coming soon · 即将支持">
+              <Mic size={18} /><b>Phone or in person · 电话或面对面</b><span>Needs voice separation in one microphone; coming soon. · 需要在同一个麦克风里区分说话人，即将支持。</span></button>
+          </div>
+        </> : <>
+          <h4 className="setting-group">Practice scenario · 练习方式</h4>
+          <div className="segmented">
+            {[['sequential', 'Prepared, in order · 顺序'], ['random', 'Prepared, random · 随机'], ['ai', 'AI improvises · AI 临场']].map(([m, label]) => (
+              <button key={m} className={practiceMode === m ? 'active' : ''} onClick={() => setPracticeMode(m)}>{label}</button>))}
+          </div>
+          <p className="faint small">The interviewer speaks; answer out loud. You can switch questions in the cockpit. · 面试官用语音提问，你口头回答；面试中可在题目栏切换。</p>
+        </>}
+
+        <h4 className="setting-group">Knowledge sources · 知识来源</h4>
+        {ready.length === 0 ? <p className="muted small">No prepared documents. Add a resume or materials in the Library. · 资料库里还没有可用资料。</p>
+          : <div className="sources">{ready.map((d) => (
+            <label key={d.document_id} className="check-row"><input type="checkbox" checked={chosen.includes(d.document_id)} onChange={() => toggle(d.document_id)} />
+              <FileText size={15} className="faint" /><span className="spacer">{d.filename}</span><span className="badge">{d.kind === 'resume' ? 'Resume' : 'Material'}</span></label>))}</div>}
+
+        <h4 className="setting-group">Answers · 回答</h4>
+        <div className="grid3">
+          <label className="field"><span>Language · 语言</span>
+            <select className="select" value={language} onChange={(e) => setLanguage(e.target.value)}>
+              <option value="">Account default · 默认（{LANGUAGES.find(([c]) => c === defaultLanguage)?.[1] ?? defaultLanguage}）</option>
+              {LANGUAGES.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select></label>
+          <label className="field"><span>Coding language · 编程语言</span>
+            <select className="select" value={coding} onChange={(e) => setCoding(e.target.value)}>
+              <option value="">Account default · 默认{prefs?.default_coding_language ? `（${prefs.default_coding_language}）` : ''}</option>
+              {CODING.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <label className="field"><span>Playbook · 回答风格</span>
+            <select className="select" value={playbook} onChange={(e) => setPlaybook(e.target.value)}>
+              <option value="">Account default · 默认</option>{playbooks.map((p) => <option key={p.playbook_id} value={p.playbook_id}>{p.name}</option>)}</select></label>
+        </div>
+
+        <h4 className="setting-group">Audio check · 音频检查</h4>
+        <div className="setting"><div className="icon-tile"><Mic /></div><div className="what"><b>Microphone · 麦克风</b>
+          <span>{micOk ? 'Hears your answers. · 用于识别你的回答。' : 'Grant microphone access to continue. · 请先授权麦克风。'}</span></div>
+          {micOk ? <MicTest /> : <button className="btn sm" onClick={() => window.copilot.requestMicrophone().then(() => window.copilot.permissions().then(setPermissions))}>Grant microphone access · 授权</button>}</div>
+        {live && <div className="setting"><div className="icon-tile"><Monitor /></div><div className="what"><b>Computer audio · 电脑声音</b>
+          <span>{systemAudio ? 'Hears the interviewer from the meeting app. macOS asks once for System Audio Recording when the session starts. · 用于听到会议里的面试官，首次开始时 macOS 会询问一次。'
+            : 'Not available on this computer. · 本机不支持。'}</span></div>
+          {systemAudio ? <span className="badge good">Ready · 就绪</span> : <span className="badge bad">Unavailable</span>}</div>}
+        <p className="faint small">Microphone and meeting audio start after you press Start. · 按下开始后才开始采集声音。</p>
+
+        {(error || blocked) && <p className="error">{error || blocked}</p>}
+        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+          <button className="btn ghost" onClick={onClose}>Cancel · 取消</button>
+          <button className="btn primary" disabled={!!blocked || starting || !prefs} onClick={start}>
+            {starting ? 'Starting… · 正在开始…' : live ? 'Start session · 开始面试' : 'Start practice session · 开始练习'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── shell ─────────────────────────────────────────────────────────────────
 function Shell({ username, role, signOut }: { username: string; role: string; signOut: () => void }) {
   const [route, setRoute] = useState<Route>({ page: 'goals' });
@@ -547,17 +688,11 @@ function Shell({ username, role, signOut }: { username: string; role: string; si
 
   const goal = route.page === 'goal' ? goals.find((g) => g.goal_id === route.goalId) : undefined;
   const liveGoal = goal ?? goals[0];
-  const start = async (topology: 'general' | 'mock', target = liveGoal) => {
+  const [preflight, setPreflight] = useState<{ goal: Goal; topology: 'general' | 'mock' } | null>(null);
+  const start = (topology: 'general' | 'mock', target = liveGoal) => {
     setError('');
     if (!target) return setCreating(true);
-    if ((await window.copilot.permissions()).microphone !== 'granted' && !(await window.copilot.requestMicrophone())) {
-      return setError('Microphone access is required. · 需要麦克风权限。');
-    }
-    try {
-      const prefs = await window.copilot.request('GET', '/api/v3/me/prefs');
-      const language = prefs.default_language || (navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US');
-      await window.copilot.startSession({ topology, goalId: target.goal_id, documentIds: chosenSources(target.goal_id, docs), language });
-    } catch (e) { setError((e as Error).message); }
+    setPreflight({ goal: target, topology });
   };
   const title = { goals: 'Goals · 目标', goal: goal ? `${goal.company} · ${goal.role}` : 'Goal', library: 'Library · 资料库', history: 'History · 历史', settings: 'Settings · 设置' }[route.page];
   const nav = useMemo(() => [
@@ -601,6 +736,8 @@ function Shell({ username, role, signOut }: { username: string; role: string; si
           {route.page === 'settings' && <SettingsPage username={username} role={role} signOut={signOut} />}
         </div>
       </main>
+      {preflight && <Preflight goal={preflight.goal} docs={docs} initial={preflight.topology} onClose={() => setPreflight(null)}
+        onStarted={() => { setPreflight(null); void refresh(); }} />}
       {creating && <NewGoal onClose={() => setCreating(false)} onCreated={(g) => { setCreating(false); void refresh(); setRoute({ page: 'goal', goalId: g.goal_id }); }} />}
     </div>
   );

@@ -4,7 +4,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 const api = {
   request: (method: string, path: string, body?: unknown) => ipcRenderer.invoke('engine:request', method, path, body),
   importDocuments: (kind: 'resume' | 'material') => ipcRenderer.invoke('documents:pick-and-import', kind),
-  startSession: (request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string }) =>
+  startSession: (request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string;
+    codingLanguage?: string | null; playbookId?: string | null; practiceMode?: string }) =>
     ipcRenderer.invoke('session:start', request),
   currentSession: () => ipcRenderer.invoke('session:current'),
   endSession: () => ipcRenderer.invoke('session:end'),

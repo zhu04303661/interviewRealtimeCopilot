@@ -6,7 +6,8 @@ interface Window {
   copilot: {
     request(method: string, path: string, body?: unknown): Promise<any>;
     importDocuments(kind: 'resume' | 'material'): Promise<any[]>;
-    startSession(request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string }): Promise<unknown>;
+    startSession(request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string;
+      codingLanguage?: string | null; playbookId?: string | null; practiceMode?: string }): Promise<unknown>;
     currentSession(): Promise<{ sessionId: string; wsUrl: string; topology: 'general' | 'mock'; jwt: string; testSystemAudio?: string } | null>;
     endSession(): Promise<void>;
     permissions(): Promise<{ microphone: string; screen: string }>;
@@ -21,7 +22,7 @@ interface Window {
     onSettings(listener: (value: DeviceSettings) => void): void;
     onCockpitCommand(listener: (command: string) => void): void;
     solveScreen(origin: 'manual' | 'automatic'): Promise<unknown>;
-    appInfo(): Promise<{ version: string; electron: string; platform: string }>;
+    appInfo(): Promise<{ version: string; electron: string; platform: string; systemAudio: boolean }>;
     testImportPaths(kind: 'resume' | 'material', paths: string[]): Promise<any[]>;
   };
 }
