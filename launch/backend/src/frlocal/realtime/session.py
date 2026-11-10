@@ -854,5 +854,5 @@ class InterviewSession:
         if not data:
             return None
         text = await self.openai.respond(coach.debrief_request(self.settings.models.coaching, data),
-                                         timeout=120, key=self.key)
+                                         timeout=300, key=self.key)
         return coach.finish_report(text, data)

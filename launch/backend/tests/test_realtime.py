@@ -427,3 +427,20 @@ async def test_computer_audio_copy_of_the_candidate_is_ignored(signed_in, fake_o
     assert [f for f in client.of("transcript") if f["data"]["role"] == "interviewer" and f["data"]["final"]] == []
     assert client.of("gate.verdict") == []
     await client.close()
+
+
+def test_debrief_reviews_every_question_and_falls_back_to_interviewer_turns():
+    from frlocal.realtime import coach
+    segments, questions = [], []
+    for i in range(20):  # a long session: 20 questions, each answered
+        segments.append({"seq": 2 * i, "role": "interviewer", "text": f"Question number {i}: how did you handle case {i} in the project?"})
+        segments.append({"seq": 2 * i + 1, "role": "interviewee", "text": f"For case {i} I measured the latency and fixed the scheduler."})
+        questions.append({"seq": 2 * i, "text": f"Question number {i}?"})
+    data = coach.debrief_input(segments, questions, {"goal": {}, "language": "en-US"}, None, None, None)
+    assert len(data["input"]["questions"]) == 20          # previously only the last 12
+    # Live session where question detection missed almost everything: interviewer turns are reviewed instead.
+    data = coach.debrief_input(segments, questions[:1], {"goal": {}, "language": "en-US"}, None, None, None)
+    assert len(data["input"]["questions"]) == 20
+    assert data["input"]["questions"][3]["answer"].startswith("For case 3")
+    # Short acknowledgements are not turned into questions.
+    assert coach.interviewer_turns([{"seq": 1, "role": "interviewer", "text": "Okay, great."}, {"seq": 2, "role": "interviewee", "text": "Sure."}]) == []
