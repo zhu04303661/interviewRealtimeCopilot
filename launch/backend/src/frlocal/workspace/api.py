@@ -162,7 +162,8 @@ class WorkspaceApi:
         if root == "v3" and resource == "sessions" and not rest and method == "GET":
             # History: every session, newest first, with its Debrief status (no report bodies).
             rows = [{k: v for k, v in self._report(workspace.username, state, session).items() if k != "report"}
-                    for session in state["sessions"].values()]
+                    for session in reversed(list(state["sessions"].values()))]
+            # Newest first; sessions created in the same instant keep creation order (stable sort).
             return raw({"sessions": sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True)})
         if root == "v3" and resource == "sessions":
             return await self.session(workspace, request, rest)
