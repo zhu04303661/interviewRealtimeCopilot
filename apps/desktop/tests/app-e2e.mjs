@@ -60,14 +60,23 @@ async function connect(url) {
     }
     throw new Error(`Timed out waiting for ${what}`);
   };
-  return { evaluate, waitFor, close: () => ws.close() };
+  const call = (method, params = {}) => { const n = ++id; return new Promise((resolve) => { pending.set(n, resolve); ws.send(JSON.stringify({ id: n, method, params })); }); };
+  return { evaluate, waitFor, call, close: () => ws.close() };
 }
 
 // Cockpit helpers (evaluated in the page).
-const entries = (who) => `[...document.querySelectorAll('.entry')].filter((e) => e.querySelector('.who')?.textContent.startsWith('${who}'))`;
-const answers = `[...document.querySelectorAll('.entry.answer')]`;
+const entries = (who) => `[...document.querySelectorAll('.c-entry')].filter((e) => e.querySelector('.stamp')?.textContent.startsWith('${who}'))`;
+const answers = `[...document.querySelectorAll('.c-answer')]`;
 const clickButton = (selector, label) => `(() => { const b = [...${selector}].flatMap((e) => [...e.querySelectorAll('button')]).find((x) => x.textContent.includes('${label}') && !x.disabled); if (!b) return false; b.click(); return true; })()`;
 const finishedAnswers = `${answers}.filter((a) => a.innerText.includes('中文') && a.innerText.length > 60).length`;
+
+// Screenshots of each screen go to IRC_SHOTS (if set), for visual review.
+async function shot(page, name) {
+  if (!process.env.IRC_SHOTS) return;
+  const { writeFileSync } = await import('node:fs');
+  const result = await page.call('Page.captureScreenshot', { format: 'jpeg', quality: 75 });
+  writeFileSync(join(process.env.IRC_SHOTS, `${name}.jpg`), Buffer.from(result.result.data, 'base64'));
+}
 
 let failed = false;
 try {
@@ -75,6 +84,7 @@ try {
 
   // ── account ───────────────────────────────────────────────────────────
   await main.waitFor(`document.body.innerText.includes('Sign in')`, 30000, 'sign-in screen');
+  await shot(main, '0-sign-in');
   const auth = (path, body) => main.evaluate(`window.copilot.request('POST', '/local/auth/${path}', ${JSON.stringify({ owner: 'main', ...body })})`);
   check((await auth('register', { username: 'tester', password: 'irc-test-password-1' })).ok, 'register failed');
   check((await auth('register', { username: 'tester', password: 'irc-test-password-1' })).error?.includes('already'), 'duplicate username accepted');
@@ -86,7 +96,7 @@ try {
   check((await auth('sign-in', { username: 'tester', password: 'irc-test-password-1' })).ok, 'sign-in failed');
   await main.evaluate('location.reload()');
   await pause(1500);
-  await main.waitFor(`document.body.innerText.includes('Knowledge sources')`, 20000, 'workspace screen');
+  await main.waitFor(`/getting started/i.test(document.body.innerText)`, 20000, 'workspace screen');
   log('account: register, duplicate rejected, sign out, wrong password rejected, sign in, workspace shown');
 
   // ── goal and knowledge sources ────────────────────────────────────────
@@ -102,8 +112,15 @@ try {
   check(docs.length === ids.length && docs.every((d) => d.status === 'ready'), 'a document did not prepare');
   await main.evaluate('location.reload()');
   await pause(1500);
-  check(await main.waitFor(`document.body.innerText.includes(${JSON.stringify(docs[0]?.filename ?? 'Knowledge sources')})`, 10000, 'documents listed'), 'documents not listed');
+  await main.evaluate(`[...document.querySelectorAll('.side-nav button')].find((b) => b.textContent.startsWith('Library')).click()`);
+  await main.evaluate(`[...document.querySelectorAll('.tab')].find((b) => b.textContent.startsWith('Materials')).click()`);
+  check(await main.waitFor(`document.body.innerText.includes(${JSON.stringify(docs.find((d) => d.kind === 'material')?.filename ?? '')})`, 10000, 'documents listed'), 'documents not listed');
+  await shot(main, '1-library');
+  await main.evaluate(`[...document.querySelectorAll('.side-goal')][0].click()`);
+  await main.waitFor(`document.body.innerText.includes('Goal context')`, 10000, 'goal page');
+  await shot(main, '2-goal');
   log('goal created; documents imported, prepared and listed');
+  await shot(main, '0-goals');
 
   // ── practice ──────────────────────────────────────────────────────────
   await main.evaluate(`window.copilot.startSession({ topology: 'mock', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: ${JSON.stringify(ids)}, language: 'en-US' })`);
@@ -122,26 +139,27 @@ try {
   const followUp = await cockpit.waitFor(`${entries('Interviewer')}.length >= 2 && ${entries('Interviewer')}.at(-1).querySelector('.text').textContent`, 60000, 'follow-up');
   log(`practice: follow-up "${followUp.slice(0, 120)}"`);
   // Buttons are disabled while a hint streams; wait for each click to be possible and for its hint.
-  const answeredBefore = await cockpit.waitFor(`!document.querySelector('.feed button:disabled') && String(${finishedAnswers})`, 60000, 'idle hints');
+  const answeredBefore = await cockpit.waitFor(`!document.querySelector('.c-feed button:disabled') && String(${finishedAnswers})`, 60000, 'idle hints');
   check(await cockpit.evaluate(clickButton(entries('You'), 'Expand answer')), 'no Expand answer button');
-  await cockpit.waitFor(`${finishedAnswers} > ${answeredBefore} && !document.querySelector('.feed button:disabled')`, 60000, 'expand-answer hint');
+  await cockpit.waitFor(`${finishedAnswers} > ${answeredBefore} && !document.querySelector('.c-feed button:disabled')`, 60000, 'expand-answer hint');
   log(`practice: Expand answer → hint "${(await cockpit.evaluate(`${answers}.at(-1).innerText`)).replace(/\n+/g, ' ').slice(0, 140)}"`);
   const before = await cockpit.evaluate(finishedAnswers);
   check(await cockpit.evaluate(clickButton(entries('Interviewer'), 'Suggest answer')), 'no Suggest answer button');
-  await cockpit.waitFor(`${finishedAnswers} > ${before} && !document.querySelector('.feed button:disabled')`, 60000, 'suggested answer');
+  await cockpit.waitFor(`${finishedAnswers} > ${before} && !document.querySelector('.c-feed button:disabled')`, 60000, 'suggested answer');
   log('practice: Suggest answer → bilingual hint');
   const target = Math.min(5, total - 1);
-  await cockpit.evaluate(`document.querySelectorAll('.plan li button')[${target}].click()`);
-  await cockpit.waitFor(`document.querySelectorAll('.plan li button')[${target}].classList.contains('current')`, 10000, 'jump marker');
-  const title = await cockpit.evaluate(`document.querySelectorAll('.plan li button')[${target}].title`);
+  await cockpit.evaluate(`document.querySelectorAll('.c-plan li button')[${target}].click()`);
+  await cockpit.waitFor(`document.querySelectorAll('.c-plan li button')[${target}].classList.contains('current')`, 10000, 'jump marker');
+  const title = await cockpit.evaluate(`document.querySelectorAll('.c-plan li button')[${target}].title`);
   const jumped = await cockpit.waitFor(`(() => { const t = ${entries('Interviewer')}.at(-1).querySelector('.text').textContent; return /move on|next|let's/i.test(t) && t; })()`, 40000, 'jumped question');
   log(`practice: jumped to #${target + 1} "${title.slice(0, 80)}" → interviewer "${jumped.slice(0, 120)}"`);
   for (const mode of ['random', 'ai', 'sequential']) {
-    await cockpit.evaluate(`[...document.querySelectorAll('.plan button')].find((b) => b.textContent.toLowerCase().startsWith(${JSON.stringify(mode === 'sequential' ? 'order' : mode)}))?.click()`);
-    await cockpit.waitFor(`[...document.querySelectorAll('.plan button.active')].some((b) => b.textContent.toLowerCase().startsWith(${JSON.stringify(mode === 'sequential' ? 'order' : mode)}))`, 10000, `${mode} mode`);
+    await cockpit.evaluate(`[...document.querySelectorAll('.c-modes button')].find((b) => b.textContent.toLowerCase().startsWith(${JSON.stringify(mode === 'sequential' ? 'order' : mode)}))?.click()`);
+    await cockpit.waitFor(`[...document.querySelectorAll('.c-modes button.active')].some((b) => b.textContent.toLowerCase().startsWith(${JSON.stringify(mode === 'sequential' ? 'order' : mode)}))`, 10000, `${mode} mode`);
   }
   log('practice: random, AI and order modes switch');
-  check(!/Disconnected|断开/.test(await cockpit.evaluate(`document.querySelector('.status')?.textContent ?? ''`)), 'practice disconnected');
+  await shot(cockpit, '3-practice-cockpit');
+  check(!/Disconnected|断开/.test(await cockpit.evaluate(`document.querySelector('.c-banner')?.textContent ?? ''`)), 'practice disconnected');
   await main.evaluate('window.copilot.endSession()');
   cockpit.close();
   log('practice: ended');
@@ -152,7 +170,7 @@ try {
   cockpit = await find((u) => u.endsWith('/cockpit.html'));
   const said = await cockpit.waitFor(`${entries('Interviewer')}[0]?.querySelector('.text')?.textContent`, 60000, 'interviewer transcript');
   log(`live: interviewer transcript "${said}"`);
-  const question = await cockpit.waitFor(`document.querySelector('.entry.question .text')?.textContent`, 30000, 'question card');
+  const question = await cockpit.waitFor(`document.querySelector('.c-question .text')?.textContent`, 30000, 'question card');
   log(`live: question card "${question}"`);
   await cockpit.waitFor(`${finishedAnswers} >= 1`, 60000, 'automatic hint');
   log(`live: automatic hint "${(await cockpit.evaluate(`${answers}[0].innerText`)).replace(/\n+/g, ' ').slice(0, 160)}"`);
@@ -161,23 +179,23 @@ try {
   log(`live: translation "${liveZh.slice(0, 80)}"`);
   const mine = await cockpit.waitFor(`${entries('You')}[0]?.querySelector('.text')?.textContent`, 60000, 'candidate line');
   log(`live: candidate line "${mine.slice(0, 100)}"`);
+  await shot(cockpit, '6-live-cockpit');
   check(await cockpit.evaluate(`${entries('Interviewer')}.every((e) => e.querySelector('.text').textContent !== ${JSON.stringify(mine)})`), 'candidate echoed as interviewer');
-  check(!/Disconnected|断开/.test(await cockpit.evaluate(`document.querySelector('.status')?.textContent ?? ''`)), 'live disconnected');
+  check(!/Disconnected|断开/.test(await cockpit.evaluate(`document.querySelector('.c-banner')?.textContent ?? ''`)), 'live disconnected');
   await main.evaluate('window.copilot.endSession()');
   cockpit.close();
   log('live: ended');
 
   // ── history and Debrief ───────────────────────────────────────────────
-  await main.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.startsWith('History'))?.click()`);
   const sessions = await main.waitFor(`window.copilot.request('GET', '/api/v3/sessions').then((r) => r.sessions.length === 2 && r.sessions.every((s) => s.status !== 'preparing') && r.sessions)`, 180000, 'reports');
   for (const s of sessions) log(`history: ${s.topology} → ${s.status}${s.headline ? ` "${s.headline}"` : ''}${s.failure_reason ? ` (${s.failure_reason})` : ''}`);
   check(sessions.every((s) => s.status === 'ready'), 'a Debrief was not generated');
-  await main.evaluate(`window.location.reload()`);
-  await pause(1500);
-  await main.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.startsWith('History'))?.click()`);
-  await main.waitFor(`document.querySelectorAll('.list li').length === 2`, 10000, 'history list');
-  await main.evaluate(`document.querySelector('.list li').click()`);
-  log(`history: report shown "${(await main.waitFor(`(() => { const t = document.querySelectorAll('.card')[1].innerText; return t.includes('Strengths') && t; })()`, 10000, 'report view')).replace(/\n+/g, ' ').slice(0, 160)}"`);
+  await main.evaluate(`[...document.querySelectorAll('.side-nav button')].find((b) => b.textContent.startsWith('History')).click()`);
+  await main.waitFor(`document.querySelectorAll('.list-row').length === 2`, 10000, 'history list');
+  await shot(main, '4-history');
+  await main.evaluate(`document.querySelector('.list-row').click()`);
+  log(`history: report shown "${(await main.waitFor(`(() => { const t = document.querySelector('.content').innerText; return t.includes('Strengths') && t; })()`, 10000, 'report view')).replace(/\n+/g, ' ').slice(0, 160)}"`);
+  await shot(main, '5-debrief');
   log('PASS');
 } catch (error) {
   failed = true;

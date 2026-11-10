@@ -69,7 +69,8 @@ def useful_translation(translation: str, original: str) -> bool:
 # just before, marks it as the speakers' echo rather than the candidate.
 ECHO_OVERLAP = 0.7
 
-SELF_INTRODUCTION = re.compile(r"tell me about yourself|introduce yourself|walk me through your (?:background|cv|resume)|自我介绍|介绍一下(?:你)?自己", re.I)
+SELF_INTRODUCTION = re.compile(r"tell me about yourself|introduce yourself|walk me through your (?:background|cv|resume|career)|"
+                               r"(?:one-line |your )?career story|自我介绍|介绍一下(?:你)?自己", re.I)
 
 # How long the Realtime practice interviewer waits for the question plan before greeting anyway.
 PLAN_WAIT_S = 2.5

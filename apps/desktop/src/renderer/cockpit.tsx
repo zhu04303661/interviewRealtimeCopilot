@@ -61,7 +61,7 @@ function Hint({ text }: { text: string }) {
   const flush = () => { if (bullets.length) blocks.push(<ul key={blocks.length}>{bullets.map((b, i) => <li key={i}>{b}</li>)}</ul>); bullets = []; };
   for (const line of text.split('\n')) {
     const bold = line.match(/^\*\*(.+)\*\*$/);
-    if (bold) { flush(); blocks.push(<strong key={blocks.length}>{bold[1]}</strong>); }
+    if (bold) { flush(); blocks.push(<div className="lang" key={blocks.length}>{bold[1]}</div>); }
     else if (/^\s*[-*] /.test(line)) bullets.push(line.replace(/^\s*[-*] /, '').replace(/\*\*/g, ''));
     else if (line.trim()) { flush(); blocks.push(<p key={blocks.length} style={{ margin: '4px 0' }}>{line.replace(/\*\*/g, '')}</p>); }
   }
@@ -134,6 +134,7 @@ function Cockpit() {
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(Date.now());
   const socket = useRef<WebSocket | null>(null);
+  const [session, setSession] = useState<{ topology: string }>({ topology: 'mock' });
   const feed = useRef<HTMLDivElement>(null);
   const answering = state.entries.some((e) => e.kind === 'answer' && !e.done);
 
@@ -144,6 +145,7 @@ function Cockpit() {
     void (async () => {
       const session = await window.copilot.currentSession();
       if (!session) return dispatch({ type: 'error', seq: 0, data: { message: 'No active session.' } });
+      setSession(session);
       const ws = new WebSocket(session.wsUrl);
       ws.binaryType = 'arraybuffer';
       socket.current = ws;
@@ -189,69 +191,76 @@ function Cockpit() {
   const elapsed = Math.floor((now - started) / 1000);
   const asked = new Set(state.plan?.asked ?? []);
 
+  const [planOpen, setPlanOpen] = useState(true);
+  const live = !state.ended;
   return (
     <div className="cockpit">
-      <header>
-        <strong>Interview Realtime Copilot</strong>
-        <span className="muted small">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</span>
+      <header className="c-header">
+        <span className={`dot ${live ? '' : 'off'}`} />
+        <span className="c-status">{live ? (session.topology === 'mock' ? 'Practice' : 'Listening') : 'Ended'}</span>
+        <span className="c-sub">{live ? (session.topology === 'mock' ? '语音练习' : '实时面试') : '已结束'}</span>
       </header>
-      {state.status && <div className="status">{state.status}</div>}
+      {state.status && <div className="c-banner">{state.status}</div>}
       {state.plan && (
-        <div className="plan">
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <span className="small muted">Practice questions · 练习题 {asked.size}/{state.plan.questions.length}</span>
-            <span className="row" style={{ gap: 2 }}>
-              {[['sequential', 'Order · 顺序'], ['random', 'Random · 随机'], ['ai', 'AI · 临场']].map(([mode, label]) => (
-                <button key={mode} className={`ghost small ${state.plan!.mode === mode ? 'active' : ''}`} onClick={() => request(mode, 'practice.mode')}>{label}</button>
-              ))}
-            </span>
+        <div className="c-plan">
+          <div className="head" onClick={() => setPlanOpen(!planOpen)}>
+            <span>Practice questions · 练习题 {asked.size}/{state.plan.questions.length}</span><span>{planOpen ? '▾' : '▸'}</span>
           </div>
-          <ol>
-            {state.plan.questions.map((q) => (
-              <li key={q.index}>
-                <button title={q.question} className={state.plan!.current === q.index ? 'current' : asked.has(q.index) ? 'asked' : ''}
-                  onClick={() => request('', 'practice.goto', q.index)}>
-                  {state.plan!.current === q.index ? '▶ ' : asked.has(q.index) ? '✓ ' : `${q.index + 1}. `}{q.topic ? `${q.topic} — ` : ''}{q.question}
-                </button>
-              </li>
-            ))}
-          </ol>
+          {planOpen && <>
+            <div className="c-modes">
+              {[['sequential', 'Order · 顺序'], ['random', 'Random · 随机'], ['ai', 'AI · 临场']].map(([mode, label]) => (
+                <button key={mode} className={state.plan!.mode === mode ? 'active' : ''} onClick={() => request(mode, 'practice.mode')}>{label}</button>))}
+            </div>
+            <ol>
+              {state.plan.questions.map((q) => (
+                <li key={q.index}>
+                  <button title={q.question} className={state.plan!.current === q.index ? 'current' : asked.has(q.index) ? 'asked' : ''} onClick={() => request('', 'practice.goto', q.index)}>
+                    <span className="n">{state.plan!.current === q.index ? '▶' : asked.has(q.index) ? '✓' : `${q.index + 1}.`}</span>{q.topic ? `${q.topic} — ` : ''}{q.question}
+                  </button>
+                </li>))}
+            </ol>
+          </>}
         </div>
       )}
-      <div className="feed" ref={feed}>
-        {state.entries.length === 0 && <p className="muted">Listening for the interviewer… · 正在聆听面试官…</p>}
+      <div className="c-feed" ref={feed}>
+        {state.entries.length === 0 && <div className="c-empty"><b>You're covered.</b><br />Listening for the interviewer's first question. · 正在聆听面试官的第一个问题。</div>}
         {state.entries.map((e) => {
-          if (e.kind === 'line') return (
-            <div className="entry" key={e.key}>
-              <div className="who">{e.who === 'me' ? 'You · 我' : 'Interviewer · 面试官'}</div>
-              <div className="text">{e.text}</div>
-              {e.zh && <div className="zh">{e.zh}</div>}
-              <button className="ghost small" disabled={answering}
-                onClick={() => e.who === 'me' ? request(e.text, 'continue', e.seq) : request(e.text, 'general', e.seq)}>
-                {e.who === 'me' ? 'Expand answer · 补充回答' : 'Suggest answer · 生成回答'}
-              </button>
-            </div>
-          );
+          if (e.kind === 'line') {
+            const voice = e.who === 'interviewer' && e.key.startsWith('s');
+            return (
+              <div className={`c-entry ${e.who === 'me' ? 'me' : ''} ${voice ? 'c-voice' : ''}`} key={e.key}>
+                <span className={`stamp ${e.who === 'me' ? 'me' : ''}`}>{e.who === 'me' ? 'You · 我' : 'Interviewer · 面试官'}</span>
+                <div className="text">{e.text}</div>
+                {e.zh && <div className="zh">{e.zh}</div>}
+                <button className="c-action" disabled={answering} onClick={() => e.who === 'me' ? request(e.text, 'continue', e.seq) : request(e.text, 'general', e.seq)}>
+                  {e.who === 'me' ? 'Expand answer · 补充回答' : 'Suggest answer · 生成回答'}</button>
+              </div>
+            );
+          }
           if (e.kind === 'question') return (
-            <div className="entry question" key={e.key}>
-              <div className="who">Question · 问题{e.decision === 'await_more' ? ' (listening…)' : ''}</div>
-              <div className="text">{e.text}</div>
-              {e.zh && <div className="zh">{e.zh}</div>}
+            <div className="c-question" key={e.key}>
+              <span className="stamp">{e.decision === 'await_more' ? 'Question · 问题 (listening…)' : 'Question · 问题'}</span>
+              <div className="text" style={{ marginTop: 6 }}>{e.text}</div>
+              {e.zh && <div className="zh" style={{ marginTop: 4, color: 'var(--c-text-2)' }}>{e.zh}</div>}
             </div>
           );
           return (
-            <div className="entry answer" key={e.key} style={e.superseded ? { opacity: .5 } : undefined}>
-              <Hint text={e.text || '…'} />
+            <div className={`c-answer ${e.superseded ? 'superseded' : ''}`} key={e.key}>
+              <Hint text={e.text} />
+              {!e.done && <span className="typing" />}
+              {e.done && !e.superseded && <div className="source">From your materials · 基于你的资料</div>}
             </div>
           );
         })}
       </div>
-      <footer>
-        <span className="muted small">{state.ended ? 'Ended · 已结束' : 'Live · 进行中'}</span>
-        <button onClick={() => window.copilot.endSession()}>End · 结束</button>
+      <footer className="c-footer">
+        <span className="spacer" />
+        <span className="timer">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</span>
+        <button className="c-btn end" onClick={() => window.copilot.endSession()}>End · 结束</button>
       </footer>
     </div>
   );
 }
 
+document.body.classList.add('cockpit-body');
 createRoot(document.getElementById('root')!).render(<Cockpit />);
