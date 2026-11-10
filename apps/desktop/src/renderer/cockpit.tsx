@@ -10,8 +10,8 @@ import './styles.css';
 
 type Entry =
   | { kind: 'line'; key: string; seq: number; who: 'me' | 'interviewer'; text: string; zh?: string }
-  | { kind: 'question'; key: string; seq: number; text: string; zh?: string; decision: string }
-  | { kind: 'answer'; key: string; turnId: string; text: string; done: boolean; superseded?: boolean };
+  | { kind: 'question'; key: string; seq: number; text: string; zh?: string; decision: string; intent?: string }
+  | { kind: 'answer'; key: string; turnId: string; text: string; done: boolean; superseded?: boolean; grounded?: boolean };
 type Plan = { mode: string; current: number | null; asked: number[]; questions: { index: number; topic: string; question: string }[] };
 type State = { entries: Entry[]; translations: Record<string, string>; plan: Plan | null; status: string; ended: boolean };
 type Frame = { type: string; seq: number; data: any };
@@ -33,14 +33,15 @@ function reduce(state: State, frame: Frame): State {
     }
     case 'gate.verdict':
       if (data.decision !== 'respond' && data.decision !== 'await_more') return state;
-      return { ...state, entries: [...entries, { kind: 'question', key: `q${seq}`, seq, text: data.utterance, zh: data.translation, decision: data.decision }] };
+      return { ...state, entries: [...entries, { kind: 'question', key: `q${seq}`, seq, text: data.utterance, zh: data.translation, decision: data.decision, intent: data.intent }] };
     case 'turn.started':
       return { ...state, entries: [...entries, { kind: 'answer', key: `a${data.turn_id}`, turnId: data.turn_id, text: '', done: false }] };
     case 'turn.token':
       return { ...state, entries: entries.map((e) => e.kind === 'answer' && e.turnId === data.turn_id ? { ...e, text: e.text + data.delta } : e) };
     case 'turn.done':
     case 'turn.superseded':
-      return { ...state, entries: entries.map((e) => e.kind === 'answer' && e.turnId === data.turn_id ? { ...e, done: true, superseded: type === 'turn.superseded' } : e) };
+      return { ...state, entries: entries.map((e) => e.kind === 'answer' && e.turnId === data.turn_id
+        ? { ...e, done: true, superseded: type === 'turn.superseded', grounded: data.rag?.outcome === 'used' } : e) };
     case 'practice.plan':
       return { ...state, plan: data };
     case 'transcription.state':
@@ -67,6 +68,11 @@ function Hint({ text }: { text: string }) {
   }
   flush();
   return <>{blocks}</>;
+}
+
+export function hexToRgba(hex: string, alpha: number): string {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
 /** Gapless playback of the practice interviewer (24 kHz PCM16 base64 chunks). */
@@ -205,9 +211,34 @@ function Cockpit() {
   const asked = new Set(state.plan?.asked ?? []);
 
   const [planOpen, setPlanOpen] = useState(true);
+  const [appearance, setAppearance] = useState<DeviceSettings | null>(null);
+  const [resultsHidden, setResultsHidden] = useState(false);
+  const [notice, setNotice] = useState('');
+  const solvedSeqs = useRef(new Set<number>());
+  useEffect(() => {
+    void window.copilot.getSettings().then(setAppearance);
+    window.copilot.onSettings(setAppearance);
+    window.copilot.onCockpitCommand((command) => {
+      if (command === 'toggle-results') setResultsHidden((hidden) => !hidden);
+      else if (command === 'solving') setNotice('Reading your screen… · 正在读取屏幕…');
+      else if (command.startsWith('error:')) setNotice(command.slice(6));
+    });
+  }, []);
+  useEffect(() => { if (notice) { const t = setTimeout(() => setNotice(''), 4000); return () => clearTimeout(t); } }, [notice]);
+  // Auto-capture: a coding or system-design question gets the screen read once, automatically.
+  useEffect(() => {
+    if (!appearance?.autoCapture) return;
+    const latest = state.entries.findLast((e) => e.kind === 'question');
+    if (latest?.kind === 'question' && latest.decision === 'respond' && (latest.intent === 'coding' || latest.intent === 'system_design') && !solvedSeqs.current.has(latest.seq)) {
+      solvedSeqs.current.add(latest.seq);
+      void window.copilot.solveScreen('automatic').catch((e) => setNotice((e as Error).message));
+    }
+  }, [state.entries, appearance?.autoCapture]);
+  const solve = () => void window.copilot.solveScreen('manual').catch((e) => setNotice((e as Error).message));
+  const panelStyle = appearance ? { background: hexToRgba(appearance.background, appearance.opacity), color: appearance.text } : undefined;
   const live = !state.ended;
   return (
-    <div className="cockpit">
+    <div className="cockpit" style={panelStyle}>
       <header className="c-header">
         <span className={`dot ${live ? '' : 'off'}`} />
         <span className="c-status">{live ? (session.topology === 'mock' ? 'Practice' : 'Listening') : 'Ended'}</span>
@@ -218,6 +249,7 @@ function Cockpit() {
             <span className="meter-bar"><span style={{ width: `${Math.round(levels[lane as number] * 100)}%` }} /></span></span>))}
       </header>
       {state.status && <div className="c-banner">{state.status}</div>}
+      {notice && <div className="c-banner">{notice}</div>}
       {state.plan && (
         <div className="c-plan">
           <div className="head" onClick={() => setPlanOpen(!planOpen)}>
@@ -239,7 +271,7 @@ function Cockpit() {
           </>}
         </div>
       )}
-      <div className="c-feed" ref={feed}>
+      <div className="c-feed" ref={feed} style={resultsHidden ? { display: 'none' } : undefined}>
         {state.entries.length === 0 && <div className="c-empty"><b>You're covered.</b><br />Listening for the interviewer's first question. · 正在聆听面试官的第一个问题。</div>}
         {state.entries.map((e) => {
           if (e.kind === 'line') {
@@ -265,12 +297,13 @@ function Cockpit() {
             <div className={`c-answer ${e.superseded ? 'superseded' : ''}`} key={e.key}>
               <Hint text={e.text} />
               {!e.done && <span className="typing" />}
-              {e.done && !e.superseded && <div className="source">From your materials · 基于你的资料</div>}
+              {e.done && e.grounded && <div className="source">From your materials · 基于你的资料</div>}
             </div>
           );
         })}
       </div>
       <footer className="c-footer">
+        <button className="c-btn" onClick={solve} title="⌥S">Solve screen · 截屏解答</button>
         <span className="spacer" />
         <span className="timer">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</span>
         <button className="c-btn end" onClick={() => window.copilot.endSession()}>End · 结束</button>

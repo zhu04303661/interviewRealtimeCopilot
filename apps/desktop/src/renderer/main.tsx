@@ -1,5 +1,5 @@
 // Main window: account, goals, library, history and settings.
-import { BookOpen, CircleHelp, FileText, Flag, History as HistoryIcon, Mic, Plus, Radio, Search, Settings as SettingsIcon, Upload } from 'lucide-react';
+import { BookOpen, CircleHelp, FileText, Flag, History as HistoryIcon, Mic, Monitor, Plus, Radio, Search, Settings as SettingsIcon, Upload } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -324,35 +324,207 @@ function HistoryPage({ sessions, sessionId, open }: { sessions: SessionRow[]; se
   );
 }
 
-function SettingsPage({ username, signOut }: { username: string; signOut: () => void }) {
-  const [section, setSection] = useState<'general' | 'permissions' | 'account'>('general');
-  const [language, setLanguage] = useState(localStorage.getItem('language') ?? 'en-US');
+const SHORTCUT_ROWS: { group: string; hint: string; rows: { ids: (keyof DeviceSettings['shortcuts'])[]; label: string; what: string }[] }[] = [
+  { group: 'Interview actions · 面试操作', hint: 'Trigger these during an active session · 会话进行中使用', rows: [
+    { ids: ['toggleResults'], label: 'Toggle results panel · 显示/隐藏结果', what: 'Show or hide the answers in the cockpit' },
+    { ids: ['solveScreen'], label: 'Solve screen · 截屏解答', what: 'Capture the screen and answer what is on it' },
+  ] },
+  { group: 'Assistant window · 助手窗口', hint: "Control the assistant window's position and visibility · 控制助手窗口的位置和显示", rows: [
+    { ids: ['toggleAssistant'], label: 'Show or hide assistant · 显示/隐藏助手', what: 'Show or hide the cockpit window' },
+    { ids: ['moveUp', 'moveDown', 'moveLeft', 'moveRight'], label: 'Move assistant · 移动助手', what: 'Move the cockpit in any direction' },
+    { ids: ['grow'], label: 'Grow assistant · 加宽', what: 'Make the cockpit wider' },
+    { ids: ['shrink'], label: 'Shrink assistant · 变窄', what: 'Make the cockpit narrower' },
+  ] },
+];
+const keyGlyphs = (accelerator: string) => accelerator.split('+').map((k) => ({ Alt: '⌥', Option: '⌥', Shift: '⇧', Control: '⌃', Ctrl: '⌃', Command: '⌘', Cmd: '⌘',
+  CommandOrControl: '⌘', Up: '↑', Down: '↓', Left: '←', Right: '→' } as Record<string, string>)[k] ?? k);
+/** Turn a keydown into an Electron accelerator; null until a non-modifier key with a modifier is pressed. */
+function accelerator(e: React.KeyboardEvent): string | null {
+  const key = { ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', ' ': 'Space' }[e.key] ?? (e.key.length === 1 ? e.key.toUpperCase() : null);
+  if (!key || ['Meta', 'Alt', 'Shift', 'Control'].includes(e.key)) return null;
+  const mods = [e.metaKey && 'Command', e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean);
+  const code = e.code.startsWith('Key') ? e.code.slice(3) : e.code.startsWith('Digit') ? e.code.slice(5) : key;  // Option changes e.key on macOS
+  return mods.length ? [...mods, { Equal: '=', Minus: '-' }[e.code] ?? code].join('+') : null;
+}
+function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const n = Number.parseInt(hex.slice(1), 16);
+    const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const [l1, l2] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+const rgba = (hex: string, alpha: number) => { const n = Number.parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`; };
+
+function Setting({ title, children, what, icon }: { title: string; what?: React.ReactNode; children?: React.ReactNode; icon?: React.ReactNode }) {
+  return <div className="setting">{icon && <div className="icon-tile">{icon}</div>}<div className="what"><b>{title}</b>{what && <span>{what}</span>}</div>{children}</div>;
+}
+function Switch({ on, onChange, label }: { on: boolean; onChange: (on: boolean) => void; label: string }) {
+  return <button className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />;
+}
+
+function SettingsPage({ username, role, signOut }: { username: string; role: string; signOut: () => void }) {
+  type Section = 'general' | 'appearance' | 'defaults' | 'privacy' | 'shortcuts' | 'account';
+  const [section, setSection] = useState<Section>('general');
+  const [device, setDevice] = useState<DeviceSettings | null>(null);
+  const [defaults, setDefaults] = useState<DeviceSettings | null>(null);
+  const [prefs, setPrefs] = useState<Record<string, any>>({});
+  const [consents, setConsents] = useState<{ share_data?: boolean; ai_training?: boolean }>({});
+  const [playbooks, setPlaybooks] = useState<{ playbook_id: string; name: string }[]>([]);
   const [permissions, setPermissions] = useState({ microphone: '', screen: '' });
+  const [voice, setVoice] = useState<any>(undefined);
+  const [accounts, setAccounts] = useState<{ username: string; role: string }[]>([]);
+  const [info, setInfo] = useState({ version: '', electron: '', platform: '' });
+  const [recording, setRecording] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    void window.copilot.getSettings().then(setDevice);
+    window.copilot.onSettings(setDevice);  // changed elsewhere (another window, a shortcut)
+    void window.copilot.defaultSettings().then(setDefaults);
+    void window.copilot.appInfo().then(setInfo);
+    void window.copilot.request('GET', '/api/v3/me/prefs').then(setPrefs);
+    void window.copilot.request('GET', '/api/v3/me/consents').then(setConsents);
+    void window.copilot.request('GET', '/api/v3/playbooks').then((r) => setPlaybooks(r.playbooks ?? []));
+    void window.copilot.request('GET', '/api/v3/voice-sample').then((r) => setVoice(r.sample ?? null)).catch(() => setVoice(null));
+    if (role === 'admin') void auth('accounts').then(setAccounts).catch(() => undefined);
+  }, [role]);
   useEffect(() => { void window.copilot.permissions().then(setPermissions); }, [section]);
-  const state = (value: string) => value === 'granted' ? <span className="badge good">Allowed · 已允许</span> : <span className="badge warn">{value || '…'}</span>;
+  const update = async (patch: Partial<DeviceSettings>) => setDevice(await window.copilot.setSettings(patch));
+  const savePrefs = async (patch: Record<string, unknown>) => setPrefs(await window.copilot.request('PUT', '/api/v3/me/prefs', patch));
+  const saveConsents = async (patch: Record<string, unknown>) => setConsents(await window.copilot.request('PUT', '/api/v3/me/consents', patch));
+  const permission = (value: string) => value === 'granted' ? <span className="badge good">✓ Granted · 已授权</span> : <span className="badge warn">{value === 'denied' ? 'Denied · 已拒绝' : 'Not set · 未设置'}</span>;
+  const sections: [Section, string][] = [['general', 'General · 通用'], ['appearance', 'Appearance · 外观'], ['defaults', 'Defaults · 默认'],
+    ['privacy', 'Privacy & Stealth · 隐私与隐身'], ['shortcuts', 'Shortcuts · 快捷键'], ['account', 'Account · 账号']];
+  if (!device || !defaults) return null;
+  const ratio = contrast(device.text, device.background);
   return (
     <div className="page settings">
-      <nav>{(['general', 'permissions', 'account'] as const).map((s) => (
-        <button key={s} className={section === s ? 'active' : ''} onClick={() => setSection(s)}>{{ general: 'General · 通用', permissions: 'Permissions · 权限', account: 'Account · 账号' }[s]}</button>))}</nav>
+      <nav>
+        {sections.map(([s, label]) => <button key={s} className={section === s ? 'active' : ''} onClick={() => setSection(s)}>{label}</button>)}
+        <p className="faint" style={{ font: '11px var(--mono)', marginTop: 24 }}>Interview Realtime Copilot v{info.version}<br />Electron {info.electron}</p>
+      </nav>
       <div>
-        {section === 'general' && <><h2 style={{ marginTop: 0 }}>General · 通用</h2>
-          <div className="setting"><div className="what"><b>Interview language · 面试语言</b><span>Language the interviewer speaks and transcripts expect. · 面试官说话和转写使用的语言。</span></div>
-            <select className="select" style={{ width: 180 }} value={language} onChange={(e) => { setLanguage(e.target.value); localStorage.setItem('language', e.target.value); }}>
-              <option value="en-US">English</option><option value="zh-CN">中文</option></select></div></>}
-        {section === 'permissions' && <><h2 style={{ marginTop: 0 }}>Permissions · 权限</h2>
-          <div className="setting"><div className="what"><b>Microphone · 麦克风</b><span>Hears your answers. · 用于识别你的回答。</span></div>{state(permissions.microphone)}
-            {permissions.microphone !== 'granted' && <button className="btn sm" onClick={() => window.copilot.requestMicrophone().then(() => window.copilot.permissions().then(setPermissions))}>Allow · 允许</button>}</div>
-          <div className="setting"><div className="what"><b>Screen &amp; system audio · 屏幕与系统录音</b><span>Hears the interviewer in Live mode. · Live 模式下用于听到面试官。</span></div>{state(permissions.screen)}
-            {permissions.screen !== 'granted' && <button className="btn sm" onClick={() => window.copilot.openScreenSettings()}>Open settings · 打开设置</button>}</div></>}
-        {section === 'account' && <><h2 style={{ marginTop: 0 }}>Account · 账号</h2>
-          <div className="setting"><div className="what"><b>{username}</b><span>Local account on this computer. · 本机账号。</span></div><button className="btn sm" onClick={signOut}>Sign out · 退出</button></div></>}
+        {section === 'general' && <>
+          <h2>General · 通用</h2>
+          <h4 className="setting-group">Startup · 启动</h4>
+          <Setting title="Launch at login · 开机启动" what="Open the app automatically when you sign in to this computer. · 登录电脑时自动打开。">
+            <Switch label="Launch at login" on={device.launchAtLogin} onChange={(on) => update({ launchAtLogin: on })} /></Setting>
+          <h4 className="setting-group">App updates · 应用更新</h4>
+          <Setting title={`Interview Realtime Copilot ${info.version}`} what="Updates ship with packaged builds and are not available in development. · 打包发布版才会提供更新，开发版不可用。">
+            <button className="btn sm" disabled>Check for updates · 检查更新</button></Setting>
+        </>}
+        {section === 'appearance' && <>
+          <h2>Appearance · 外观</h2>
+          <h4 className="setting-group">Cockpit · 面试窗口</h4>
+          <p className="muted small">How the assistant panel looks during a live session. These settings stay on this device and never change on their own. · 只影响面试窗口，只保存在本机。</p>
+          <div className="checker">
+            <div className="preview" style={{ background: rgba(device.background, device.opacity), color: device.text }}>
+              <div className="preview-head"><span className="dot" /> <b style={{ font: '600 12px var(--mono)' }}>Listening</b></div>
+              <div style={{ padding: '12px 14px' }}><div>Start with the outcome, then the two decisions that got you there.</div>
+                <div style={{ opacity: .62, marginTop: 8, fontSize: 13 }}>Secondary detail sits at this weight.</div></div>
+              <div className="preview-foot"><span>Solve screen</span><span>00:07</span></div>
+            </div>
+          </div>
+          <Setting title="Opacity · 不透明度" what="How much of the meeting behind the panel shows through. Ships at 80%; below 70% the answer text stops surviving real meeting content, so that is the floor. · 默认 80%，最低 70%。">
+            <input type="range" min={70} max={100} value={Math.round(device.opacity * 100)} onChange={(e) => update({ opacity: Number(e.target.value) / 100 })} style={{ width: 180 }} />
+            <span className="faint" style={{ font: '12px var(--mono)', width: 40 }}>{Math.round(device.opacity * 100)}%</span></Setting>
+          {(['background', 'text'] as const).map((key) => (
+            <Setting key={key} title={key === 'background' ? 'Background · 背景色' : 'Text · 文字颜色'}
+              what={key === 'background' ? "The panel's base colour. · 面板底色。" : 'The base colour for text; the three text weights are derived from it. · 文字基色，三级文字层次由它派生。'}>
+              <input type="color" value={device[key]} onChange={(e) => update({ [key]: e.target.value })} style={{ width: 36, height: 32, border: 0, background: 'none' }} />
+              <input className="input" style={{ width: 110, fontFamily: 'var(--mono)' }} defaultValue={device[key]} key={device[key]}
+                onBlur={(e) => /^#[0-9a-f]{6}$/i.test(e.target.value) && update({ [key]: e.target.value })} />
+              <button className="btn ghost sm" disabled={device[key] === defaults[key]} onClick={() => update({ [key]: defaults[key] })}>Use default · 恢复默认</button>
+            </Setting>))}
+          {ratio < 4.5 && <p className="error">Low contrast ({ratio.toFixed(1)}:1). Text may be hard to read during a session; aim for at least 4.5:1. · 对比度过低，面试时可能看不清。</p>}
+        </>}
+        {section === 'defaults' && <>
+          <h2>Defaults · 默认设置</h2>
+          <h4 className="setting-group">Launch defaults · 启动默认值</h4>
+          <p className="muted small">What a fresh session starts from. · 新会话使用的默认值。</p>
+          <Setting title="Answer language · 回答语言" what="The language the copilot answers in and transcribes. · 转写和回答使用的语言。">
+            <select className="select" style={{ width: 190 }} value={prefs.default_language ?? ''} onChange={(e) => savePrefs({ default_language: e.target.value || null })}>
+              <option value="">System default · 跟随系统</option><option value="en-US">English</option><option value="zh-CN">中文（普通话）</option>
+              <option value="ja-JP">日本語</option><option value="ko-KR">한국어</option><option value="de-DE">Deutsch</option><option value="fr-FR">Français</option><option value="es-ES">Español</option>
+            </select></Setting>
+          <Setting title="Coding language · 编程语言" what="The default language for code the copilot writes. · 生成代码时默认使用的语言。">
+            <select className="select" style={{ width: 190 }} value={prefs.default_coding_language ?? ''} onChange={(e) => savePrefs({ default_coding_language: e.target.value || null })}>
+              <option value="">Any · 不限</option>{['Python', 'C++', 'C', 'Java', 'JavaScript', 'TypeScript', 'Go', 'Rust', 'MATLAB'].map((l) => <option key={l}>{l}</option>)}
+            </select></Setting>
+          <Setting title="Default playbook · 默认回答风格" what="How the copilot shows up when a goal has no choice yet. · 目标未单独设置时使用的回答风格。">
+            <select className="select" style={{ width: 190 }} value={prefs.default_playbook_id ?? ''} onChange={(e) => savePrefs({ default_playbook_id: e.target.value || null })}>
+              <option value="">Platform default · 默认</option>{playbooks.map((p) => <option key={p.playbook_id} value={p.playbook_id}>{p.name}</option>)}
+            </select></Setting>
+        </>}
+        {section === 'privacy' && <>
+          <h2>Privacy &amp; Stealth · 隐私与隐身</h2>
+          <h4 className="setting-group">Stealth · 隐身</h4>
+          <p className="muted small">Keep the cockpit out of view while you interview. · 面试时不让别人看到面试窗口。</p>
+          <Setting title="Hide from screen sharing · 共享屏幕时隐藏" what="The cockpit never appears in a shared screen or recording. · 共享屏幕或录屏中都不会出现面试窗口。">
+            <Switch label="Hide from screen sharing" on={device.stealth} onChange={(on) => update({ stealth: on })} /></Setting>
+          {!device.stealth && <p className="error">While this is off, anyone you share your screen with can see the cockpit, and recordings will include it. · 关闭后，你共享屏幕时对方能看到面试窗口，录屏也会录进去。</p>}
+          <h4 className="setting-group">System access · 系统权限</h4>
+          <p className="muted small">Needed to hear the interview and read the shared screen. Capture runs only during an active session. · 只在会话进行中采集。</p>
+          <Setting icon={<Mic />} title="Microphone · 麦克风" what="Required for hearing your voice during interviews. · 用于识别你的回答。">{permission(permissions.microphone)}
+            <button className="btn sm" disabled={permissions.microphone === 'granted'} onClick={() => window.copilot.requestMicrophone().then(() => window.copilot.permissions().then(setPermissions))}>
+              {permissions.microphone === 'granted' ? 'Granted' : 'Grant · 授权'}</button></Setting>
+          <Setting icon={<Monitor />} title="Screen & System Audio · 屏幕与系统录音" what="Required to hear the interviewer in Live mode and for screen capture. · Live 模式听面试官、截屏解答都需要。">{permission(permissions.screen)}
+            <button className="btn sm" disabled={permissions.screen === 'granted'} onClick={() => window.copilot.openScreenSettings()}>{permissions.screen === 'granted' ? 'Granted' : 'Open settings · 打开设置'}</button></Setting>
+          <h4 className="setting-group">Screen capture · 屏幕读取</h4>
+          <Setting title="Auto-capture · 自动截屏" what="When a coding or system-design question needs what is on your screen, capture it to read the content. Captures stay hidden from the interviewer and only happen during an active session. · 遇到编程或系统设计题时自动读取屏幕，只在会话中进行。">
+            <Switch label="Auto-capture" on={device.autoCapture} onChange={(on) => update({ autoCapture: on })} /></Setting>
+          <h4 className="setting-group">Voice &amp; memory · 声音与记忆</h4>
+          <Setting title="Voice sample · 声音样本" what={voice ? `Saved ${new Date(voice.created_at ?? voice.updated_at ?? Date.now()).toLocaleDateString()} · 已保存` : 'No voice sample is saved. · 尚未保存声音样本。'}>
+            {voice && <button className="btn sm" onClick={() => window.copilot.request('DELETE', '/api/v3/voice-sample').then(() => setVoice(null))}>Delete · 删除</button>}</Setting>
+          <Setting title="Erase its memory · 清除记忆" what="Deletes learned facts, preferences, strengths and weaknesses across every goal. Sessions, debriefs and documents stay. · 清除学到的偏好和优劣势，会话、复盘和资料保留。">
+            <button className="btn sm" onClick={async () => { if (confirm('Erase everything the coach has learned? · 确定清除全部记忆？')) { await window.copilot.request('DELETE', '/api/v3/memory'); setMessage('Memory erased. · 已清除。'); } }}>Erase everything… · 全部清除…</button></Setting>
+          <h4 className="setting-group">Data authorization · 数据授权</h4>
+          <Setting title="Share data · 共享数据" what="Allow sharing your data with service providers that help operate and improve the product. · 允许与协助运营和改进产品的服务商共享数据。">
+            <Switch label="Share data" on={!!consents.share_data} onChange={(on) => saveConsents({ share_data: on })} /></Setting>
+          <Setting title="AI training · AI 训练" what="Allow your data to be used to improve the AI. · 允许用你的数据改进 AI。">
+            <Switch label="AI training" on={!!consents.ai_training} onChange={(on) => saveConsents({ ai_training: on })} /></Setting>
+          <p className="faint small">Turning a switch off applies to new data from that point on. · 关闭后只影响之后的新数据。</p>
+          {message && <p className="small">{message}</p>}
+        </>}
+        {section === 'shortcuts' && <>
+          <h2>Shortcuts · 快捷键</h2>
+          <p className="muted small">These shortcuts are active during a session. No window-switching needed. Click any shortcut to reassign it. · 会话进行中有效，点击按键可重新设置。</p>
+          {SHORTCUT_ROWS.map((group) => (<div key={group.group}>
+            <h4 className="setting-group">{group.group}</h4><p className="muted small" style={{ marginTop: -4 }}>{group.hint}</p>
+            {group.rows.map((row) => (
+              <Setting key={row.label} title={row.label} what={row.what}>
+                <span className="row" style={{ gap: 6 }}>{row.ids.map((id) => (
+                  <button key={id} className={`keys ${recording === id ? 'recording' : ''}`} onClick={() => setRecording(id)}
+                    onKeyDown={(e) => { if (recording !== id) return; e.preventDefault(); if (e.key === 'Escape') return setRecording(null);
+                      const key = accelerator(e); if (key) { void update({ shortcuts: { ...device.shortcuts, [id]: key } }); setRecording(null); } }}
+                    onBlur={() => recording === id && setRecording(null)}>
+                    {recording === id ? 'Press keys… · 按下新组合' : keyGlyphs(device.shortcuts[id]).map((k, i) => <kbd key={i}>{k}</kbd>)}
+                  </button>))}</span>
+              </Setting>))}
+          </div>))}
+          <div style={{ marginTop: 18 }}><button className="btn sm" onClick={() => update({ shortcuts: defaults.shortcuts })}>Reset to defaults · 恢复默认</button></div>
+        </>}
+        {section === 'account' && <>
+          <h2>Account · 账号</h2>
+          <h4 className="setting-group">Account · 账号</h4>
+          <Setting title={username} what={role === 'admin' ? 'Local administrator · 本机管理员' : 'Local account · 本机账号'}>
+            <button className="btn sm" onClick={signOut}>Sign out · 退出登录</button></Setting>
+          <h4 className="setting-group">Local workspace · 本地工作区</h4>
+          <p className="muted small">This computer stores your workspace: goals, documents, sessions and debriefs. Live AI uses the OpenAI project configured for the engine. · 目标、资料、会话和复盘都保存在本机。</p>
+          <Setting title="Delete account · 删除账号" what="Account deletion is unavailable in this local build. · 本地版暂不支持删除账号。"><button className="btn sm" disabled>Delete account… · 删除账号…</button></Setting>
+          {role === 'admin' && accounts.length > 0 && <>
+            <h4 className="setting-group">Local accounts · 本机账号</h4>
+            {accounts.map((a) => <div key={a.username} className="list-row"><div className="avatar">{a.username[0]?.toUpperCase()}</div><span className="spacer">{a.username}</span><span className="badge">{a.role}</span></div>)}
+          </>}
+        </>}
       </div>
     </div>
   );
 }
 
 // ── shell ─────────────────────────────────────────────────────────────────
-function Shell({ username, signOut }: { username: string; signOut: () => void }) {
+function Shell({ username, role, signOut }: { username: string; role: string; signOut: () => void }) {
   const [route, setRoute] = useState<Route>({ page: 'goals' });
   const [goals, setGoals] = useState<Goal[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -382,7 +554,9 @@ function Shell({ username, signOut }: { username: string; signOut: () => void })
       return setError('Microphone access is required. · 需要麦克风权限。');
     }
     try {
-      await window.copilot.startSession({ topology, goalId: target.goal_id, documentIds: chosenSources(target.goal_id, docs), language: localStorage.getItem('language') ?? 'en-US' });
+      const prefs = await window.copilot.request('GET', '/api/v3/me/prefs');
+      const language = prefs.default_language || (navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US');
+      await window.copilot.startSession({ topology, goalId: target.goal_id, documentIds: chosenSources(target.goal_id, docs), language });
     } catch (e) { setError((e as Error).message); }
   };
   const title = { goals: 'Goals · 目标', goal: goal ? `${goal.company} · ${goal.role}` : 'Goal', library: 'Library · 资料库', history: 'History · 历史', settings: 'Settings · 设置' }[route.page];
@@ -424,7 +598,7 @@ function Shell({ username, signOut }: { username: string; signOut: () => void })
             openSession={(id) => setRoute({ page: 'history', sessionId: id })} />}
           {route.page === 'library' && <LibraryPage docs={docs} refresh={refresh} />}
           {route.page === 'history' && <HistoryPage sessions={sessions} sessionId={route.sessionId} open={(id) => setRoute({ page: 'history', sessionId: id })} />}
-          {route.page === 'settings' && <SettingsPage username={username} signOut={signOut} />}
+          {route.page === 'settings' && <SettingsPage username={username} role={role} signOut={signOut} />}
         </div>
       </main>
       {creating && <NewGoal onClose={() => setCreating(false)} onCreated={(g) => { setCreating(false); void refresh(); setRoute({ page: 'goal', goalId: g.goal_id }); }} />}
@@ -433,11 +607,11 @@ function Shell({ username, signOut }: { username: string; signOut: () => void })
 }
 
 function App() {
-  const [user, setUser] = useState<string | null | undefined>(undefined);
-  useEffect(() => { auth('session').then((s) => setUser(s?.account.username ?? null)).catch(() => setUser(null)); }, []);
+  const [user, setUser] = useState<{ username: string; role: string } | null | undefined>(undefined);
+  useEffect(() => { auth('session').then((s) => setUser(s?.account ?? null)).catch(() => setUser(null)); }, []);
   if (user === undefined) return <div className="auth"><span className="muted">Starting… · 正在启动…</span></div>;
-  if (!user) return <SignIn onSignedIn={setUser} />;
-  return <Shell username={user} signOut={() => void auth('sign-out', {}).then(() => setUser(null))} />;
+  if (!user) return <SignIn onSignedIn={(username) => setUser({ username, role: 'member' })} />;
+  return <Shell username={user.username} role={user.role} signOut={() => void auth('sign-out', {}).then(() => setUser(null))} />;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

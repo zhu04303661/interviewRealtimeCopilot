@@ -3,10 +3,11 @@
 // Owns the local engine, the main window (goals, materials, account) and the
 // cockpit window shown during an interview. Renderers reach the engine only
 // through the narrow IPC surface in ../preload/preload.ts.
-import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, systemPreferences } from 'electron';
+import { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, screen, session, shell, systemPreferences } from 'electron';
 import { readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { Engine } from './engine';
+import { DEFAULTS, type Settings, SettingsStore, type ShortcutId } from './settings';
 
 // Automated tests: a WAV file stands in for the microphone (no real device).
 if (process.env.IRC_FAKE_AUDIO) {
@@ -25,6 +26,7 @@ let engine: Engine;
 let mainWindow: BrowserWindow | null = null;
 let cockpit: BrowserWindow | null = null;
 let current: { sessionId: string; wsUrl: string; topology: string } | null = null;
+let settings: SettingsStore;
 
 const renderer = (page: string) => join(__dirname, '../renderer', page);
 const preload = join(__dirname, '../preload/preload.js');
@@ -47,13 +49,71 @@ function openMainWindow(): void {
 
 function openCockpit(): void {
   cockpit?.close();
+  // Frameless and transparent: the renderer paints the panel with the configured
+  // background opacity, so the meeting behind it shows through.
   cockpit = new BrowserWindow({
-    width: 460, height: 760, alwaysOnTop: true, title: 'Copilot', backgroundColor: '#111316',
+    width: 460, height: 760, alwaysOnTop: true, title: 'Copilot', frame: false, transparent: true, hasShadow: true,
     webPreferences: { ...secure, backgroundThrottling: false },
   });
+  cockpit.setAlwaysOnTop(true, 'floating');
   void cockpit.loadFile(renderer('cockpit.html'));
   watch(cockpit, 'cockpit');
-  cockpit.on('closed', () => { cockpit = null; });
+  cockpit.on('closed', () => { cockpit = null; globalShortcut.unregisterAll(); });
+  applySettings(settings.value);
+}
+
+/** Apply device settings to the OS and the open windows. */
+function applySettings(value: Settings): void {
+  if (process.platform === 'darwin' || process.platform === 'win32') app.setLoginItemSettings({ openAtLogin: value.launchAtLogin });
+  cockpit?.setContentProtection(value.stealth);
+  registerShortcuts(value);
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', value);
+}
+
+/** Session shortcuts: active only while the cockpit is open. */
+function registerShortcuts(value: Settings): void {
+  globalShortcut.unregisterAll();
+  if (!cockpit) return;
+  const move = (dx: number, dy: number) => { const [x, y] = cockpit!.getPosition(); cockpit!.setPosition(x + dx, y + dy); };
+  const resize = (dw: number) => { const [w, h] = cockpit!.getSize(); cockpit!.setSize(Math.min(900, Math.max(340, w + dw)), h); };
+  const actions: Record<ShortcutId, () => void> = {
+    toggleResults: () => cockpit?.webContents.send('cockpit:command', 'toggle-results'),
+    solveScreen: () => void solveScreen('manual').catch((e) => cockpit?.webContents.send('cockpit:command', `error:${(e as Error).message}`)),
+    toggleAssistant: () => (cockpit?.isVisible() ? cockpit.hide() : cockpit?.showInactive()),
+    moveUp: () => move(0, -40), moveDown: () => move(0, 40), moveLeft: () => move(-40, 0), moveRight: () => move(40, 0),
+    grow: () => resize(40), shrink: () => resize(-40),
+  };
+  for (const [id, key] of Object.entries(value.shortcuts) as [ShortcutId, string][]) {
+    try { globalShortcut.register(key, actions[id]); } catch { console.error(`Shortcut ${key} could not be registered.`); }
+  }
+}
+
+/** Capture the primary screen (the cockpit itself is excluded under stealth) and have the engine answer it. */
+async function solveScreen(origin: 'manual' | 'automatic'): Promise<void> {
+  if (!current) throw new Error('No active session.');
+  // Automated tests: a fixed image instead of the real screen (never capture a developer's screen).
+  if (process.env.IRC_E2E === '1') {
+    if (!process.env.IRC_TEST_SCREEN) throw new Error('Screen capture is disabled in tests.');
+    const form = new FormData();
+    form.append('purpose', 'solve');
+    form.append('origin', origin);
+    form.append('image', new Blob([new Uint8Array(readFileSync(process.env.IRC_TEST_SCREEN))], { type: 'image/png' }), 'screen.png');
+    cockpit?.webContents.send('cockpit:command', 'solving');
+    await engine.upload(`/api/v3/sessions/${current.sessionId}/screen`, form);
+    return;
+  }
+  const display = screen.getPrimaryDisplay();
+  const size = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
+  const [source] = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size });
+  if (!source || source.thumbnail.isEmpty()) throw new Error('Screen capture is not allowed. Allow Screen & System Audio Recording.');
+  let image = source.thumbnail.toJPEG(85);
+  if (image.length > 9_500_000) image = source.thumbnail.resize({ width: Math.round(size.width / 2) }).toJPEG(80);
+  const form = new FormData();
+  form.append('purpose', 'solve');
+  form.append('origin', origin);
+  form.append('image', new Blob([new Uint8Array(image)], { type: 'image/jpeg' }), 'screen.jpg');
+  cockpit?.webContents.send('cockpit:command', 'solving');
+  await engine.upload(`/api/v3/sessions/${current.sessionId}/screen`, form);
 }
 
 /** Typed IPC handlers: every renderer call goes through one of these. */
@@ -99,6 +159,11 @@ function registerIpc(): void {
     current = null;
     cockpit?.close();
   });
+  ipcMain.handle('settings:get', () => settings.value);
+  ipcMain.handle('settings:defaults', () => DEFAULTS);
+  ipcMain.handle('settings:set', (_event, patch: unknown) => { const value = settings.update(patch); applySettings(value); return value; });
+  ipcMain.handle('screen:solve', (_event, origin: 'manual' | 'automatic') => solveScreen(origin === 'automatic' ? 'automatic' : 'manual'));
+  ipcMain.handle('app:info', () => ({ version: app.getVersion(), electron: process.versions.electron, platform: process.platform }));
   ipcMain.handle('permissions:status', () => ({
     microphone: systemPreferences.getMediaAccessStatus('microphone'),
     screen: process.platform === 'darwin' ? systemPreferences.getMediaAccessStatus('screen') : 'granted',
@@ -110,7 +175,9 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(() => {
-  engine = new Engine({ engineDir, dataDir });
+  engine = new Engine({ engineDir, dataDir, resolveProxy: (url) => session.defaultSession.resolveProxy(url) });
+  settings = new SettingsStore(dataDir);
+  if (process.env.IRC_E2E !== '1') app.setLoginItemSettings({ openAtLogin: settings.value.launchAtLogin });
   // getDisplayMedia from the cockpit gets the primary screen with system audio
   // (loopback); the video track is discarded by the renderer.
   session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {

@@ -14,10 +14,24 @@ import { join } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 
 const here = import.meta.dirname;
-const [resume, ...materials] = process.argv.slice(2);
+let [resume, ...materials] = process.argv.slice(2);
 const port = 19671;
 const data = mkdtempSync(join(tmpdir(), 'irc-app-e2e-'));
 const logFile = join(data, 'app.log');
+if (!resume) {
+  // No documents given: generate a PDF resume and a Markdown Q&A material (no personal files needed).
+  const { pdfFixture } = await import('./fixtures.mjs');
+  const { writeFileSync } = await import('node:fs');
+  resume = join(data, 'resume.pdf');
+  writeFileSync(resume, pdfFixture(['Jane Doe - Software Engineering Manager', 'Led 40 engineers building LTE and 5G NR layer-1 software.',
+    'Built a bit-exact C++ uplink receiver model used as the golden reference for DSP and FPGA teams.',
+    'Introduced hardware-in-the-loop CI and cut the release cycle from three months to four weeks.']));
+  materials = [join(data, 'prep.md')];
+  writeFileSync(materials[0], ['# Interview preparation', '', '## How did CFO estimation work in the uplink receiver you modelled, and what are its limits?',
+    'De-rotate with the previous TTI estimate, estimate the residual from the phase between the two DMRS symbols, smooth it per UE. Limits: large CFO and sparse allocations.', '',
+    '## How do you build a high-performance team?', 'Clear ownership, design reviews, CI on target hardware, and coaching team leads.', '',
+    '## Why do you want to work at AccelerComm?', 'Their 5G NR and NTN physical-layer IP sits where real-time PHY and rigorous software meet.'].join('\n'));
+}
 const env = { ...process.env, IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'fixtures/answer.wav'),
   IRC_TEST_SYSTEM_AUDIO: join(here, 'fixtures/question.wav') };
 delete env.ELECTRON_RUN_AS_NODE;
