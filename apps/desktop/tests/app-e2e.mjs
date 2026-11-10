@@ -79,7 +79,8 @@ async function connect(url) {
 }
 
 // Cockpit helpers (evaluated in the page).
-const entries = (who) => `[...document.querySelectorAll('.c-entry')].filter((e) => e.querySelector('.stamp')?.textContent.startsWith('${who}'))`;
+// Final lines only (the live caption has a typing cursor).
+const entries = (who) => `[...document.querySelectorAll('.c-entry')].filter((e) => e.querySelector('.stamp')?.textContent.startsWith('${who}') && !e.querySelector('.typing'))`;
 const answers = `[...document.querySelectorAll('.c-answer')]`;
 const clickButton = (selector, label) => `(() => { const b = [...${selector}].flatMap((e) => [...e.querySelectorAll('button')]).find((x) => x.textContent.includes('${label}') && !x.disabled); if (!b) return false; b.click(); return true; })()`;
 const finishedAnswers = `${answers}.filter((a) => a.innerText.includes('中文') && a.innerText.length > 60).length`;

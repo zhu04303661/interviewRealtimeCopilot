@@ -94,7 +94,9 @@ function openCockpit(): void {
 
 /** Apply device settings to the OS and the open windows. */
 function applySettings(value: Settings): void {
-  if (process.platform === 'darwin' || process.platform === 'win32') app.setLoginItemSettings({ openAtLogin: value.launchAtLogin });
+  if ((process.platform === 'darwin' || process.platform === 'win32') && app.getLoginItemSettings().openAtLogin !== value.launchAtLogin) {
+    app.setLoginItemSettings({ openAtLogin: value.launchAtLogin });
+  }
   cockpit?.setContentProtection(value.stealth);
   registerShortcuts(value);
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', value);
@@ -213,7 +215,6 @@ function registerIpc(): void {
 app.whenReady().then(() => {
   engine = new Engine({ engineDir, dataDir, resolveProxy: (url) => session.defaultSession.resolveProxy(url) });
   settings = new SettingsStore(dataDir);
-  if (process.env.IRC_E2E !== '1') app.setLoginItemSettings({ openAtLogin: settings.value.launchAtLogin });
   // getDisplayMedia from the cockpit gets the primary screen with system audio
   // (loopback); the video track is discarded by the renderer.
   session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {

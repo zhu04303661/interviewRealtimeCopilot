@@ -9,12 +9,13 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 
 type Entry =
-  | { kind: 'line'; key: string; seq: number; who: 'me' | 'interviewer'; text: string; zh?: string }
+  | { kind: 'line'; key: string; seq: number; who: 'me' | 'interviewer'; text: string; zh?: string; at?: number; ids?: string[] }
   | { kind: 'question'; key: string; seq: number; text: string; zh?: string; decision: string; intent?: string }
   | { kind: 'answer'; key: string; turnId: string; text: string; done: boolean; superseded?: boolean; grounded?: boolean };
 type Plan = { mode: string; current: number | null; asked: number[]; questions: { index: number; topic: string; question: string }[] };
 type State = { entries: Entry[]; translations: Record<string, string>; plan: Plan | null; status: string; ended: boolean; interim: string };
 type Frame = { type: string; seq: number; data: any };
+const MERGE_GAP_MS = 2000;
 
 function reduce(state: State, frame: Frame): State {
   const { type, seq, data } = frame;
@@ -25,13 +26,29 @@ function reduce(state: State, frame: Frame): State {
       if (!data.text) return state;
       if (data.role === 'interviewer') state = { ...state, interim: '' };
       const who = data.role === 'interviewer' ? 'interviewer' : 'me';
-      return { ...state, entries: [...entries, { kind: 'line', key: `t${data.segment_id}`, seq, who, text: data.text, zh: state.translations[data.segment_id] }] };
+      const now = Date.now();
+      const last = entries.at(-1);
+      // A continuation of the same speaker's unfinished sentence joins the previous line.
+      const shortTail = data.text.trim().split(/\s+/).length <= 6;
+      if (last?.kind === 'line' && last.who === who && last.key.startsWith('t') && last.at && now - last.at < MERGE_GAP_MS
+          && (shortTail || !/[.?!。？！]\s*$/.test(last.text))) {
+        const merged = { ...last, text: `${last.text} ${data.text}`.replace(/\s+/g, ' '), at: now, ids: [...(last.ids ?? []), data.segment_id], zh: undefined };
+        return { ...state, entries: [...entries.slice(0, -1), merged] };
+      }
+      return { ...state, entries: [...entries, { kind: 'line', key: `t${data.segment_id}`, seq, who, text: data.text, zh: state.translations[data.segment_id], at: now, ids: [data.segment_id] }] };
     }
     case 'say':
       return { ...state, entries: [...entries, { kind: 'line', key: `s${data.say_id}`, seq, who: 'interviewer', text: data.text, zh: state.translations[data.say_id] }] };
     case 'transcript.translation': {
-      const translations = { ...state.translations, [data.segment_id]: data.text };
-      return { ...state, translations, entries: entries.map((e) => e.kind === 'line' && (e.key === `t${data.segment_id}` || e.key === `s${data.segment_id}`) ? { ...e, zh: data.text } : e) };
+      const translations: Record<string, string> = { ...state.translations, [data.segment_id]: data.text };
+      return { ...state, translations, entries: entries.map((e) => {
+        if (e.kind !== 'line') return e;
+        if (e.key === `s${data.segment_id}`) return { ...e, zh: data.text };
+        if (!e.ids?.includes(data.segment_id)) return e;
+        // A merged line shows the translations of its parts in order.
+        const zh = e.ids.map((id) => translations[id]).filter(Boolean).join(' ');
+        return { ...e, zh };
+      }) };
     }
     case 'gate.verdict':
       if (data.decision !== 'respond' && data.decision !== 'await_more') return state;
@@ -105,6 +122,31 @@ function createVoice() {
   };
 }
 
+/**
+ * End-of-turn detection for one capture lane: an adaptive noise floor and
+ * speech threshold on 100 ms frames. After speech, ~0.8 s of quiet ends the
+ * turn, so the engine transcribes whole utterances instead of fixed slices.
+ */
+export function createTurnDetector(onTurnEnd: () => void, { quietMs = 800, frameMs = 100 } = {}) {
+  let floor = 200;
+  let speaking = false;
+  let quiet = 0;
+  return (rms: number) => {
+    floor = rms < floor ? floor * 0.9 + rms * 0.1 : floor * 0.995 + rms * 0.005;  // falls fast, rises slowly
+    const voiced = rms > Math.max(350, floor * 2.5);
+    if (voiced) { speaking = true; quiet = 0; return; }
+    if (!speaking) return;
+    quiet += frameMs;
+    if (quiet >= quietMs) { speaking = false; quiet = 0; onTurnEnd(); }
+  };
+}
+
+const rmsOf = (samples: Int16Array) => {
+  let sum = 0;
+  for (let i = 0; i < samples.length; i += 2) sum += samples[i] * samples[i];
+  return Math.sqrt(sum / Math.max(1, samples.length / 2));
+};
+
 /** Automated tests: plays a WAV (base64) into a stream, once, 2 s after it is requested. */
 async function testAudioStream(base64: string): Promise<MediaStream> {
   const context = new AudioContext();
@@ -120,17 +162,16 @@ async function testAudioStream(base64: string): Promise<MediaStream> {
 
 /** Streams a MediaStream's audio as 100 ms PCM16 frames on lane ``stream``. */
 async function captureLane(stream: MediaStream, lane: number, send: (frame: ArrayBuffer) => void,
-  onLevel: (lane: number, level: number) => void): Promise<() => void> {
+  onLevel: (lane: number, level: number) => void, onRms: (rms: number) => void = () => {}): Promise<() => void> {
   const context = new AudioContext();
   await context.audioWorklet.addModule('./pcm-worklet.js');
   const source = context.createMediaStreamSource(stream);
   const node = new AudioWorkletNode(context, 'pcm-frames');
   let sequence = 0;
   node.port.onmessage = ({ data }: MessageEvent<ArrayBuffer>) => {
-    const samples = new Int16Array(data);
-    let sum = 0;
-    for (let i = 0; i < samples.length; i += 4) sum += samples[i] * samples[i];
-    onLevel(lane, Math.min(1, Math.sqrt(sum / (samples.length / 4)) / 6000));
+    const rms = rmsOf(new Int16Array(data));
+    onLevel(lane, Math.min(1, rms / 6000));
+    onRms(rms);
     const frame = new Uint8Array(5 + data.byteLength);
     const view = new DataView(frame.buffer);
     view.setUint8(0, lane);
@@ -176,19 +217,21 @@ function Cockpit() {
         if (general) streams.push({ stream_id: 'interviewer', source: 'system', role: 'interviewer', encoding: 'pcm16', sample_rate: 16000 });
         ws.send(JSON.stringify({ v: 1, type: 'hello', jwt: session.jwt, session_id: session.sessionId, streams }));
         const send = (frame: ArrayBuffer) => { if (ws.readyState === WebSocket.OPEN) ws.send(frame); };
+        const finalize = (lane: number) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ v: 1, type: 'finalize', stream: lane })); };
+        // Interviewers pause mid-question more than candidates do; their lane waits longer before ending a turn.
+        const turns = [createTurnDetector(() => finalize(0), { quietMs: 900 }), createTurnDetector(() => finalize(1), { quietMs: 1200 })];
         try {
           const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
-          stops.push(await captureLane(mic, 0, send, onLevel));
+          stops.push(await captureLane(mic, 0, send, onLevel, turns[0]));
           if (general && session.testSystemAudio) {
-            stops.push(await captureLane(await testAudioStream(session.testSystemAudio), 1, send, onLevel));
+            stops.push(await captureLane(await testAudioStream(session.testSystemAudio), 1, send, onLevel, turns[1]));
           } else if (general && await window.copilot.startSystemAudio()) {
             // macOS: frames from the Core Audio tap helper, already 16 kHz PCM16.
             let sequence = 0;
             window.copilot.onSystemAudio((pcm) => {
-              const samples = new Int16Array(pcm.buffer, pcm.byteOffset, pcm.byteLength >> 1);
-              let sum = 0;
-              for (let i = 0; i < samples.length; i += 4) sum += samples[i] * samples[i];
-              onLevel(1, Math.min(1, Math.sqrt(sum / (samples.length / 4)) / 6000));
+              const rms = rmsOf(new Int16Array(pcm.buffer, pcm.byteOffset, pcm.byteLength >> 1));
+              onLevel(1, Math.min(1, rms / 6000));
+              turns[1](rms);
               const frame = new Uint8Array(5 + pcm.byteLength);
               new DataView(frame.buffer).setUint8(0, 1);
               new DataView(frame.buffer).setUint32(1, sequence++, true);
@@ -200,7 +243,7 @@ function Cockpit() {
             const display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
             display.getVideoTracks().forEach((t) => t.stop());
             if (!display.getAudioTracks().length) throw new Error('No system audio. Allow Screen & System Audio Recording. · 无系统声音，请授权屏幕与系统录音。');
-            stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send, onLevel));
+            stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send, onLevel, turns[1]));
           }
           dispatch({ type: 'transcription.state', seq: 0, data: { state: 'ok' } });
         } catch (error) {

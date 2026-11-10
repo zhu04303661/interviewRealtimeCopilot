@@ -261,3 +261,25 @@ async def test_preflight_chooses_the_starting_practice_mode(signed_in, fake_open
     plan = await client.wait_type("practice.plan", timeout=8)
     assert plan["data"]["mode"] == "ai"
     await client.close()
+
+
+def test_candidate_turn_does_not_split_the_interviewers_line():
+    """Regression: a candidate turn while the interviewer was still speaking cut the spoken line in two."""
+    from frlocal.realtime import session as session_module
+    from frlocal.realtime.voice_agent import RealtimeVoiceAgent
+
+    finished = []
+    agent = RealtimeVoiceAgent.__new__(RealtimeVoiceAgent)
+    interview = session_module.InterviewSession.__new__(session_module.InterviewSession)
+    interview._live, interview._live_answer = agent, None
+    interview._finish_live_say = lambda: finished.append("say")
+    interview._finish_live_answer = lambda: None
+    interview._cancel_reply = lambda: None
+    for speaking, expected in ((True, []), (False, ["say"])):
+        finished.clear()
+        type(agent).interviewer_speaking = property(lambda self, value=speaking: value)
+        try:
+            interview._realtime_candidate_done("Uh")  # a filler, so no reply is scheduled
+        finally:
+            del type(agent).interviewer_speaking
+        assert finished == expected
