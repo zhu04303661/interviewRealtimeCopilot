@@ -62,7 +62,10 @@ class RealtimeVoiceAgent:
                     # Interview answers contain thinking pauses; wait for the whole thought.
                     # The backend decides each interviewer turn (next prepared question
                     # or one follow-up), so VAD only detects turns and never replies by itself.
-                    "turn_detection": {"type": "semantic_vad", "eagerness": "low", "create_response": False},
+                    # Without barge-in the candidate cannot cut the interviewer off,
+                    # so speech must not cancel a reply that is still being generated.
+                    "turn_detection": {"type": "semantic_vad", "eagerness": "low", "create_response": False,
+                                       "interrupt_response": barge_in},
                 },
                 "output": {"format": {"type": "audio/pcm", "rate": OUTPUT_RATE}, "voice": voice},
             },

@@ -63,6 +63,7 @@ class FakeOpenAI:
         self.requests: list[dict[str, Any]] = []
         self.request_times: list[tuple[str, float]] = []
         self.understanding_delay = 0.0
+        self.topics_delay = 0.0
         self.answer_first_token_delay = 0.0
         self.answer_token_gap = 0.0
         self.answer_chunks = ["**EN**\n- I led ", "the migration.\n", "**中文**\n- 我负责了迁移。"]
@@ -140,6 +141,8 @@ class FakeOpenAI:
             return response
         if purpose == "understanding":
             await asyncio.sleep(self.understanding_delay)
+        if purpose == "topics":
+            await asyncio.sleep(self.topics_delay)
         value = self.handlers[purpose](body)
         text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
         return web.json_response({"output": [{"type": "message", "content": [{"type": "output_text", "text": text}]}]})

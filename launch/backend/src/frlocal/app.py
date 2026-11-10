@@ -69,6 +69,9 @@ def build_app(settings: Settings, *, openai: OpenAI | None = None) -> web.Applic
     @web.middleware
     async def require_token(request: web.Request, handler):
         supplied = request.headers.get("Authorization", "")
+        if request.path.startswith("/realtime/") and "token" in request.query:
+            # Browser WebSockets cannot set headers: the renderer passes the token in the URL.
+            supplied = f"Bearer {request.query['token']}"
         if not hmac.compare_digest(supplied.encode(), f"Bearer {settings.token}".encode()):
             return web.json_response({"detail": "The local backend only accepts requests from the app."}, status=403)
         return await handler(request)

@@ -150,3 +150,12 @@ def test_workspaces_move_once_from_the_old_profile_folder(tmp_path):
     (target / "admin" / "workspace.json").write_text('{"goals": {}}')
     assert migrate_legacy_workspaces(legacy, target) == []          # never overwrites newer data
     assert migrate_legacy_workspaces(None, target) == []
+
+
+async def test_session_history_lists_sessions_newest_first(signed_in):
+    goal = await signed_in.call("POST", "/api/v3/goals", json={"role": "SEM", "company": "AccelerComm"})
+    first = await signed_in.call("POST", "/api/v3/sessions", json={"topology": "mock", "goal_id": goal["goal_id"], "config": {}})
+    second = await signed_in.call("POST", "/api/v3/sessions", json={"topology": "general", "goal_id": goal["goal_id"], "config": {}})
+    rows = (await signed_in.call("GET", "/api/v3/sessions"))["sessions"]
+    assert [r["session_id"] for r in rows] == [second["session_id"], first["session_id"]]
+    assert rows[0]["topology"] == "general" and rows[0]["company"] == "AccelerComm" and "report" not in rows[0]

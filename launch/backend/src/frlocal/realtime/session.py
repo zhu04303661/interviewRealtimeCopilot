@@ -51,16 +51,29 @@ def is_filler(text: str) -> bool:
     return bool(FILLER.match(text.strip()))
 
 
+CJK = re.compile(r"[\u4e00-\u9fff]")
+
+
 def useful_translation(translation: str, original: str) -> bool:
-    """A translation worth showing: present and not just the original repeated."""
+    """A translation worth showing: present, not the original repeated, and in the other language
+    (English and other Latin-script speech → Chinese, Chinese → English)."""
     def squash(value: str) -> str:
         return re.sub(r"\W+", "", value).lower()
-    return bool(translation.strip()) and squash(translation) != squash(original)
+    if not translation.strip() or squash(translation) == squash(original):
+        return False
+    source_is_chinese = len(CJK.findall(original)) > len(re.findall(r"[A-Za-z]", original)) / 4
+    return not CJK.search(translation) if source_is_chinese else bool(CJK.search(translation))
 
 
 # Share of a microphone line's words that, when all heard from the interviewer
 # just before, marks it as the speakers' echo rather than the candidate.
 ECHO_OVERLAP = 0.7
+
+SELF_INTRODUCTION = re.compile(r"tell me about yourself|introduce yourself|walk me through your (?:background|cv|resume|career)|"
+                               r"(?:one-line |your )?career story|自我介绍|介绍一下(?:你)?自己", re.I)
+
+# How long the Realtime practice interviewer waits for the question plan before greeting anyway.
+PLAN_WAIT_S = 2.5
 
 # How long an unfinished-sounding question waits for more before it is answered anyway.
 AUTO_ANSWER_WAIT_S = 2.0
@@ -154,6 +167,7 @@ class InterviewSession:
         self._asked: set[int] = set()  # prepared questions already asked
         self._practice_mode = "sequential"  # sequential | random | ai (improvised, never repeating)
         self._reply_timer: asyncio.TimerHandle | None = None
+        self._plan_task: asyncio.Task | None = None
 
     # ── frames ──────────────────────────────────────────────────────────────
 
@@ -324,6 +338,8 @@ class InterviewSession:
                 self.emit("transcript.translation", {
                     "segment_id": segment.segment_id, "text": result.translation, "language": result.language,
                     "target_language": "en" if result.language == "zh" else "zh"})
+            elif result:  # the combined call sometimes rewords instead of translating
+                self._spawn(self._translate_say(segment.segment_id, segment.text))
             if number != self._pending.analysis or self.ended:
                 return  # a newer utterance arrived; its analysis decides
             self._decide(result or understanding.heuristic(pending_text), pending_text, started)
@@ -514,13 +530,16 @@ class InterviewSession:
             return [dict(q, question=coach.spoken_question(q["question"])) for q in json.loads(cache.read_text())]
         except (OSError, ValueError, TypeError, KeyError):
             pass
+        body = coach.question_bank_request(model, self.config["goal"], {"filename": filename, "text": text}, generate=generate)
         async with limit:
-            try:
-                body = coach.question_bank_request(model, self.config["goal"], {"filename": filename, "text": text}, generate=generate)
-                questions = coach.parse_question_bank(await self.openai.respond(
-                    body, timeout=self.settings.limits.understanding_timeout_s * 8, key=self.key))
-            except (ProviderError, TimeoutError) as error:
-                log.info("Could not read prepared questions from %s: %s", filename, error)
+            for attempt in (1, 2):  # one retry: long extractions occasionally drop on the network
+                try:
+                    questions = coach.parse_question_bank(await self.openai.respond(
+                        body, timeout=self.settings.limits.understanding_timeout_s * 8, key=self.key))
+                    break
+                except (ProviderError, TimeoutError) as error:
+                    log.info("Could not read prepared questions from %s (attempt %d): %s", filename, attempt, error)
+            else:
                 return []
         try:
             cache.parent.mkdir(parents=True, exist_ok=True)
@@ -611,17 +630,31 @@ class InterviewSession:
             return
         if self._sources is None:
             self._sources = asyncio.get_running_loop().create_task(self._load_sources())
-        bank, resume = await self._practice_plan()
+        self._plan_task = self._spawn(self._practice_plan())
+        # The Realtime interviewer does not wait for question extraction (seconds on first use):
+        # it greets and asks for a short self-introduction, then continues with the plan.
+        await asyncio.wait({self._plan_task}, timeout=None if mode == "live" else PLAN_WAIT_S)
         if self.ended or not self.connected:
             return
+        ready = self._plan_task.done() and not self._plan_task.cancelled()
+        bank, resume = self._plan_task.result() if ready else ([], next((s.text for s in await self._sources if s.kind == "resume"), ""))
         language = coach.spoken_language(self.config.get("language"))
         goal = self.config["goal"]
         topics = [{"title": q["topic"] or q["question"][:60], "focus": q["question"]} for q in bank]
         instructions = coach.live_instructions(goal, topics, resume, language, self.config.get("persona"))
         greeting = coach.live_greeting(goal, topics, language)
-        first = self._pick_next()
+        first = self._pick_next() if ready else None
         if first is not None:
             greeting += coach.first_question_line(bank[first]["question"])
+        elif not ready:
+            greeting = coach.introduction_greeting(goal, language)
+
+            def plan_ready(_task: asyncio.Task) -> None:
+                # The greeting already asked for a self-introduction: do not ask it again.
+                self._asked.update(i for i, q in enumerate(self._bank or []) if SELF_INTRODUCTION.search(q["question"]))
+                self._emit_plan()
+
+            self._plan_task.add_done_callback(plan_ready)
         on_audio = lambda audio: self.emit("say.audio", {"audio": audio})  # noqa: E731
         if mode == "realtime":
             live = RealtimeVoiceAgent(
@@ -655,7 +688,7 @@ class InterviewSession:
         # Marked only now: if voice failed, the text interviewer asks this question instead.
         if first is not None:
             self._mark_asked(first)
-        else:
+        elif ready:  # otherwise the plan is sent when extraction finishes
             self._emit_plan()
 
     def _live_closed(self, reason: str | None) -> None:
@@ -727,7 +760,14 @@ class InterviewSession:
         self._reply_timer = None
         if self.ended or not isinstance(self._live, RealtimeVoiceAgent):
             return
-        self._spawn(self._live.respond(self._next_turn()))
+
+        async def reply() -> None:
+            if self._plan_task and not self._plan_task.done():
+                await asyncio.wait({self._plan_task})  # the plan is still being extracted
+            if isinstance(self._live, RealtimeVoiceAgent) and not self.ended:
+                await self._live.respond(self._next_turn())
+
+        self._spawn(reply())
 
     def _finish_live_answer(self) -> None:
         answer, self._live_answer = self._live_answer, None
