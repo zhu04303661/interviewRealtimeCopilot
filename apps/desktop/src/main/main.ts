@@ -4,7 +4,8 @@
 // cockpit window shown during an interview. Renderers reach the engine only
 // through the narrow IPC surface in ../preload/preload.ts.
 import { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, screen, session, shell, systemPreferences } from 'electron';
-import { readFileSync } from 'node:fs';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { Engine } from './engine';
 import { DEFAULTS, type Settings, SettingsStore, type ShortcutId } from './settings';
@@ -17,8 +18,6 @@ if (process.env.IRC_FAKE_AUDIO) {
   app.commandLine.appendSwitch('disable-features', 'AudioServiceSandbox');  // lets the audio service read the file
 }
 
-// macOS system-audio loopback for getDisplayMedia (ScreenCaptureKit).
-app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride');
 
 const engineDir = process.env.IRC_ENGINE_DIR ?? resolve(__dirname, '../../../../engine');
 const dataDir = process.env.IRC_DATA_DIR ?? join(app.getPath('appData'), 'Interview Realtime Copilot');
@@ -27,6 +26,37 @@ let mainWindow: BrowserWindow | null = null;
 let cockpit: BrowserWindow | null = null;
 let current: { sessionId: string; wsUrl: string; topology: string } | null = null;
 let settings: SettingsStore;
+let systemAudio: ChildProcess | null = null;
+
+/** macOS: computer audio comes from our Core Audio tap helper (Electron's loopback is Windows-only). */
+const systemAudioHelper = process.env.IRC_SYSTEM_AUDIO_HELPER ?? join(__dirname, '../../native/bin/irc-system-audio');
+
+function startSystemAudio(): boolean {
+  stopSystemAudio();
+  if (process.platform !== 'darwin' || !existsSync(systemAudioHelper)) return false;
+  const child = spawn(systemAudioHelper, [], { stdio: ['pipe', 'pipe', 'pipe'] });
+  systemAudio = child;
+  let carry = Buffer.alloc(0);
+  child.stdout!.on('data', (chunk: Buffer) => {
+    carry = Buffer.concat([carry, chunk]);
+    while (carry.length >= 3_200) {  // 100 ms of 16 kHz PCM16
+      cockpit?.webContents.send('system-audio:frame', new Uint8Array(carry.subarray(0, 3_200)));
+      carry = carry.subarray(3_200);
+    }
+  });
+  child.stderr!.on('data', (line: Buffer) => {
+    const text = line.toString().trim();
+    console.log(`[system-audio] ${text}`);
+    if (text.startsWith('error:')) cockpit?.webContents.send('cockpit:command', `error:${text.slice(7)} · 无法采集电脑声音，请在“录屏与系统录音”中允许本应用。`);
+  });
+  child.on('exit', () => { if (systemAudio === child) systemAudio = null; });
+  return true;
+}
+
+function stopSystemAudio(): void {
+  systemAudio?.stdin?.end();  // the helper exits when stdin closes
+  systemAudio = null;
+}
 
 const renderer = (page: string) => join(__dirname, '../renderer', page);
 const preload = join(__dirname, '../preload/preload.js');
@@ -58,7 +88,7 @@ function openCockpit(): void {
   cockpit.setAlwaysOnTop(true, 'floating');
   void cockpit.loadFile(renderer('cockpit.html'));
   watch(cockpit, 'cockpit');
-  cockpit.on('closed', () => { cockpit = null; globalShortcut.unregisterAll(); });
+  cockpit.on('closed', () => { cockpit = null; globalShortcut.unregisterAll(); stopSystemAudio(); });
   applySettings(settings.value);
 }
 
@@ -159,6 +189,8 @@ function registerIpc(): void {
     current = null;
     cockpit?.close();
   });
+  ipcMain.handle('system-audio:start', () => startSystemAudio());
+  ipcMain.handle('system-audio:stop', () => stopSystemAudio());
   ipcMain.handle('settings:get', () => settings.value);
   ipcMain.handle('settings:defaults', () => DEFAULTS);
   ipcMain.handle('settings:set', (_event, patch: unknown) => { const value = settings.update(patch); applySettings(value); return value; });
@@ -194,4 +226,4 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('will-quit', () => engine?.stop());
+app.on('will-quit', () => { stopSystemAudio(); engine?.stop(); });

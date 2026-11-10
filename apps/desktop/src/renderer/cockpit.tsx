@@ -13,7 +13,7 @@ type Entry =
   | { kind: 'question'; key: string; seq: number; text: string; zh?: string; decision: string; intent?: string }
   | { kind: 'answer'; key: string; turnId: string; text: string; done: boolean; superseded?: boolean; grounded?: boolean };
 type Plan = { mode: string; current: number | null; asked: number[]; questions: { index: number; topic: string; question: string }[] };
-type State = { entries: Entry[]; translations: Record<string, string>; plan: Plan | null; status: string; ended: boolean };
+type State = { entries: Entry[]; translations: Record<string, string>; plan: Plan | null; status: string; ended: boolean; interim: string };
 type Frame = { type: string; seq: number; data: any };
 
 function reduce(state: State, frame: Frame): State {
@@ -21,7 +21,9 @@ function reduce(state: State, frame: Frame): State {
   const entries = state.entries;
   switch (type) {
     case 'transcript': {
-      if (!data.final || !data.text) return state;
+      if (!data.final) return data.role === 'interviewer' ? { ...state, interim: data.text ?? '' } : state;  // live caption
+      if (!data.text) return state;
+      if (data.role === 'interviewer') state = { ...state, interim: '' };
       const who = data.role === 'interviewer' ? 'interviewer' : 'me';
       return { ...state, entries: [...entries, { kind: 'line', key: `t${data.segment_id}`, seq, who, text: data.text, zh: state.translations[data.segment_id] }] };
     }
@@ -141,7 +143,7 @@ async function captureLane(stream: MediaStream, lane: number, send: (frame: Arra
 }
 
 function Cockpit() {
-  const [state, dispatch] = useReducer(reduce, { entries: [], translations: {}, plan: null, status: 'Connecting… · 正在连接…', ended: false });
+  const [state, dispatch] = useReducer(reduce, { entries: [], translations: {}, plan: null, status: 'Connecting… · 正在连接…', ended: false, interim: '' });
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(Date.now());
   const socket = useRef<WebSocket | null>(null);
@@ -179,6 +181,21 @@ function Cockpit() {
           stops.push(await captureLane(mic, 0, send, onLevel));
           if (general && session.testSystemAudio) {
             stops.push(await captureLane(await testAudioStream(session.testSystemAudio), 1, send, onLevel));
+          } else if (general && await window.copilot.startSystemAudio()) {
+            // macOS: frames from the Core Audio tap helper, already 16 kHz PCM16.
+            let sequence = 0;
+            window.copilot.onSystemAudio((pcm) => {
+              const samples = new Int16Array(pcm.buffer, pcm.byteOffset, pcm.byteLength >> 1);
+              let sum = 0;
+              for (let i = 0; i < samples.length; i += 4) sum += samples[i] * samples[i];
+              onLevel(1, Math.min(1, Math.sqrt(sum / (samples.length / 4)) / 6000));
+              const frame = new Uint8Array(5 + pcm.byteLength);
+              new DataView(frame.buffer).setUint8(0, 1);
+              new DataView(frame.buffer).setUint32(1, sequence++, true);
+              frame.set(pcm, 5);
+              send(frame.buffer);
+            });
+            stops.push(() => void window.copilot.stopSystemAudio());
           } else if (general) {
             const display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
             display.getVideoTracks().forEach((t) => t.stop());
@@ -301,6 +318,7 @@ function Cockpit() {
             </div>
           );
         })}
+        {state.interim && <div className="c-entry"><span className="stamp">Interviewer · 面试官</span><div className="text" style={{ opacity: .7 }}>{state.interim}<span className="typing" /></div></div>}
       </div>
       <footer className="c-footer">
         <button className="c-btn" onClick={solve} title="⌥S">Solve screen · 截屏解答</button>

@@ -8,10 +8,11 @@
   "scripts": {
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
-    "build": "npm run build:main && npm run build:renderer",
+    "build": "npm run build:native && npm run build:main && npm run build:renderer",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "start": "npm run build && electron .",
-    "app": "npm run build && open -n node_modules/electron/dist/Electron.app --args \"$PWD\""
+    "app": "npm run build && open -n node_modules/electron/dist/Electron.app --args \"$PWD\"",
+    "build:native": "node scripts/build-native.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

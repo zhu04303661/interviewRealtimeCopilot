@@ -12,6 +12,9 @@ interface Window {
     permissions(): Promise<{ microphone: string; screen: string }>;
     requestMicrophone(): Promise<boolean>;
     openScreenSettings(): Promise<void>;
+    startSystemAudio(): Promise<boolean>;
+    stopSystemAudio(): Promise<void>;
+    onSystemAudio(listener: (frame: Uint8Array) => void): void;
     getSettings(): Promise<DeviceSettings>;
     defaultSettings(): Promise<DeviceSettings>;
     setSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;
