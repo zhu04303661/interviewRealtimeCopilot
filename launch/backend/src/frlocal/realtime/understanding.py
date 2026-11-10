@@ -45,6 +45,7 @@ INSTRUCTIONS = """You assist a job candidate during a live interview. You receiv
 3. Decide about pending_interviewer_speech as a whole:
    - is_question: the interviewer asks the candidate something or gives a task that needs an answer (including imperative prompts like "walk me through…").
    - complete: the question is fully stated and the interviewer is likely waiting for the answer. Small talk, acknowledgements and unfinished sentences are not complete questions.
+   - An unfinished sentence that names a topic for the candidate to address ("So when you think about the scheduler design…", "Tell me about…") is a question (is_question true, complete false); small talk and acknowledgements are not.
    - question: the question restated as one self-contained sentence in its original language, resolving references from the conversation; empty when is_question is false.
    - question_translation: question translated as in step 2; empty when question is empty.
    - intent: coding for programming tasks, system_design for architecture/design tasks, otherwise general.
