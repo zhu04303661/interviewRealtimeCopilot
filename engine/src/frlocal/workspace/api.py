@@ -503,6 +503,8 @@ class WorkspaceApi:
             return raw(self._report(workspace.username, state, session))
         if action == "transcript" and method == "GET":
             return raw({"segments": state["transcripts"].get(session_id, [])})
+        if action == "recordings" and method == "GET" and not recording_id:
+            return raw({"recordings": [r for r in state["recordings"].values() if r["session_id"] == session_id and r.get("completed_at")]})
         if action == "recordings" and method == "POST":
             if not recording_id:
                 body = await json_fields(request)

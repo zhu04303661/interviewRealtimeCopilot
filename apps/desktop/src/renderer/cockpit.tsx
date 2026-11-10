@@ -97,6 +97,48 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
+/** Records the whole session (microphone + interviewer) as one Opus/WebM track. */
+function createRecorder() {
+  const context = new AudioContext();
+  const mix = context.createMediaStreamDestination();
+  const chunks: Blob[] = [];
+  let recorder: MediaRecorder | null = null;
+  let started = 0;
+  let next = 0;
+  return {
+    addStream(stream: MediaStream) { context.createMediaStreamSource(stream).connect(mix); },
+    /** PCM16 mono chunks (computer audio at 16 kHz, interviewer voice at 24 kHz), queued back to back. */
+    addPcm(samples: Int16Array, rate: number) {
+      if (!samples.length) return;
+      const buffer = context.createBuffer(1, samples.length, rate);
+      const channel = buffer.getChannelData(0);
+      for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(mix);
+      next = Math.max(next, context.currentTime + 0.05);
+      source.start(next);
+      next += buffer.duration;
+    },
+    start() {
+      recorder = new MediaRecorder(mix.stream, { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 32_000 });
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      recorder.start(1000);
+      started = Date.now();
+    },
+    async stop(): Promise<{ blob: Blob; durationMs: number } | null> {
+      const active = recorder;
+      recorder = null;
+      if (!active || active.state === 'inactive') return null;
+      await new Promise((resolve) => { active.onstop = resolve; active.stop(); });
+      void context.close();
+      return chunks.length ? { blob: new Blob(chunks, { type: 'audio/webm' }), durationMs: Date.now() - started } : null;
+    },
+  };
+}
+
+const decodePcm = (base64: string) => { const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)); return new Int16Array(bytes.buffer, 0, bytes.length >> 1); };
+
 /** Gapless playback of the practice interviewer (24 kHz PCM16 base64 chunks). */
 function createVoice() {
   let context: AudioContext | null = null;
@@ -191,6 +233,8 @@ function Cockpit() {
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(Date.now());
   const socket = useRef<WebSocket | null>(null);
+  const recorderRef = useRef<ReturnType<typeof createRecorder> | null>(null);
+  const sessionIdRef = useRef('');
   const [session, setSession] = useState<{ topology: string }>({ topology: 'mock' });
   // Live input levels per lane (0 = microphone, 1 = computer audio), so missing input is visible at once.
   const [levels, setLevels] = useState<number[]>([0, 0]);
@@ -205,12 +249,15 @@ function Cockpit() {
 
   useEffect(() => {
     const voice = createVoice();
+    const recorder = createRecorder();
+    recorderRef.current = recorder;
     const stops: (() => void)[] = [];
     let closed = false;
     void (async () => {
       const session = await window.copilot.currentSession();
       if (!session) return dispatch({ type: 'error', seq: 0, data: { message: 'No active session.' } });
       setSession(session);
+      sessionIdRef.current = session.sessionId;
       const ws = new WebSocket(session.wsUrl);
       ws.binaryType = 'arraybuffer';
       socket.current = ws;
@@ -225,9 +272,13 @@ function Cockpit() {
         const turns = [createTurnDetector(() => finalize(0), { quietMs: 900 }), createTurnDetector(() => finalize(1), { quietMs: 1200 })];
         try {
           const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+          recorder.addStream(mic);
+          recorder.start();
           stops.push(await captureLane(mic, 0, send, onLevel, turns[0]));
           if (general && session.testSystemAudio) {
-            stops.push(await captureLane(await testAudioStream(session.testSystemAudio), 1, send, onLevel, turns[1]));
+            const testStream = await testAudioStream(session.testSystemAudio);
+            recorder.addStream(testStream);
+            stops.push(await captureLane(testStream, 1, send, onLevel, turns[1]));
           } else if (general && await window.copilot.startSystemAudio()) {
             // macOS: frames from the Core Audio tap helper, already 16 kHz PCM16.
             let sequence = 0;
@@ -239,6 +290,7 @@ function Cockpit() {
               new DataView(frame.buffer).setUint8(0, 1);
               new DataView(frame.buffer).setUint32(1, sequence++, true);
               frame.set(pcm, 5);
+              recorder.addPcm(new Int16Array(pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength)), 16_000);
               send(frame.buffer);
             });
             stops.push(() => void window.copilot.stopSystemAudio());
@@ -256,7 +308,7 @@ function Cockpit() {
       ws.onmessage = ({ data }) => {
         if (typeof data !== 'string') return;
         const frame: Frame = JSON.parse(data);
-        if (frame.type === 'say.audio') return voice.play(frame.data.audio);
+        if (frame.type === 'say.audio') { recorder.addPcm(decodePcm(frame.data.audio), 24_000); return voice.play(frame.data.audio); }
         if (frame.type === 'say.audio.clear' || frame.type === 'session.ended') voice.stop();
         dispatch(frame);
       };
@@ -297,6 +349,20 @@ function Cockpit() {
       void window.copilot.solveScreen('automatic').catch((e) => setNotice((e as Error).message));
     }
   }, [state.entries, appearance?.autoCapture]);
+  const [ending, setEnding] = useState(false);
+  /** End the session, saving the recording first (the cockpit closes when the session ends). */
+  const end = async () => {
+    setEnding(true);
+    try {
+      const recording = await recorderRef.current?.stop();
+      if (recording && sessionIdRef.current) {
+        await window.copilot.saveRecording(sessionIdRef.current, new Uint8Array(await recording.blob.arrayBuffer()), 'audio/webm', recording.durationMs);
+      }
+    } catch (error) {
+      console.error('Recording could not be saved', error);
+    }
+    await window.copilot.endSession();
+  };
   const solve = () => void window.copilot.solveScreen('manual').catch((e) => setNotice((e as Error).message));
   const panelStyle = appearance ? { background: hexToRgba(appearance.background, appearance.opacity), color: appearance.text } : undefined;
   const live = !state.ended;
@@ -370,7 +436,7 @@ function Cockpit() {
         <button className="c-btn" onClick={solve} title="⌥S">Solve screen · 截屏解答</button>
         <span className="spacer" />
         <span className="timer">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</span>
-        <button className="c-btn end" onClick={() => window.copilot.endSession()}>End · 结束</button>
+        <button className="c-btn end" disabled={ending} onClick={end}>{ending ? 'Saving… · 保存中…' : 'End · 结束'}</button>
       </footer>
     </div>
   );

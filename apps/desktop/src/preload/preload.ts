@@ -12,6 +12,8 @@ const api = {
   permissions: () => ipcRenderer.invoke('permissions:status'),
   requestMicrophone: () => ipcRenderer.invoke('permissions:request-microphone'),
   openScreenSettings: () => ipcRenderer.invoke('permissions:open-screen-settings'),
+  saveRecording: (sessionId: string, bytes: Uint8Array, contentType: string, durationMs: number) => ipcRenderer.invoke('recording:save', sessionId, bytes, contentType, durationMs),
+  loadRecording: (sessionId: string) => ipcRenderer.invoke('recording:load', sessionId),
   startSystemAudio: () => ipcRenderer.invoke('system-audio:start'),
   stopSystemAudio: () => ipcRenderer.invoke('system-audio:stop'),
   onSystemAudio: (listener: (frame: Uint8Array) => void) => { ipcRenderer.on('system-audio:frame', (_event, frame) => listener(frame)); },

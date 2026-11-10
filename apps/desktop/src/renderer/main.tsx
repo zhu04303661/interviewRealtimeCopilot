@@ -274,10 +274,22 @@ function LibraryPage({ docs, refresh }: { docs: Doc[]; refresh: () => void }) {
 
 function HistoryPage({ sessions, sessionId, open }: { sessions: SessionRow[]; sessionId?: string; open: (id?: string) => void }) {
   const [report, setReport] = useState<any>(null);
+  const [audio, setAudio] = useState<string | null>(null);
   useEffect(() => {
     setReport(null);
     if (sessionId) void window.copilot.request('GET', `/api/v3/sessions/${sessionId}/report`).then((r) => setReport(r.report ?? false));
   }, [sessionId, sessions]);
+  useEffect(() => {  // the session recording, played from memory
+    setAudio(null);
+    if (!sessionId) return;
+    let url: string | null = null;
+    void window.copilot.loadRecording(sessionId).then((rec) => {
+      if (!rec) return;
+      url = URL.createObjectURL(new Blob([new Uint8Array(rec.data)], { type: rec.contentType }));
+      setAudio(url);
+    }).catch(() => undefined);
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [sessionId]);
   const row = sessions.find((s) => s.session_id === sessionId);
   if (sessionId && row) {
     return (
@@ -285,6 +297,10 @@ function HistoryPage({ sessions, sessionId, open }: { sessions: SessionRow[]; se
         <button className="link small" onClick={() => open()}>← History · 历史</button>
         <div className="page-head" style={{ marginTop: 16 }}><div><div className="eyebrow">{row.topology === 'mock' ? 'Practice · 练习' : 'Live · 实时面试'} · {when(row.created_at)}</div>
           <h1 className="long">{report?.overall?.headline ?? `${row.company} · ${row.role}`}</h1><p>{report?.overall?.summary ?? (row.status === 'preparing' ? 'Preparing the debrief… · 正在生成复盘…' : 'No debrief for this session. · 这个会话没有复盘。')}</p></div></div>
+        <div className="card" style={{ marginTop: 20, padding: '14px 18px' }}>
+          <div className="row"><b>Recording · 录音</b><span className="spacer" />
+            {audio ? <audio controls src={audio} style={{ width: 420 }} /> : <span className="muted small">No recording for this session. · 这个会话没有录音。</span>}</div>
+        </div>
         {report && (
           <div className="two-col" style={{ marginTop: 24 }}>
             <div className="stack">

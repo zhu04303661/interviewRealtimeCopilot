@@ -119,6 +119,15 @@ export class Engine {
     return value;
   }
 
+  /** Raw bytes to or from the engine (recordings). */
+  async raw(method: 'PUT' | 'GET', path: string, body?: Uint8Array, headers: Record<string, string> = {}): Promise<Response> {
+    const response = await fetch(`${await this.baseUrl()}${path}`, {
+      method, headers: { Authorization: `Bearer ${this.token}`, ...headers }, body: body ? Buffer.from(body) : undefined,
+    });
+    if (!response.ok && response.status !== 308) throw new Error(`Engine ${method} ${path} failed (${response.status}).`);
+    return response;
+  }
+
   stop(): void {
     this.stopping = true;
     this.child?.kill('SIGTERM');

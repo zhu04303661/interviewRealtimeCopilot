@@ -197,18 +197,37 @@ try {
   await shot(cockpit, '6-live-cockpit');
   check(await cockpit.evaluate(`${entries('Interviewer')}.every((e) => e.querySelector('.text').textContent !== ${JSON.stringify(mine)})`), 'candidate echoed as interviewer');
   check(!/Disconnected|断开/.test(await cockpit.evaluate(`document.querySelector('.c-banner')?.textContent ?? ''`)), 'live disconnected');
-  await main.evaluate('window.copilot.endSession()');
+  // End from the cockpit so the recording is saved first.
+  await cockpit.evaluate(`[...document.querySelectorAll('.c-footer button')].find((b) => b.textContent.startsWith('End')).click()`);
+  const liveId = await main.evaluate(`window.copilot.request('GET', '/api/v3/sessions').then((r) => r.sessions[0].session_id)`);
+  const recording = await main.waitFor(`window.copilot.loadRecording(${JSON.stringify(liveId)}).then((r) => r && { bytes: r.data.length, ms: r.durationMs, type: r.contentType })`, 20000, 'live recording');
+  check(recording.bytes > 20000 && recording.ms > 5000, `recording too small: ${JSON.stringify(recording)}`);
+  log(`live: recording saved (${(recording.bytes / 1024).toFixed(0)} KB, ${(recording.ms / 1000).toFixed(0)} s, ${recording.type})`);
+  // The recording must contain the interviewer's speech, not silence: decode it and measure the loudest second.
+  const peak = await main.evaluate(`window.copilot.loadRecording(${JSON.stringify(liveId)}).then(async (r) => {
+    const audio = await new AudioContext().decodeAudioData(new Uint8Array(r.data).buffer);
+    const data = audio.getChannelData(0); let best = 0;
+    for (let start = 0; start < data.length; start += audio.sampleRate) {
+      let sum = 0; const end = Math.min(data.length, start + audio.sampleRate);
+      for (let i = start; i < end; i++) sum += data[i] * data[i];
+      best = Math.max(best, Math.sqrt(sum / (end - start)));
+    }
+    return { seconds: audio.duration, rms: best };
+  })`);
+  check(peak.rms > 0.01, `recording is silent: ${JSON.stringify(peak)}`);
+  log(`live: recording decodes to ${peak.seconds.toFixed(1)} s, loudest second RMS ${peak.rms.toFixed(3)}`);
   cockpit.close();
   log('live: ended');
 
   // ── history and Debrief ───────────────────────────────────────────────
-  const sessions = await main.waitFor(`window.copilot.request('GET', '/api/v3/sessions').then((r) => r.sessions.length === 2 && r.sessions.every((s) => s.status !== 'preparing') && r.sessions)`, 180000, 'reports');
+  const sessions = await main.waitFor(`window.copilot.request('GET', '/api/v3/sessions').then((r) => r.sessions.length === 2 && r.sessions.every((s) => s.ended_at && s.status !== 'preparing') && r.sessions)`, 180000, 'reports');
   for (const s of sessions) log(`history: ${s.topology} → ${s.status}${s.headline ? ` "${s.headline}"` : ''}${s.failure_reason ? ` (${s.failure_reason})` : ''}`);
   check(sessions.every((s) => s.status === 'ready'), 'a Debrief was not generated');
   await main.evaluate(`[...document.querySelectorAll('.side-nav button')].find((b) => b.textContent.startsWith('History')).click()`);
   await main.waitFor(`document.querySelectorAll('.list-row').length === 2`, 10000, 'history list');
   await shot(main, '4-history');
   await main.evaluate(`document.querySelector('.list-row').click()`);
+  check(await main.waitFor(`!!document.querySelector('.content audio')`, 10000, 'recording player'), 'no recording player');
   log(`history: report shown "${(await main.waitFor(`(() => { const t = document.querySelector('.content').innerText; return t.includes('Strengths') && t; })()`, 10000, 'report view')).replace(/\n+/g, ' ').slice(0, 160)}"`);
   await shot(main, '5-debrief');
   log('PASS');

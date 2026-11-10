@@ -13,6 +13,8 @@ interface Window {
     permissions(): Promise<{ microphone: string; screen: string }>;
     requestMicrophone(): Promise<boolean>;
     openScreenSettings(): Promise<void>;
+    saveRecording(sessionId: string, bytes: Uint8Array, contentType: string, durationMs: number): Promise<string>;
+    loadRecording(sessionId: string): Promise<{ contentType: string; durationMs: number | null; data: Uint8Array } | null>;
     startSystemAudio(): Promise<boolean>;
     stopSystemAudio(): Promise<void>;
     onSystemAudio(listener: (frame: Uint8Array) => void): void;

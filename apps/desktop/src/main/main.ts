@@ -199,6 +199,22 @@ function registerIpc(): void {
     current = null;
     cockpit?.close();
   });
+  // Session recording: the cockpit records microphone + interviewer audio and hands it over at the end.
+  ipcMain.handle('recording:save', async (_event, sessionId: string, bytes: Uint8Array, contentType: string, durationMs: number) => {
+    if (!/^[\w-]{8,64}$/.test(sessionId) || !bytes?.length || !/^audio\//.test(contentType)) throw new Error('Invalid recording.');
+    const created = await engine.request('POST', `/api/v3/sessions/${sessionId}/recordings`, { kind: 'audio', content_type: contentType }) as { recording_id: string; upload_url: string };
+    const path = new URL(created.upload_url).pathname;
+    await engine.raw('PUT', path, bytes, { 'Content-Type': contentType, 'Content-Range': `bytes 0-${bytes.length - 1}/${bytes.length}` });
+    await engine.request('POST', `/api/v3/sessions/${sessionId}/recordings/${created.recording_id}/complete`, { duration_ms: Math.round(durationMs) });
+    return created.recording_id;
+  });
+  ipcMain.handle('recording:load', async (_event, sessionId: string) => {
+    const { recordings } = await engine.request('GET', `/api/v3/sessions/${sessionId}/recordings`) as { recordings: { recording_id: string; content_type: string; duration_ms?: number }[] };
+    const latest = recordings.at(-1);
+    if (!latest) return null;
+    const response = await engine.raw('GET', `/local-recordings/${latest.recording_id}`);
+    return { contentType: latest.content_type, durationMs: latest.duration_ms ?? null, data: new Uint8Array(await response.arrayBuffer()) };
+  });
   ipcMain.handle('system-audio:start', () => startSystemAudio());
   ipcMain.handle('system-audio:stop', () => stopSystemAudio());
   ipcMain.handle('settings:get', () => settings.value);
