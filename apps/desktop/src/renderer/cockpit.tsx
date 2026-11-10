@@ -53,8 +53,11 @@ function reduce(state: State, frame: Frame): State {
     case 'gate.verdict':
       if (data.decision !== 'respond' && data.decision !== 'await_more') return state;
       return { ...state, entries: [...entries, { kind: 'question', key: `q${seq}`, seq, text: data.utterance, zh: data.translation, decision: data.decision, intent: data.intent }] };
-    case 'turn.started':
-      return { ...state, entries: [...entries, { kind: 'answer', key: `a${data.turn_id}`, turnId: data.turn_id, text: '', done: false }] };
+    case 'turn.started': {
+      // An unfinished question answered after the pause becomes a regular question card.
+      const marked = entries.map((e) => e.kind === 'question' && e.seq === data.gate_seq && e.decision === 'await_more' ? { ...e, decision: 'respond' } : e);
+      return { ...state, entries: [...marked, { kind: 'answer', key: `a${data.turn_id}`, turnId: data.turn_id, text: '', done: false }] };
+    }
     case 'turn.token':
       return { ...state, entries: entries.map((e) => e.kind === 'answer' && e.turnId === data.turn_id ? { ...e, text: e.text + data.delta } : e) };
     case 'turn.done':
@@ -347,7 +350,7 @@ function Cockpit() {
             );
           }
           if (e.kind === 'question') return (
-            <div className="c-question" key={e.key}>
+            <div className="c-question" key={e.key} data-intent={e.intent} data-decision={e.decision}>
               <span className="stamp">{e.decision === 'await_more' ? 'Question · 问题 (listening…)' : 'Question · 问题'}</span>
               <div className="text" style={{ marginTop: 6 }}>{e.text}</div>
               {e.zh && <div className="zh" style={{ marginTop: 4, color: 'var(--c-text-2)' }}>{e.zh}</div>}

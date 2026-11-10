@@ -1,0 +1,66 @@
+{
+  "about": "Interviewer audio scenarios for Live mode. Each is synthesised with macOS `say` ([[slnc N]] = N ms of silence) and played as computer audio. `expect` is checked by run-corpus.mjs; ranges are [min, max].",
+  "scenarios": [
+    {
+      "id": "short-question",
+      "voice": "Daniel",
+      "text": "How do you prioritise when two releases compete for the same engineers?",
+      "expect": { "lines": [1, 1], "questions": [1, 1], "hint": true, "translation": "zh", "keywords": ["prioriti", "releases"] }
+    },
+    {
+      "id": "pauses-mid-question",
+      "voice": "Daniel",
+      "text": "When you led the uplink receiver work, [[slnc 600]] how did you split the processing between the FPGA and the DSP, [[slnc 500]] and what were the main latency trade-offs [[slnc 400]] that you had to make?",
+      "expect": { "lines": [1, 1], "questions": [1, 1], "hint": true, "translation": "zh", "keywords": ["FPGA", "make"] }
+    },
+    {
+      "id": "context-then-question",
+      "voice": "Daniel",
+      "text": "Our team builds 5G NR physical layer IP, and we ship a release to chip vendors every quarter. [[slnc 700]] How would you set up continuous integration for that kind of product?",
+      "expect": { "lines": [1, 1], "questions": [1, 1], "hint": true, "translation": "zh", "keywords": ["continuous integration"] }
+    },
+    {
+      "id": "two-questions",
+      "voice": "Daniel",
+      "text": "Tell me about the team you manage today. [[slnc 3500]] And why are you thinking about leaving?",
+      "expect": { "lines": [2, 2], "questions": [2, 2], "hint": true, "translation": "zh", "keywords": ["team", "leaving"] }
+    },
+    {
+      "id": "small-talk",
+      "voice": "Daniel",
+      "text": "Hi, thanks for joining us this morning. Let me just share my screen first. Okay, great.",
+      "expect": { "lines": [1, 2], "questions": [0, 0], "hint": false, "translation": "zh" }
+    },
+    {
+      "id": "unfinished-question",
+      "voice": "Daniel",
+      "text": "So when you think about the scheduler design and the latency budget for the uplink",
+      "expect": { "lines": [1, 1], "questions": [1, 1], "hint": true, "keywords": ["scheduler"] }
+    },
+    {
+      "id": "chinese-question",
+      "voice": "Tingting",
+      "language": "zh-CN",
+      "text": "请介绍一下你在上行接收机项目中负责的工作，[[slnc 500]] 以及你遇到的最大技术挑战是什么？",
+      "expect": { "lines": [1, 1], "questions": [1, 1], "hint": true, "translation": "en", "keywords": ["接收机"] }
+    },
+    {
+      "id": "coding-question",
+      "voice": "Daniel",
+      "text": "Can you write a function that returns the indices of the two numbers in an array that add up to a given target?",
+      "expect": { "lines": [1, 1], "questions": [1, 1], "hint": true, "intent": "coding", "keywords": ["target"] }
+    },
+    {
+      "id": "system-design-question",
+      "voice": "Daniel",
+      "text": "How would you design a service that streams live interview transcripts to thousands of users with low latency?",
+      "expect": { "lines": [1, 1], "questions": [1, 1], "hint": true, "intent": "system_design", "keywords": ["design"] }
+    },
+    {
+      "id": "fillers-only",
+      "voice": "Daniel",
+      "text": "Um. [[slnc 1500]] Hmm. [[slnc 1500]] Right.",
+      "expect": { "lines": [0, 3], "questions": [0, 0], "hint": false }
+    }
+  ]
+}

@@ -27,6 +27,7 @@ let cockpit: BrowserWindow | null = null;
 let current: { sessionId: string; wsUrl: string; topology: string } | null = null;
 let settings: SettingsStore;
 let systemAudio: ChildProcess | null = null;
+let testSystemAudioPath = process.env.IRC_TEST_SYSTEM_AUDIO;  // tests only (IRC_E2E=1)
 
 /** macOS: computer audio comes from our Core Audio tap helper (Electron's loopback is Windows-only). */
 const systemAudioHelper = process.env.IRC_SYSTEM_AUDIO_HELPER ?? join(__dirname, '../../native/bin/irc-system-audio');
@@ -167,6 +168,10 @@ function registerIpc(): void {
     if (process.env.IRC_E2E !== '1') throw new Error('Unavailable.');
     return Promise.all(paths.map((filePath) => engine.request('POST', '/local/documents/import', { kind, filePath, filename: basename(filePath) })));
   });
+  ipcMain.handle('test:set-system-audio', (_event, path: string) => {
+    if (process.env.IRC_E2E !== '1') throw new Error('Unavailable.');
+    testSystemAudioPath = path;
+  });
   ipcMain.handle('session:start', async (_event, request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string;
     codingLanguage?: string | null; playbookId?: string | null; practiceMode?: string }) => {
     const config: Record<string, unknown> = { language: request.language, document_ids: request.documentIds };
@@ -185,7 +190,7 @@ function registerIpc(): void {
     url.protocol = 'ws:';
     url.searchParams.set('token', engine.token);
     // Automated tests: a WAV file replaces the computer-audio capture in Live mode.
-    const testAudio = process.env.IRC_E2E === '1' && process.env.IRC_TEST_SYSTEM_AUDIO;
+    const testAudio = process.env.IRC_E2E === '1' && testSystemAudioPath;
     const testSystemAudio = testAudio ? readFileSync(testAudio).toString('base64') : undefined;
     return { ...current, wsUrl: url.toString(), jwt: signedIn?.value?.token ?? '', testSystemAudio };
   });

@@ -16,6 +16,8 @@
   `node tests/app-e2e.mjs <resume> <material…>` — account, goal, documents, practice, Live, history/Debrief.
   `node tests/practice-e2e.mjs` is the quick practice-only check (media denied).
   `node tests/settings-e2e.mjs` checks all six Settings sections and the cockpit appearance/Solve screen.
+- Audio corpus (Live mode, real OpenAI): `node tests/audio/build-corpus.mjs && node tests/audio/run-corpus.mjs [id…]`.
+  Scenarios and expectations are in `tests/audio/corpus.json`; the report goes to `tests/reports/audio-corpus.json`.
 - In tests (`IRC_E2E=1`) Solve screen never captures the real screen: it uses `IRC_TEST_SCREEN` (an image) or fails.
 - Electron binary download: GitHub may time out via the proxy; `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node node_modules/electron/install.js`.
 

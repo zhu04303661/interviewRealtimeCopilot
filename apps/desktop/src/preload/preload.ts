@@ -22,6 +22,7 @@ const api = {
   onCockpitCommand: (listener: (command: string) => void) => { ipcRenderer.on('cockpit:command', (_event, command) => listener(command)); },
   solveScreen: (origin: 'manual' | 'automatic') => ipcRenderer.invoke('screen:solve', origin),
   appInfo: () => ipcRenderer.invoke('app:info'),
+  testSetSystemAudio: (path: string) => ipcRenderer.invoke('test:set-system-audio', path),
   testImportPaths: (kind: 'resume' | 'material', paths: string[]) => ipcRenderer.invoke('test:import-paths', kind, paths),
 };
 

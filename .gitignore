@@ -8,3 +8,4 @@ __pycache__/
 .env
 .DS_Store
 apps/desktop/native/bin/
+apps/desktop/tests/audio/wav/

@@ -1,0 +1,279 @@
+{
+  "at": "2026-11-10T05:06:31.836Z",
+  "results": [
+    {
+      "id": "short-question",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "How do you prioritize when two releases compete for the same engineers?",
+            "zh": "当两个版本争夺同一批工程师时，你如何确定优先级？"
+          }
+        ],
+        "questions": [
+          {
+            "text": "How do you prioritize when two releases compete for the same engineers?",
+            "intent": "general",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI prioritize by business impact, customer commitments, and risk: I align on which release has the highest revenue, contractual, or launch-critical impact, then staff that first.\nI make the trade-off explicit by comparing scope, dependencies, and schedule risk; if both matter, I split the team only when it won’t create half-done work or unstable integration.\nI use a short, data-driven decision: estimated effort, blocked paths, and the cost of delay, then I communicate the decision and the why to both stakeholders fast.\nIf priorities stay tied, I escalate with options, not problems: reduce scope, move dates, or add temporary support, and I track the impact weekly.\n中文\n我会按业务影响、客户承诺和风险来排优先级：先对齐哪个发布对收入、合同或上线最关键，然后先保障它。\n我会把取舍说清楚：比较范围、依赖和进度风险；如果两个都重要，只在不会造成“半成品”或集成不稳时才拆分团队。\n我会用简短的数据驱动决策：估算工作量、阻塞路径和延迟成本，然后尽快把决定和原因同步给双方。\n如果优先级仍然打平，我会带着方案升级：缩范围、改日期或加临时支援，并每周跟踪影响。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "pauses-mid-question",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "When you led the uplink receiver work, how did you split the processing between the FPGA and the DSP, and what were the main latency trade-offs that you had to make?",
+            "zh": "当你主导上行接收机工作时，你是如何在 FPGA 和 DSP 之间划分处理任务的，以及你不得不做出的主要时延权衡是什么？"
+          }
+        ],
+        "questions": [
+          {
+            "text": "When you led the uplink receiver work, how did you split the processing between the FPGA and the DSP, and what were the main latency trade-offs that you had to make?",
+            "intent": "general",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI split the uplink receiver so the FPGA handled the hard real-time front end—data capture, time-critical filtering, and symbol-level preprocessing—while the DSP ran the more flexible control and higher-level baseband algorithms.\nThat let me keep latency low where it mattered most, and use the DSP where programmability was more important than cycle-level determinism.\nThe main trade-off was FPGA latency and determinism versus DSP flexibility and easier iteration; I pushed the fixed, pipeline-heavy work into FPGA to avoid jitter, and kept algorithm changes on DSP.\nIf you want, I can also describe how I validated the partition with profiling and where the bottlenecks showed up.\n中文\n我把上行接收链路拆分为：FPGA 负责硬实时前端——数据采集、时序关键滤波和符号级预处理；DSP 负责更灵活的控制和更高层的基带算法。\n这样能把最关键路径的延迟压低，同时把需要快速迭代的部分放在 DSP 上。\n主要权衡是 FPGA 的低延迟和确定性 vs. DSP 的灵活性和易改性；我把固定、流水线重的工作放到 FPGA，避免抖动，把算法调整留给 DSP。\n如果需要，我也可以继续讲我是怎么用 profiling 验证这个划分、以及瓶颈出现在哪里。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "context-then-question",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "Our team builds 5G NR physical layer IP, and we ship a release to chip vendors every quarter. How would you set up continuous integration for that kind of product?",
+            "zh": "我们的团队开发 5G NR 物理层 IP，并且每季度向芯片厂商交付一个版本。对于这种产品，你会如何搭建持续集成？"
+          }
+        ],
+        "questions": [
+          {
+            "text": "Our team builds 5G NR physical layer IP, and we ship a release to chip vendors every quarter. How would you set up continuous integration for that kind of product?",
+            "intent": "system_design",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI’d make CI release-gated and layered: fast unit and lint checks on every commit, then protocol-level simulations for 5G NR PHY changes, and a nightly full regression that mirrors the chip-vendor release flow.\nI’d keep a small, stable golden test set for every feature, plus randomized and corner-case vectors for numerology, MIMO, and HARQ so we catch PHY regressions without waiting for quarterly integration.\nI’d require clear artifact versioning, reproducible builds, and hardware-in-the-loop only for the final gate, because RTL/PHY regressions can hide in timing and fixed-point behavior.\nI’d track pass rate, cycle time, and escaped defects per release; if a check becomes noisy, I’d quarantine it quickly and debug root cause before it blocks the team.\n中文\n我会把 CI 做成分层的发布门禁：每次提交先跑快速单元测试和静态检查，再跑 5G NR PHY 级仿真，夜间再做覆盖完整的回归，贴近每季度给芯片厂商的发布流程。\n我会维护一小套稳定的 golden 测试集，并补充数值随机和边界用例，覆盖 numerology、MIMO、HARQ，尽早发现物理层回归，而不是等到季度集成才暴露。\n我会要求可复现构建、清晰的制品版本管理，硬件在环只放到最后一道门禁，因为 RTL/PHY 问题常藏在时序和定点行为里。\n我会看通过率、周期和每版漏网缺陷；如果某个检查噪声太大，就先隔离并定位根因，避免它拖慢团队。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "two-questions",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "Tell me about the team you manage today",
+            "zh": "请介绍一下你目前管理的团队"
+          },
+          {
+            "text": "And why are you thinking about leaving?",
+            "zh": "你为什么在考虑离开？"
+          }
+        ],
+        "questions": [
+          {
+            "text": "Tell me about the team you manage today.",
+            "intent": "general",
+            "decision": "respond"
+          },
+          {
+            "text": "And why are you thinking about leaving?",
+            "intent": "general",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI lead a software team focused on delivering complex, time-sensitive systems; if helpful, I can frame it around team size, scope, and the kinds of platforms we own.\nI organize the team around clear ownership, technical standards, and predictable delivery, so we can move fast without sacrificing quality.\nI stay close to the technical details where needed, but I mainly unblock people, align priorities, and make trade-offs visible to stakeholders.\nIf you want specifics, I can share how I structure execution, review quality, and measure outcomes in a way that maps to L1/PHY delivery.\n中文\n我带领一个专注交付复杂、时效性强系统的软件团队；如果需要，我可以具体说明团队规模、职责范围和负责的平台类型。\n我会按清晰的责任分工、统一的技术标准和可预测的交付节奏来管理团队，兼顾速度和质量。\n我会在需要时深入技术细节，但主要工作是帮大家排障、对齐优先级，并把取舍清楚地传达给相关方。\n如果你想听更具体的内容，我可以继续讲我如何组织执行、做代码评审，以及如何衡量成果，和 L1/PHY 交付方式也很契合。",
+            "done": true,
+            "superseded": false
+          },
+          {
+            "text": "EN\nI’m looking for a role where I can lead a larger, more specialized L1 team and stay close to 5G/PHY software delivery, especially in a company focused on 5G NR and NTN.\nI’ve enjoyed building and supporting my current team, but I want a scope with more direct impact on the product roadmap, technical execution, and cross-team delivery.\nThe move is less about escaping my current role and more about finding a better fit for my next step: deeper ownership, bigger technical challenge, and more room to scale a team.\nIf helpful, I can also share what I’ve learned from managing the team today and how that would translate here.\n中文\n我想找一个能带领更专业的 L1 团队、并且继续贴近 5G/PHY 软件交付的岗位，尤其是在像你们这样专注 5G NR 和 NTN 的公司。\n我很享受在现团队里建设和支持团队，但我希望有更直接影响产品路线、技术执行和跨团队交付的职责范围。\n这次考虑离开不是因为想逃离现在的岗位，而是想找一个更匹配下一步发展的环境：更深的 ownership、更大的技术挑战，以及更大的团队成长空间。\n如果你愿意，我也可以补充我现在怎么带团队，以及这些经验如何迁移到这里。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "small-talk",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "Hi, thanks for joining us this morning. Let me just share my screen first. Okay, great.",
+            "zh": "嗨，感谢你今天早上加入我们。让我先共享一下我的屏幕。好，太好了。"
+          }
+        ],
+        "questions": [],
+        "hints": [],
+        "banners": []
+      }
+    },
+    {
+      "id": "unfinished-question",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "So when you think about the scheduler design and the latency budget for the uplink",
+            "zh": "那么，当你考虑调度器设计和上行链路的时延预算时"
+          }
+        ],
+        "questions": [
+          {
+            "text": "When you think about the scheduler design and the latency budget for the uplink, please walk me through your thoughts.",
+            "intent": "system_design",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI’d start from the uplink latency budget end-to-end, then allocate time to each stage so the scheduler never becomes the bottleneck for 5G NR or NTN PHY processing.\nI’d design the scheduler to be deterministic and work off clear priority/urgency rules, because uplink timing is usually more important than raw throughput once deadlines are tight.\nI’d keep the critical path short: precompute what I can, minimize lock contention and cross-thread handoffs, and use backpressure when the budget is at risk.\nIf I don’t have project-specific numbers from my resume, I’d say I’d validate the design with profiling and trace-based measurements, then iterate until the latency target is met.\n中文\n我会先从端到端的上行时延预算入手，再把时间分配到各个阶段，确保调度器不会成为 5G NR 或 NTN PHY 处理的瓶颈。\n我会把调度器设计成确定性的，并基于清晰的优先级/紧急度规则来工作，因为在严格时限下，上行时延通常比纯吞吐更重要。\n我会尽量缩短关键路径：能预计算的就预计算，减少锁竞争和跨线程交接，并在预算快超时时启用背压。\n如果我的简历里没有具体项目数据，我会诚实说明会先用 profiling 和 trace 进行验证，再迭代直到满足时延目标。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "chinese-question",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "请介绍一下你在上行接收机项目中负责的工作，以及你遇到的最大技术挑战是什么？",
+            "zh": "Please introduce the work you were responsible for in the uplink receiver project, and what was the biggest technical challenge you encountered?"
+          }
+        ],
+        "questions": [
+          {
+            "text": "请介绍一下你在上行接收机项目中负责的工作，以及你遇到的最大技术挑战是什么？",
+            "intent": "general",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI led the uplink receiver work by owning the algorithm-to-software path, from requirements through implementation and integration, and I focused on keeping the receiver robust under real radio impairments.\nMy biggest technical challenge was balancing detection performance with latency and compute budget; I solved that by tightening the critical path, simplifying hot spots, and validating changes against end-to-end receiver metrics.\nThe main trade-off was accuracy versus real-time behavior, so I chose approaches that were slightly simpler but more predictable in timing, which is important for L1 PHY software.\nIf needed, I’d quantify the result with the project’s actual KPIs and timing numbers from the resume or project notes; I don’t want to invent metrics I can’t support.\n中文\n我负责上行接收机从算法到软件的落地，包括需求分析、实现和集成，重点是保证接收机在真实无线信道失真下依然稳定。\n我遇到的最大技术挑战是同时兼顾检测性能、时延和算力预算；我通过收紧关键路径、简化热点逻辑，并用端到端接收机指标做验证来解决。\n核心权衡是精度和实时性，所以我优先选择时序更可控、实现更稳定的方案，这对 L1 PHY 软件很关键。\n如果需要，我可以结合简历或项目材料里的实际 KPI 和时延数据补充结果；如果没有这些数据，我会如实说明，不会编造。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "coding-question",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "Can you write a function that returns the indices of the two numbers in an array that add up to a given target?",
+            "zh": "你能写一个函数，返回数组中两个数相加等于给定目标值的索引吗？"
+          }
+        ],
+        "questions": [
+          {
+            "text": "Can you write a function that returns the indices of the two numbers in an array that add up to a given target?",
+            "intent": "coding",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI’d use a hash map to solve it in one pass: for each number, I check whether the complement is already seen, and if so I return both indices.\nThis gives O(n) time and O(n) space, which is the right trade-off versus a nested loop’s O(n²) time.\nI’d handle duplicates by storing the earliest index seen for each value, and I’d return as soon as I find the match.\nIf no pair exists, I’d return an empty result or null, depending on the API contract.\n中文\n我会用哈希表一次遍历解决：对每个数先查找它的补数是否已经出现，出现就返回两个下标。\n这样时间复杂度是 O(n)，空间是 O(n)，比双重循环的 O(n²) 更合适。\n我会把每个值最早出现的下标存起来，处理重复值时直接返回找到的结果。\n如果没有符合条件的配对，我会按接口约定返回空结果或 null。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "system-design-question",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "How would you design a service that streams live interview transcripts to thousands of users with low latency",
+            "zh": "你会如何设计一个将实时采访记录低延迟地流式传输给数千名用户的服务？"
+          }
+        ],
+        "questions": [
+          {
+            "text": "How would you design a service that streams live interview transcripts to thousands of users with low latency?",
+            "intent": "system_design",
+            "decision": "respond"
+          }
+        ],
+        "hints": [
+          {
+            "text": "EN\nI’d use a fan-out architecture: one ingest service receives the transcript stream, then publishes events to a broker like Kafka or Redis Streams, and edge/websocket servers push updates to clients with low latency.\nI’d keep messages small and ordered by interview/session ID, so each client can subscribe only to the transcript it needs; that reduces cross-traffic and keeps per-user latency low.\nI’d trade a tiny bit of strict consistency for speed by accepting eventual consistency across replicas, but I’d make each transcript line idempotent and sequence-numbered to handle retries and reconnects safely.\nI’d scale horizontally with stateless websocket gateways, autoscaling, and backpressure; if load spikes, I’d buffer briefly, shed nonessential updates, and monitor p95 latency and disconnect rates.\n中文\n我会用扇出架构：一个接入服务接收实时字幕流，再通过 Kafka 或 Redis Streams 这类消息总线发布，边缘/WebSocket 服务把更新低延迟推给客户端。\n我会按 interview/session ID 保持消息小且有序，让每个客户端只订阅自己需要的 transcript，减少交叉流量并降低单用户延迟。\n我会用“少量一致性换速度”的取舍：接受副本间最终一致性，但给每条字幕加序列号并做幂等，方便重试和断线重连。\n我会让 WebSocket 网关无状态并水平扩容，配合自动扩缩容和背压；高峰时短暂缓冲、丢弃非关键更新，并监控 p95 延迟和断连率。",
+            "done": true,
+            "superseded": false
+          }
+        ],
+        "banners": []
+      }
+    },
+    {
+      "id": "fillers-only",
+      "pass": true,
+      "problems": [],
+      "seen": {
+        "lines": [
+          {
+            "text": "Um, Um,",
+            "zh": "嗯， 嗯，"
+          },
+          {
+            "text": "Right,",
+            "zh": "对，"
+          }
+        ],
+        "questions": [],
+        "hints": [],
+        "banners": []
+      }
+    }
+  ]
+}
