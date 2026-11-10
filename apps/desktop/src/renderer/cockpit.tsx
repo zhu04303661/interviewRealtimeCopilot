@@ -111,13 +111,18 @@ async function testAudioStream(base64: string): Promise<MediaStream> {
 }
 
 /** Streams a MediaStream's audio as 100 ms PCM16 frames on lane ``stream``. */
-async function captureLane(stream: MediaStream, lane: number, send: (frame: ArrayBuffer) => void): Promise<() => void> {
+async function captureLane(stream: MediaStream, lane: number, send: (frame: ArrayBuffer) => void,
+  onLevel: (lane: number, level: number) => void): Promise<() => void> {
   const context = new AudioContext();
   await context.audioWorklet.addModule('./pcm-worklet.js');
   const source = context.createMediaStreamSource(stream);
   const node = new AudioWorkletNode(context, 'pcm-frames');
   let sequence = 0;
   node.port.onmessage = ({ data }: MessageEvent<ArrayBuffer>) => {
+    const samples = new Int16Array(data);
+    let sum = 0;
+    for (let i = 0; i < samples.length; i += 4) sum += samples[i] * samples[i];
+    onLevel(lane, Math.min(1, Math.sqrt(sum / (samples.length / 4)) / 6000));
     const frame = new Uint8Array(5 + data.byteLength);
     const view = new DataView(frame.buffer);
     view.setUint8(0, lane);
@@ -135,6 +140,14 @@ function Cockpit() {
   const [now, setNow] = useState(Date.now());
   const socket = useRef<WebSocket | null>(null);
   const [session, setSession] = useState<{ topology: string }>({ topology: 'mock' });
+  // Live input levels per lane (0 = microphone, 1 = computer audio), so missing input is visible at once.
+  const [levels, setLevels] = useState<number[]>([0, 0]);
+  const levelRef = useRef<number[]>([0, 0]);
+  useEffect(() => {
+    const timer = setInterval(() => { setLevels([...levelRef.current]); levelRef.current = levelRef.current.map((l) => l * 0.6); }, 200);
+    return () => clearInterval(timer);
+  }, []);
+  const onLevel = (lane: number, level: number) => { levelRef.current[lane] = Math.max(levelRef.current[lane], level); };
   const feed = useRef<HTMLDivElement>(null);
   const answering = state.entries.some((e) => e.kind === 'answer' && !e.done);
 
@@ -157,14 +170,14 @@ function Cockpit() {
         const send = (frame: ArrayBuffer) => { if (ws.readyState === WebSocket.OPEN) ws.send(frame); };
         try {
           const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
-          stops.push(await captureLane(mic, 0, send));
+          stops.push(await captureLane(mic, 0, send, onLevel));
           if (general && session.testSystemAudio) {
-            stops.push(await captureLane(await testAudioStream(session.testSystemAudio), 1, send));
+            stops.push(await captureLane(await testAudioStream(session.testSystemAudio), 1, send, onLevel));
           } else if (general) {
             const display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
             display.getVideoTracks().forEach((t) => t.stop());
             if (!display.getAudioTracks().length) throw new Error('No system audio. Allow Screen & System Audio Recording. · 无系统声音，请授权屏幕与系统录音。');
-            stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send));
+            stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send, onLevel));
           }
           dispatch({ type: 'transcription.state', seq: 0, data: { state: 'ok' } });
         } catch (error) {
@@ -199,6 +212,10 @@ function Cockpit() {
         <span className={`dot ${live ? '' : 'off'}`} />
         <span className="c-status">{live ? (session.topology === 'mock' ? 'Practice' : 'Listening') : 'Ended'}</span>
         <span className="c-sub">{live ? (session.topology === 'mock' ? '语音练习' : '实时面试') : '已结束'}</span>
+        <span className="spacer" />
+        {(session.topology === 'mock' ? [[0, 'Mic · 麦克风']] : [[0, 'Mic · 麦克风'], [1, 'Computer · 电脑']]).map(([lane, label]) => (
+          <span key={lane} className="meter" title={label as string}><span className="meter-label">{(label as string).split(' ')[0]}</span>
+            <span className="meter-bar"><span style={{ width: `${Math.round(levels[lane as number] * 100)}%` }} /></span></span>))}
       </header>
       {state.status && <div className="c-banner">{state.status}</div>}
       {state.plan && (

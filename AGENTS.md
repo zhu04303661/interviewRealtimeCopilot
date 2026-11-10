@@ -9,7 +9,9 @@
 
 ## Commands
 - Engine tests: `cd engine && uv run pytest -q` (fake OpenAI, no network); lint: `uvx ruff check src tests`.
-- Desktop: `cd apps/desktop && npm run typecheck && npm run build`; run: `npx electron .` (unset `ELECTRON_RUN_AS_NODE`).
+- Desktop: `cd apps/desktop && npm run typecheck && npm run build`; run for real use: `npm run app` (opens Electron.app via
+  LaunchServices so macOS asks for microphone/screen permission for Electron itself; `npx electron .` from a terminal
+  inherits the terminal's permissions instead). Unset `ELECTRON_RUN_AS_NODE` in agent shells.
 - Desktop e2e (real OpenAI from `~/.env`, never the real microphone; fixtures replace mic and computer audio):
   `node tests/app-e2e.mjs <resume> <material…>` — account, goal, documents, practice, Live, history/Debrief.
   `node tests/practice-e2e.mjs` is the quick practice-only check (media denied).

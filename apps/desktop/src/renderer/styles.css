@@ -171,3 +171,7 @@ body.cockpit-body { background: #16181b; color: #e9eaec; --c-line: #2a2d32; --c-
 .c-btn { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--c-line); background: var(--c-panel); color: #e9eaec; cursor: pointer; font-size: 13px; }
 .c-btn.end { background: #2b1d1f; border-color: #4a2a2e; color: #ffb4b4; }
 .c-banner { margin: 8px 12px 0; padding: 8px 12px; border-radius: 9px; background: #2a2418; color: #f0c674; font-size: 13px; }
+.meter { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--mono); color: var(--c-text-2); }
+.meter-bar { width: 40px; height: 5px; border-radius: 3px; background: #2a2d32; overflow: hidden; }
+.meter-bar span { display: block; height: 100%; background: #5b7cff; transition: width .15s; }
+.c-header .spacer { flex: 1; }
