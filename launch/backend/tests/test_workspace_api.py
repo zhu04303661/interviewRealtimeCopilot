@@ -159,3 +159,16 @@ async def test_session_history_lists_sessions_newest_first(signed_in):
     rows = (await signed_in.call("GET", "/api/v3/sessions"))["sessions"]
     assert [r["session_id"] for r in rows] == [second["session_id"], first["session_id"]]
     assert rows[0]["topology"] == "general" and rows[0]["company"] == "AccelerComm" and "report" not in rows[0]
+
+
+async def test_session_recordings_are_listed_once_complete(signed_in):
+    goal = await signed_in.call("POST", "/api/v3/goals", json={"role": "SEM", "company": "AccelerComm"})
+    session = await signed_in.call("POST", "/api/v3/sessions", json={"topology": "general", "goal_id": goal["goal_id"], "config": {}})
+    sid = session["session_id"]
+    created = await signed_in.call("POST", f"/api/v3/sessions/{sid}/recordings", json={"kind": "audio", "content_type": "audio/webm"})
+    assert (await signed_in.call("GET", f"/api/v3/sessions/{sid}/recordings"))["recordings"] == []  # not uploaded yet
+    upload = "/" + created["upload_url"].split("/", 3)[3]
+    await signed_in.call("PUT", upload, expect=None, data=b"webm-bytes", headers={"Content-Type": "audio/webm", "Content-Range": "bytes 0-9/10"})
+    await signed_in.call("POST", f"/api/v3/sessions/{sid}/recordings/{created['recording_id']}/complete", json={"duration_ms": 1234})
+    listed = (await signed_in.call("GET", f"/api/v3/sessions/{sid}/recordings"))["recordings"]
+    assert [(r["recording_id"], r["byte_size"], r["duration_ms"]) for r in listed] == [(created["recording_id"], 10, 1234)]
