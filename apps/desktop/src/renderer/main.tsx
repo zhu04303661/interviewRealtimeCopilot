@@ -38,8 +38,13 @@ function SignIn({ onSignedIn }: { onSignedIn: (name: string) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  // Same rules as the engine (accounts.py): checked here so mistakes show before submitting.
+  const nameProblem = !/^[a-z][a-z0-9._-]{2,31}$/i.test(username.trim())
+    ? 'Username: 3–32 letters, numbers, . _ or -, starting with a letter (no email or Chinese). · 用户名：3–32 位字母、数字或 . _ -，以字母开头（不能用邮箱或中文）。' : '';
+  const passwordProblem = password.length < 15 ? 'Password: at least 15 characters. · 密码：至少 15 个字符。' : '';
   const submit = async () => {
     setError('');
+    if (mode === 'register' && (nameProblem || passwordProblem)) return setError(nameProblem || passwordProblem);
     try { onSignedIn((await auth(mode, { username, password })).account.username); } catch (e) { setError((e as Error).message); }
   };
   return (
@@ -51,6 +56,12 @@ function SignIn({ onSignedIn }: { onSignedIn: (name: string) => void }) {
         <label className="field"><span>Username · 用户名</span><input className="input" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus /></label>
         <label className="field"><span>Password · 密码</span>
           <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
+        {mode === 'register' && (
+          <ul className="small muted" style={{ margin: '-4px 0 14px', paddingLeft: 18 }}>
+            <li style={{ color: username && nameProblem ? 'var(--bad)' : undefined }}>Username: 3–32 letters/numbers/. _ -, starts with a letter · 用户名 3–32 位，以字母开头</li>
+            <li style={{ color: password && passwordProblem ? 'var(--bad)' : undefined }}>Password: at least 15 characters ({password.length}/15) · 密码至少 15 位</li>
+          </ul>
+        )}
         {error && <p className="error">{error}</p>}
         <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} onClick={submit}>{mode === 'sign-in' ? 'Sign in · 登录' : 'Create account · 注册'}</button>
         <p className="small muted" style={{ textAlign: 'center', marginBottom: 0 }}>
