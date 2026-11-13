@@ -43,7 +43,7 @@ def signed(payload: bytes, secret="whsec_test"):
 
 
 async def test_pages_are_served(site):
-    for path in ("/", "/pricing.html", "/demo.html", "/download.html", "/login.html", "/account.html"):
+    for path in ("/", "/use-cases.html", "/pricing.html", "/demo.html", "/download.html", "/login.html", "/account.html", "/i18n.js"):
         response = await site.get(path)
         assert response.status == 200, path
     assert (await site.get("/../app.py")).status == 404
