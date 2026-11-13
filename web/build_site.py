@@ -27,9 +27,25 @@ def page(name: str, title: tuple[str, str], body: str) -> None:
     head = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<title data-i18n="{key}">{title[0]}</title><meta name="description" content="Real-time interview copilot: live transcript, '
             f'question detection, answer hints grounded in your own resume, spoken practice and debriefs.">'
+            f'<meta name="keywords" content="AI interview assistant, interview copilot, real-time interview help, interview answer generator, coding interview AI, AI面试助手, 实时面试辅助, 面试外挂, 面试神器, 英文面试, 跨语言面试, 面试翻译, 编程面试代码, 面试题答案, 模拟面试">'
+            f'<meta property="og:title" content="{title[0]}"><meta property="og:type" content="website"><meta property="og:url" content="https://copilot.xichiuk.com/{"" if name == "index" else name + ".html"}">'
+            f'<meta property="og:description" content="Real-time AI interview assistant: live translation, question detection, answers from your resume, coding help from your screen.">'
+            f'<link rel="canonical" href="https://copilot.xichiuk.com/{"" if name == "index" else name + ".html"}">'
+            f'<script type="application/ld+json">{LD}</script>'
             f'<link rel="stylesheet" href="/site.css"><script src="/i18n.js" defer></script><script src="/site.js" defer></script></head><body data-page="{name}">')
     (STATIC / f"{name}.html").write_text(head + body + "</body></html>\n")
 
+
+LD = json.dumps({"@context": "https://schema.org", "@graph": [
+    {"@type": "SoftwareApplication", "name": "Interview Realtime Copilot", "applicationCategory": "BusinessApplication", "operatingSystem": "macOS 14.2+",
+     "description": "AI interview assistant (AI面试助手) that listens to live interviews, translates English and Chinese in real time, detects each question and suggests answers from your own resume; solves coding questions from your screen; spoken mock interviews and debriefs.",
+     "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free"}, {"@type": "Offer", "price": "29", "priceCurrency": "USD", "name": "Pro monthly"},
+                {"@type": "Offer", "price": "199", "priceCurrency": "USD", "name": "Pro yearly"}]},
+    {"@type": "FAQPage", "mainEntity": [
+        {"@type": "Question", "name": "What is an AI interview assistant (面试外挂 / AI面试助手)?", "acceptedAnswer": {"@type": "Answer", "text": "A desktop app that listens to your live interview, recognises each question and shows a short answer drawn from your own resume and notes, with English–Chinese translation."}},
+        {"@type": "Question", "name": "Can it help if my English is not fluent?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every interviewer line is translated into Chinese as it is spoken, and hints give natural English you can say directly."}},
+        {"@type": "Question", "name": "Does it help with coding interviews?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It reads the coding problem on your screen and writes a working solution with complexity and edge cases, hidden from screen sharing."}},
+        {"@type": "Question", "name": "I have no time to prepare. Can it still help?", "acceptedAnswer": {"@type": "Answer", "text": "Upload your resume, notes or the job description; prepared questions are extracted for spoken practice and live hints come from the same files."}}]}]}, ensure_ascii=False)
 
 COCKPIT = ('<div class="stage"><div class="scene" data-scene>'
            # The meeting the candidate is in (what the interviewer and candidate see on the call).
@@ -224,6 +240,17 @@ def build() -> None:
                         ("mock.h3", "The trade-off was a 2-TTI feedback delay, which I mitigated with predictive smoothing.",
                          "代价是 2 个 TTI 的反馈延迟，我用预测平滑来弥补。")]:
         t(key, en, zh)
+    (STATIC / "robots.txt").write_text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /account.html\nSitemap: https://copilot.xichiuk.com/sitemap.xml\n")
+    urls = "".join(f"<url><loc>https://copilot.xichiuk.com/{p}</loc></url>" for p in ("", "use-cases.html", "demo.html", "pricing.html", "download.html", "privacy.html"))
+    (STATIC / "sitemap.xml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')
+    (STATIC / "llms.txt").write_text("""# Interview Realtime Copilot
+> AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro $29/month or $199/year.
+
+- [Use cases](https://copilot.xichiuk.com/use-cases.html): cross-language interviews, expert answers, last-minute preparation, coding questions from the screen
+- [Demo](https://copilot.xichiuk.com/demo.html)
+- [Pricing](https://copilot.xichiuk.com/pricing.html)
+- [Download](https://copilot.xichiuk.com/download.html)
+""")
     (STATIC / "i18n.js").write_text("// Generated by web/build_site.py — edit the strings there.\nwindow.I18N = "
                                     + json.dumps(STRINGS, ensure_ascii=False, indent=0) + ";\n")
     print(f"{len(STRINGS['en'])} strings")

@@ -1,0 +1,7 @@
+# Interview Realtime Copilot
+> AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro $29/month or $199/year.
+
+- [Use cases](https://copilot.xichiuk.com/use-cases.html): cross-language interviews, expert answers, last-minute preparation, coding questions from the screen
+- [Demo](https://copilot.xichiuk.com/demo.html)
+- [Pricing](https://copilot.xichiuk.com/pricing.html)
+- [Download](https://copilot.xichiuk.com/download.html)
