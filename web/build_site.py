@@ -22,7 +22,7 @@ def t(key: str, en: str, zh: str, tag: str = "span", cls: str = "") -> str:
     return f'<{tag} data-i18n="{key}"{f" class={chr(34)}{cls}{chr(34)}" if cls else ""}>{en}</{tag}>'
 
 
-def page(name: str, title: tuple[str, str], body: str) -> None:
+def page(name: str, title: tuple[str, str], body: str, out: str | None = None) -> None:
     key = f"title.{name}"
     STRINGS["en"][key], STRINGS["zh"][key] = title
     head = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
@@ -31,7 +31,7 @@ def page(name: str, title: tuple[str, str], body: str) -> None:
             f'<meta name="keywords" content="AI interview assistant, interview copilot, real-time interview help, interview answer generator, coding interview AI, AI面试助手, 实时面试辅助, 面试外挂, 面试神器, 英文面试, 跨语言面试, 面试翻译, 编程面试代码, 面试题答案, 模拟面试">'
             f'<meta property="og:title" content="{title[0]}"><meta property="og:type" content="website"><meta property="og:url" content="https://copilot.xichiuk.com/{"" if name == "index" else name + ".html"}">'
             f'<meta property="og:description" content="Real-time AI interview assistant: live translation, question detection, answers from your resume, coding help from your screen.">'
-            f'<link rel="canonical" href="https://copilot.xichiuk.com/{"" if name == "index" else name + ".html"}">'
+            f'<link rel="canonical" href="https://copilot.xichiuk.com/{out or ("" if name == "index" else name + ".html")}">'
             f'<script type="application/ld+json">{LD}</script>'
             f'<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">'
             f'<link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#06070b">'
@@ -39,7 +39,9 @@ def page(name: str, title: tuple[str, str], body: str) -> None:
             f'<link rel="stylesheet" href="/site.css"><script src="/i18n.js" defer></script><script src="/site.js" defer></script></head><body data-page="{name}">'
             '<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9d85ff"/><stop offset=".5" stop-color="#5b8cff"/><stop offset="1" stop-color="#3fe0ff"/></linearGradient></defs></svg>'
             '<div class="bg-grid"></div><div class="aurora"><i></i><i></i><i></i></div><canvas id="stars"></canvas><div class="spot"></div>')
-    (STATIC / f"{name}.html").write_text(head + body + "</body></html>\n")
+    target = STATIC / (out or f"{name}.html")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(head + body + "</body></html>\n")
 
 
 LD = json.dumps({"@context": "https://schema.org", "@graph": [
@@ -102,6 +104,61 @@ def scenario_tiles(detail: bool) -> str:
         tiles.append(f'<div class="tile{" wide" if detail else ""} reveal"><div class="ico">{icon}</div>'
                      + t(f"sc.{key}.title", en_title, zh_title, "h3") + t(f"sc.{key}.text", en_text, zh_text, "p") + "</div>")
     return '<div class="bento">' + "".join(tiles) + "</div>"
+
+
+def build_docs() -> list[str]:
+    """Help Center: one page per entry in docs_content.DOCS, under /docs/."""
+    from docs_content import DOCS
+    flat = [(g, p) for g in DOCS for p in g[3]]
+    urls = []
+    for n, ((gkey, gen, gzh, _), doc) in enumerate(flat):
+        slug = doc["slug"]
+        k = f"doc.{slug}"
+        nav = ['<input class="input docs-search" type="search" data-i18n-placeholder="docs.search" placeholder="Search">']
+        for g2key, g2en, g2zh, pages in DOCS:
+            links = "".join(f'<a href="/docs/{"" if p["slug"] == "index" else p["slug"] + ".html"}" class="{"on" if p["slug"] == slug else ""}">'
+                            + t(f"doc.{p['slug']}.title", *p["title"]) + "</a>" for p in pages)
+            nav.append(f'<details {"open" if g2key == gkey or True else ""}><summary>{t(f"docg.{g2key}", g2en, g2zh)}</summary>{links}</details>')
+        html, toc, h = [], [], 0
+        for i, block in enumerate(doc["blocks"]):
+            kind, key = block[0], f"{k}.b{i}"
+            if kind == "h2":
+                h += 1
+                html.append(f'<h2 id="s{h}">{t(key, block[1], block[2])}</h2>')
+                toc.append(f'<a href="#s{h}">{t(key, block[1], block[2])}</a>')
+            elif kind == "p":
+                html.append(t(key, block[1], block[2], "p"))
+            elif kind == "note":
+                html.append(f'<div class="callout">{t(key, block[1], block[2])}</div>')
+            elif kind in ("ul", "steps"):
+                tag = "ol" if kind == "steps" else "ul"
+                html.append(f'<{tag} class="{"doc-steps" if kind == "steps" else ""}">' + "".join(t(f"{key}.{j}", en, zh, "li") for j, (en, zh) in enumerate(block[1])) + f"</{tag}>")
+            elif kind == "cards":
+                html.append('<div class="doc-cards">' + "".join(f'<div class="card">{t(f"{key}.{j}t", a, b, "h3")}{t(f"{key}.{j}p", c, d, "p", "muted")}</div>'
+                                                            for j, (a, b, c, d) in enumerate(block[1])) + "</div>")
+            elif kind == "table":
+                cell = lambda v, ck, tag: f"<{tag}>{t(ck, *v) if isinstance(v, tuple) else v}</{tag}>"  # noqa: E731
+                head_ = "".join(cell(v, f"{key}.h{j}", "th") for j, v in enumerate(block[1]))
+                rows = "".join("<tr>" + "".join(cell(v, f"{key}.r{r}c{c}", "td") for c, v in enumerate(row)) + "</tr>" for r, row in enumerate(block[2]))
+                html.append(f'<div class="doc-table"><table><thead><tr>{head_}</tr></thead><tbody>{rows}</tbody></table></div>')
+        prev_ = flat[n - 1][1] if n > 0 else None
+        next_ = flat[n + 1][1] if n + 1 < len(flat) else None
+        link = lambda d: f'/docs/{"" if d["slug"] == "index" else d["slug"] + ".html"}'  # noqa: E731
+        def pager_link(d, cls, label_key, label):
+            title = t("doc." + d["slug"] + ".title", *d["title"], "b")
+            return f'<a class="card {cls}" href="{link(d)}"><span class="faint small" data-i18n="{label_key}">{label}</span>{title}</a>'
+        pager = (pager_link(prev_, "", "docs.prev", "Previous") if prev_ else "<span></span>") + (pager_link(next_, "next", "docs.next", "Next") if next_ else "")
+        body = (f'<div class="docs wrap"><aside class="docs-nav">{"".join(nav)}</aside><main class="docs-main">'
+                f'<div class="eyebrow">{t(f"docg.{gkey}", gen, gzh)}</div><h1>{t(k + ".title", *doc["title"])}</h1>{t(k + ".lead", *doc["lead"], "p", "lead")}'
+                + "".join(html) + f'<div class="pager">{pager}</div></main>'
+                f'<nav class="docs-toc">{("<b class=" + chr(34) + "faint small" + chr(34) + " data-i18n=" + chr(34) + "docs.toc" + chr(34) + ">On this page</b>" + "".join(toc)) if toc else ""}</nav></div>')
+        out = "docs/index.html" if slug == "index" else f"docs/{slug}.html"
+        page(f"docs-{slug}", (f"{doc['title'][0]} — Interview Realtime Copilot Help", f"{doc['title'][1]} — Interview Realtime Copilot 帮助中心"), body, out)
+        urls.append(out.replace("index.html", ""))
+    for key, en, zh in [("docs.search", "Search the guide", "搜索手册"), ("docs.prev", "Previous", "上一篇"), ("docs.next", "Next", "下一篇"),
+                        ("docs.toc", "On this page", "本页内容"), ("nav.docs", "Docs", "使用手册")]:
+        t(key, en, zh)
+    return urls
 
 
 def build() -> None:
@@ -258,7 +315,8 @@ def build() -> None:
         "background_color": "#06070b", "display": "standalone", "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
                                                                        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}]}) + "\n")
     (STATIC / "robots.txt").write_text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /account.html\nSitemap: https://copilot.xichiuk.com/sitemap.xml\n")
-    urls = "".join(f"<url><loc>https://copilot.xichiuk.com/{p}</loc></url>" for p in ("", "use-cases.html", "demo.html", "pricing.html", "download.html", "privacy.html"))
+    docs = build_docs()
+    urls = "".join(f"<url><loc>https://copilot.xichiuk.com/{p}</loc></url>" for p in ("", "use-cases.html", "demo.html", "pricing.html", "download.html", "privacy.html", *docs))
     (STATIC / "sitemap.xml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')
     (STATIC / "llms.txt").write_text("""# Interview Realtime Copilot
 > AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro $29/month or $199/year.
@@ -267,6 +325,7 @@ def build() -> None:
 - [Demo](https://copilot.xichiuk.com/demo.html)
 - [Pricing](https://copilot.xichiuk.com/pricing.html)
 - [Download](https://copilot.xichiuk.com/download.html)
+- [Help Center](https://copilot.xichiuk.com/docs/): install, permissions, plans, practice, live interview, shortcuts, debriefs, troubleshooting
 - Support: {SUPPORT_EMAIL}
 """.replace("{SUPPORT_EMAIL}", SUPPORT_EMAIL))
     (STATIC / "i18n.js").write_text(f"// Generated by web/build_site.py — edit the strings there.\nwindow.SUPPORT_EMAIL = {json.dumps(SUPPORT_EMAIL)};\nwindow.I18N = "

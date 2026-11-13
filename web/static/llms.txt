@@ -5,4 +5,5 @@
 - [Demo](https://copilot.xichiuk.com/demo.html)
 - [Pricing](https://copilot.xichiuk.com/pricing.html)
 - [Download](https://copilot.xichiuk.com/download.html)
+- [Help Center](https://copilot.xichiuk.com/docs/): install, permissions, plans, practice, live interview, shortcuts, debriefs, troubleshooting
 - Support: linkyourfuture2026@outlook.com

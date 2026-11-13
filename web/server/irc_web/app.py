@@ -312,6 +312,8 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
     async def page(request: web.Request) -> web.StreamResponse:
         name = request.match_info.get("name") or "index.html"
         path = (STATIC / name).resolve()
+        if path.is_dir():  # /docs/ → docs/index.html
+            path = path / "index.html"
         if STATIC not in path.parents or not path.is_file():
             path = STATIC / "404.html"
             return web.FileResponse(path, status=404)

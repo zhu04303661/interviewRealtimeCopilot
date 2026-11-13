@@ -7,6 +7,7 @@ const tr = (key, vars = {}) => Object.entries(vars).reduce((s, [k, v]) => s.repl
 function applyLanguage() {
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = tr(el.dataset.i18nPlaceholder); });
   document.querySelectorAll('.lang button').forEach((b) => b.classList.toggle('on', b.dataset.lang === lang));
   window.dispatchEvent(new Event('language'));
 }
@@ -24,13 +25,13 @@ function chrome() {
   const link = (href, key, name) => `<a href="${href}" class="${page === name ? 'active' : ''}" data-i18n="${key}"></a>`;
   document.body.prepend(el(`<header class="nav"><div class="wrap">
     <a class="brand" href="/"><span class="logo">IR</span>Interview Realtime Copilot</a>
-    <nav class="links">${link('/use-cases.html', 'nav.scenarios', 'use-cases')}${link('/demo.html', 'nav.demo', 'demo')}${link('/pricing.html', 'nav.pricing', 'pricing')}${link('/download.html', 'nav.download', 'download')}</nav>
+    <nav class="links">${link('/use-cases.html', 'nav.scenarios', 'use-cases')}${link('/demo.html', 'nav.demo', 'demo')}${link('/pricing.html', 'nav.pricing', 'pricing')}${link('/download.html', 'nav.download', 'download')}<a href="/docs/" class="${page.startsWith('docs-') ? 'active' : ''}" data-i18n="nav.docs"></a></nav>
     <span class="spacer"></span><span class="lang">${Object.entries(LANGS).map(([k, v]) => `<button data-lang="${k}">${v}</button>`).join('')}</span>
     <span id="account-slot"><a class="btn" href="/login.html" data-i18n="nav.signin"></a></span>
     <a class="btn primary" href="/download.html" data-i18n="nav.start"></a></div></header>`));
   document.body.append(el(`<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>
     <a href="/use-cases.html" data-i18n="nav.scenarios"></a><a href="/pricing.html" data-i18n="nav.pricing"></a><a href="/download.html" data-i18n="nav.download"></a>
-    <a href="/privacy.html" data-i18n="foot.privacy"></a><a href="mailto:${window.SUPPORT_EMAIL}"><span data-i18n="foot.support"></span> · ${window.SUPPORT_EMAIL}</a><a href="/terms.html" data-i18n="foot.terms"></a><span>© ${new Date().getFullYear()}</span></div></footer>`));
+    <a href="/docs/" data-i18n="nav.docs"></a><a href="/privacy.html" data-i18n="foot.privacy"></a><a href="mailto:${window.SUPPORT_EMAIL}"><span data-i18n="foot.support"></span> · ${window.SUPPORT_EMAIL}</a><a href="/terms.html" data-i18n="foot.terms"></a><span>© ${new Date().getFullYear()}</span></div></footer>`));
   document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; localStorage.setItem('lang', lang); applyLanguage(); }));
   api('/api/me').then(({ user }) => {
     if (user) document.getElementById('account-slot').innerHTML = `<a class="btn" href="/account.html">${user.email.split('@')[0]} · ${user.plan === 'free' ? 'Free' : 'Pro'}</a>`;
@@ -161,6 +162,25 @@ const pages = {
   },
 };
 
+/** Help Center: filter the sidebar as you type, and highlight the section being read in "On this page". */
+function docs() {
+  const search = document.querySelector('.docs-search');
+  if (!search) return;
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    document.querySelectorAll('.docs-nav details').forEach((group) => {
+      let any = false;
+      group.querySelectorAll('a').forEach((a) => { const hit = !q || a.textContent.toLowerCase().includes(q); a.hidden = !hit; any ||= hit; });
+      group.hidden = !any; if (q) group.open = true;
+    });
+  });
+  const links = [...document.querySelectorAll('.docs-toc a')];
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (e.isIntersecting) links.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === `#${e.target.id}`));
+  }), { rootMargin: '-80px 0px -70% 0px' });
+  document.querySelectorAll('.docs-main h2[id]').forEach((h) => io.observe(h));
+}
+
 function waitlistForm(topic) {
   const form = el(`<form class="inline-form" data-waitlist="${topic}"><input class="input" name="email" type="email" placeholder="you@example.com" required>
     <button class="btn primary" data-i18n="dl.notify">${tr('dl.notify')}</button><p class="error"></p></form>`);
@@ -220,6 +240,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-cockpit]').forEach(cockpitDemo);
   document.querySelectorAll('form[data-waitlist]').forEach(bindWaitlist);
   pages[document.body.dataset.page]?.();
+  docs();
   const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
   document.querySelectorAll('.reveal').forEach((node) => io.observe(node));
 });
