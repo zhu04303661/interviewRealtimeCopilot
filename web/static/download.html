@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download — Interview Realtime Copilot</title><meta name="description" content="Real-time interview copilot: bilingual live transcript, question detection, answer hints grounded in your own resume, and spoken practice interviews.">
+<link rel="stylesheet" href="/site.css"><script src="/site.js" defer></script></head><body>
+
+<section class="hero"><div class="wrap grid2"><div><div class="eyebrow">Download · 下载</div><h1>Get the desktop app.</h1>
+<p class="lead">The copilot runs on your computer, next to your meeting app. 应用在本机运行，配合会议软件使用。</p>
+<div class="card" style="margin-top:22px"><h3>macOS · 14.2 or later</h3><p class="muted small" id="mac-status">Checking for the current build… · 正在检查安装包…</p>
+<div id="mac-download"></div>
+<p class="faint small">Preview builds are not yet notarised by Apple: after opening, go to System Settings → Privacy &amp; Security and click “Open Anyway”. 测试版尚未经 Apple 公证：首次打开后，在「系统设置 → 隐私与安全性」中点「仍要打开」。</p></div>
+<div class="card" style="margin-top:16px"><h3>Windows · coming soon · 即将推出</h3><p class="muted small">Leave your email and we will tell you when it is ready. 留下邮箱，发布时通知你。</p>
+<form class="inline-form" data-waitlist="windows"><input class="input" name="email" type="email" placeholder="you@example.com" required><button class="btn primary">Notify me · 通知我</button><p class="error"></p></form></div>
+</div><div class="card"><h3>After installing · 安装之后</h3><div class="steps">
+<div><span>Allow the microphone when asked. 允许麦克风权限。</span></div><div><span>For live interviews, allow System Audio Recording so the copilot hears the meeting. Live 模式需允许系统录音。</span></div>
+<div><span>Create a goal, add your resume and notes, and start a practice session. 创建目标、上传资料、开始练习。</span></div></div></div></div></section>
+<script>
+window.addEventListener('DOMContentLoaded', async () => {
+  const status = document.getElementById('mac-status'), slot = document.getElementById('mac-download');
+  try {
+    const response = await fetch('/downloads/latest.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error();
+    const latest = await response.json();
+    status.textContent = `Version ${latest.version} · ${latest.size_mb} MB · ${latest.date}`;
+    slot.innerHTML = `<a class="btn primary lg" href="/downloads/${latest.file}">Download for macOS · 下载</a>`;
+  } catch {
+    status.textContent = 'The preview build is being prepared. Leave your email to get it first. · 测试版正在准备中，留下邮箱抢先获取。';
+    slot.innerHTML = '<form class="inline-form" data-waitlist="macos"><input class="input" name="email" type="email" placeholder="you@example.com" required><button class="btn primary">Notify me · 通知我</button><p class="error"></p></form>';
+    slot.querySelector('form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try { await api('/api/waitlist', { email: event.target.email.value, topic: 'macos' }); slot.innerHTML = '<div class="notice">Thanks — we will email you. · 已登记。</div>'; }
+      catch (e) { event.target.querySelector('.error').textContent = e.message; }
+    });
+  }
+});
+</script>
+</body></html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — Interview Realtime Copilot</title><meta name="description" content="Real-time interview copilot: bilingual live transcript, question detection, answer hints grounded in your own resume, and spoken practice interviews.">
+<link rel="stylesheet" href="/site.css"><script src="/site.js" defer></script></head><body>
+
+<div class="wrap"><div class="auth card"><h2 id="title" style="margin-top:0">Sign in · 登录</h2>
+<form id="auth"><label class="field"><span>Email · 邮箱</span><input class="input" name="email" type="email" autocomplete="email" required></label>
+<label class="field"><span>Password · 密码 <span class="faint" id="rule"></span></span><input class="input" name="password" type="password" autocomplete="current-password" required></label>
+<p class="error" id="error"></p><button class="btn primary lg" style="width:100%" id="submit">Sign in · 登录</button></form>
+<p class="small muted" style="text-align:center"><a href="#" id="switch" style="border-bottom:1px solid var(--line)">New here? Create an account · 注册新账号</a></p></div></div>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(location.search);
+  let mode = params.get('mode') === 'signup' ? 'signup' : 'login';
+  const render = () => {
+    document.getElementById('title').textContent = mode === 'signup' ? 'Create your account · 注册' : 'Sign in · 登录';
+    document.getElementById('submit').textContent = mode === 'signup' ? 'Create account · 注册' : 'Sign in · 登录';
+    document.getElementById('switch').textContent = mode === 'signup' ? 'Already registered? Sign in · 已有账号' : 'New here? Create an account · 注册新账号';
+    document.getElementById('rule').textContent = mode === 'signup' ? '(at least 10 characters · 至少 10 位)' : '';
+  };
+  render();
+  document.getElementById('switch').addEventListener('click', (e) => { e.preventDefault(); mode = mode === 'signup' ? 'login' : 'signup'; render(); });
+  document.getElementById('auth').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    try {
+      await api(mode === 'signup' ? '/api/signup' : '/api/login', { email: form.email.value, password: form.password.value });
+      location.href = params.get('next')?.startsWith('/') ? params.get('next') : '/account.html';
+    } catch (error) { document.getElementById('error').textContent = error.message; }
+  });
+});
+</script>
+</body></html>

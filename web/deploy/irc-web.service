@@ -1,0 +1,21 @@
+[Unit]
+Description=Interview Realtime Copilot website
+After=network-online.target
+
+[Service]
+User=ircweb
+Group=ircweb
+EnvironmentFile=/etc/irc-web.env
+WorkingDirectory=/opt/irc-web/server
+ExecStart=/opt/irc-web/venv/bin/python -m irc_web.app
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/irc-web
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target

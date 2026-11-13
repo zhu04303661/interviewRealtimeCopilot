@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing — Interview Realtime Copilot</title><meta name="description" content="Real-time interview copilot: bilingual live transcript, question detection, answer hints grounded in your own resume, and spoken practice interviews.">
+<link rel="stylesheet" href="/site.css"><script src="/site.js" defer></script></head><body>
+
+<section class="hero"><div class="wrap" style="text-align:center"><div class="eyebrow">Pricing · 价格</div><h1>Simple plans. Cancel anytime.</h1>
+<p class="lead" style="margin:0 auto">AI usage is included — no API key needed. 已包含 AI 费用，无需自己的 API 密钥。</p>
+<div id="checkout-note"></div>
+<div class="plans" style="text-align:left">
+<div class="plan"><h3>Free · 免费</h3><div class="price">$0</div><p class="muted small">Try the copilot on your next practice. 先体验。</p>
+<ul><li>2 spoken practice sessions per month</li><li>Bilingual transcript and hints</li><li>Prepared-question extraction</li><li>Debrief for each session</li></ul>
+<a class="btn" href="/download.html">Download · 下载</a></div>
+<div class="plan"><h3>Pro monthly · 月付</h3><div class="price">$29<small> / month</small></div><p class="muted small">For an active job search. 求职进行中。</p>
+<ul><li>Unlimited live interviews</li><li>Unlimited practice sessions</li><li>Solve screen and auto-capture</li><li>Recordings and full debriefs</li><li>Priority support</li></ul>
+<button class="btn primary" data-plan="monthly">Subscribe monthly · 订阅月付</button></div>
+<div class="plan featured"><h3>Pro yearly · 年付</h3><div class="price">$199<small> / year</small></div><p class="muted small">Save 43% — about $16.60 a month. 约省 43%。</p>
+<ul><li>Everything in Pro monthly</li><li>Two months of interviews for the price of one… and then some</li><li>Early access to Windows and new features</li></ul>
+<button class="btn primary" data-plan="yearly">Subscribe yearly · 订阅年付</button></div>
+</div><p class="error" id="checkout-error"></p></div></section>
+<section class="soft"><div class="wrap faq"><h2 style="text-align:center">Questions · 常见问题</h2>
+<details><summary>Do I need my own OpenAI key? · 需要自己的 API 密钥吗？</summary><p class="muted">No. Pro includes the speech and language model usage. 不需要，Pro 已包含模型费用。</p></details>
+<details><summary>Where is my data stored? · 数据存在哪里？</summary><p class="muted">On your computer: documents, transcripts, debriefs and recordings. Only audio and text needed for a live answer are sent to the AI models during a session. 全部存在本机。</p></details>
+<details><summary>Can I cancel? · 可以取消吗？</summary><p class="muted">Yes, anytime from your account page; you keep Pro until the end of the paid period. 随时可在账号页取消，已付费周期内继续可用。</p></details>
+<details><summary>Which platforms? · 支持哪些系统？</summary><p class="muted">macOS 14.2 or later today; Windows is coming. 目前支持 macOS 14.2 及以上，Windows 即将推出。</p></details>
+</div></section>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const note = document.getElementById('checkout-note');
+  if (location.search.includes('checkout=cancelled')) note.innerHTML = '<div class="notice warn">Checkout was cancelled — nothing was charged. · 已取消支付，未扣款。</div>';
+  document.querySelectorAll('[data-plan]').forEach((button) => button.addEventListener('click', async () => {
+    const error = document.getElementById('checkout-error');
+    error.textContent = '';
+    button.disabled = true;
+    try {
+      const me = await api('/api/me');
+      if (!me.user) { location.href = '/login.html?next=/pricing.html&mode=signup'; return; }
+      const { url } = await api('/api/checkout', { plan: button.dataset.plan });
+      location.href = url;
+    } catch (e) { error.textContent = e.message; button.disabled = false; }
+  }));
+});
+</script>
+</body></html>
