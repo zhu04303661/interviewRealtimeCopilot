@@ -289,6 +289,24 @@ def build() -> None:
                         ("acc.empty", "This month's AI allowance is used up. Upgrade to Pro for a larger monthly allowance.", "本月 AI 额度已用完，升级 Pro 可获得更多每月额度。")]:
         t(key, en, zh)
 
+    page("admin", ("Admin — Interview Realtime Copilot", "管理后台 — Interview Realtime Copilot"), f'''
+<div class="wrap" style="padding:60px 28px 80px"><span class="eyebrow">{t("ad.eyebrow", "Admin", "管理后台")}</span><h1 style="font-size:42px">{t("ad.h1", "Dashboard", "运营数据")}</h1>
+<div id="admin"><p class="muted" data-i18n="acc.loading">Loading…</p></div></div>''')
+    for key, en, zh in [("ad.users", "Registered users", "注册用户"), ("ad.new", "+{d7} this week · +{d30} this month", "本周 +{d7} · 本月 +{d30}"),
+                        ("ad.active", "Active (30 days)", "活跃用户（30 天）"), ("ad.devices", "{n} signed-in devices", "{n} 台已登录设备"),
+                        ("ad.subs", "Pro subscriptions", "Pro 订阅"), ("ad.subsplit", "{m} monthly · {y} yearly · {f} free", "月付 {m} · 年付 {y} · 免费 {f}"),
+                        ("ad.month", "AI usage this month", "本月 AI 用量"), ("ad.of", "of ${total} total allowance · {req} requests", "总额度 ${total} · {req} 次请求"),
+                        ("ad.remaining", "Remaining allowance", "剩余总额度"), ("ad.credit", "incl. ${credit} credit · ~{min} audio min this month", "含余额 ${credit} · 本月约 {min} 分钟音频"),
+                        ("ad.alltime", "All-time usage", "累计用量"), ("ad.alltimereq", "{req} requests", "{req} 次请求"),
+                        ("ad.daily", "Daily usage (30 days)", "每日用量（近 30 天）"), ("ad.models", "Usage by model this month", "本月各模型用量"),
+                        ("ad.userlist", "Users", "用户"), ("ad.search", "Search email", "搜索邮箱"),
+                        ("ad.c.email", "Email", "邮箱"), ("ad.c.model", "Model", "模型"), ("ad.c.plan", "Plan", "套餐"), ("ad.c.joined", "Joined", "注册时间"), ("ad.c.used", "Used / allowance", "已用 / 额度"),
+                        ("ad.c.balance", "Remaining", "剩余"), ("ad.c.req", "Requests", "请求数"), ("ad.c.last", "Last active", "最近活跃"),
+                        ("ad.wishes", "Wishlist", "许愿单"), ("ad.waitlist", "Notify-me sign-ups", "登记通知的邮箱"), ("ad.c.topic", "For", "关注"),
+                        ("ad.c.text", "Wish", "心愿"), ("ad.c.when", "When", "时间"), ("ad.none", "Nothing yet.", "暂无。"), ("ad.anon", "(no email)", "（未留邮箱）"),
+                        ("ad.denied", "This page is for admin accounts. Sign in with an admin account.", "此页面仅限管理员账号，请用管理员账号登录。"), ("nav.admin", "Admin", "后台")]:
+        t(key, en, zh)
+
     page("privacy", ("Privacy — Interview Realtime Copilot", "隐私 — Interview Realtime Copilot"), f'''
 <div class="wrap" style="max-width:820px;padding:80px 28px">{t("pv.h1", "Privacy", "隐私", "h1")}
 {t("pv.1t", "Stored on your Mac", "保存在你的 Mac 上", "h3")}{t("pv.1p", "Goals, documents, extracted questions, transcripts, debriefs and recordings are kept in the app's local data folder.", "目标、资料、提取的问题、字幕、复盘和录音都保存在应用的本地数据文件夹中。", "p", "muted")}
@@ -323,7 +341,7 @@ def build() -> None:
     (STATIC / "site.webmanifest").write_text(json.dumps({"name": "Interview Realtime Copilot", "short_name": "IR Copilot", "theme_color": "#06070b",
         "background_color": "#06070b", "display": "standalone", "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
                                                                        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}]}) + "\n")
-    (STATIC / "robots.txt").write_text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /account.html\nSitemap: https://copilot.xichiuk.com/sitemap.xml\n")
+    (STATIC / "robots.txt").write_text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /account.html\nDisallow: /admin.html\nSitemap: https://copilot.xichiuk.com/sitemap.xml\n")
     docs = build_docs()
     urls = "".join(f"<url><loc>https://copilot.xichiuk.com/{p}</loc></url>" for p in ("", "use-cases.html", "demo.html", "pricing.html", "download.html", "privacy.html", *docs))
     (STATIC / "sitemap.xml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')

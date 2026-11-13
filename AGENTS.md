@@ -40,4 +40,3 @@
 - The packaged engine reads OPENAI_API_KEY from `<data dir>/openai.env` (Settings → Account), then `~/.env`.
 - User-facing wording never names the AI provider or models (say "realtime AI engine"); the privacy text says audio is processed
   by our AI engine and trusted AI processing partners. Code, comments and logs may name OpenAI.
-- Team notifications (notify-me sign-ups, wishlist) go by SMTP: set IRC_SMTP_HOST/PORT/USER/PASSWORD/FROM and IRC_NOTIFY_TO in /etc/irc-web.env.

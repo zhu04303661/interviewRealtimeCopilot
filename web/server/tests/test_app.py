@@ -103,32 +103,33 @@ def test_signature_rejects_old_or_wrong():
     assert not verify_stripe_signature(payload, header, "whsec_test")
 
 
-async def test_waitlist_emails_the_team_once(site, monkeypatch):
-    import asyncio
 
-    from irc_web import notify
-    sent = []
-    monkeypatch.setenv("IRC_SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("IRC_NOTIFY_TO", "support@example.com")
-    monkeypatch.setattr(notify, "_send", lambda subject, body, reply_to: sent.append((subject, reply_to)))
-    assert (await post(site, "/api/waitlist", {"email": "d@example.com", "topic": "windows"})).status == 200
-    assert (await post(site, "/api/waitlist", {"email": "d@example.com", "topic": "windows"})).status == 200  # repeat: no second email
-    await asyncio.sleep(0.1)
-    assert sent == [("New sign-up: d@example.com wants windows", "d@example.com")]
-
-
-async def test_wishlist_is_stored_and_emailed(site, monkeypatch):
-    import asyncio
-
-    from irc_web import notify
-    sent = []
-    monkeypatch.setenv("IRC_SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("IRC_NOTIFY_TO", "support@example.com")
-    monkeypatch.setattr(notify, "_send", lambda subject, body, reply_to: sent.append((subject, body, reply_to)))
+async def test_wishlist_validation(site):
     assert (await post(site, "/api/wish", {"text": "hi"})).status == 422
     assert (await post(site, "/api/wish", {"text": "Please support Windows", "email": "bad"})).status == 422
     assert (await post(site, "/api/wish", {"text": "Please support Windows and Teams captions", "email": "W@example.com"})).status == 200
     assert (await post(site, "/api/wish", {"text": "Anonymous idea: dark mode for the docs"})).status == 200
-    await asyncio.sleep(0.1)
-    assert sent[0][0].startswith("Wishlist: Please support Windows") and sent[0][2] == "w@example.com" and "Teams captions" in sent[0][1]
-    assert sent[1][2] is None and "(no email left)" in sent[1][1]
+
+
+
+async def test_admin_dashboard_is_for_admins_only(site):
+    assert (await site.get("/api/admin/overview")).status == 401
+    await post(site, "/api/signup", {"email": "member@example.com", "password": "long-enough-1"})
+    assert (await site.get("/api/admin/overview")).status == 403
+    await post(site, "/api/logout")
+    await post(site, "/api/signup", {"email": "boss@example.com", "password": "long-enough-1"})
+    await post(site, "/api/wish", {"text": "Add Windows support please"})
+    await post(site, "/api/waitlist", {"email": "fan@example.com", "topic": "windows"})
+    from irc_web.app import Store
+    # flag the admin directly in the test database (the CLI does the same)
+    db_path = site.server.app["db_path"]
+    Store(db_path).db.execute("update users set is_admin = 1 where email = 'boss@example.com'")
+    overview = await (await site.get("/api/admin/overview")).json()
+    assert overview["users"]["total"] == 2 and overview["subscriptions"]["plans"] == {"free": 2}
+    assert overview["messages"] == {"wishes": 1, "waitlist": 1} and overview["usage"]["month_allowance_usd"] > 0
+    users = (await (await site.get("/api/admin/users?q=member")).json())["users"]
+    assert [u["email"] for u in users] == ["member@example.com"] and users[0]["balance_usd"] == users[0]["allowance_usd"]
+    messages = await (await site.get("/api/admin/messages")).json()
+    assert messages["wishes"][0]["email"] == "boss@example.com" and messages["waitlist"][0]["email"] == "fan@example.com"
+    assert (await (await site.get("/api/admin/usage")).json())["days"] == []
+    assert (await (await site.get("/api/me")).json())["user"]["admin"] is True

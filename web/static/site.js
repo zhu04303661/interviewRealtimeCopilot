@@ -36,7 +36,8 @@ function chrome() {
     <a href="/docs/" data-i18n="nav.docs"></a><a href="/#wishlist" data-i18n="foot.wishlist"></a><a href="/privacy.html" data-i18n="foot.privacy"></a><a href="mailto:${window.SUPPORT_EMAIL}"><span data-i18n="foot.support"></span> · ${window.SUPPORT_EMAIL}</a><a href="/terms.html" data-i18n="foot.terms"></a><span>© ${new Date().getFullYear()}</span></div></footer>`));
   document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; localStorage.setItem('lang', lang); applyLanguage(); }));
   api('/api/me').then(({ user }) => {
-    if (user) document.getElementById('account-slot').innerHTML = `<a class="btn" href="/account.html">${user.email.split('@')[0]} · ${user.plan === 'free' ? 'Free' : 'Pro'}</a>`;
+    if (user) document.getElementById('account-slot').innerHTML = (user.admin ? `<a class="btn" href="/admin.html" data-i18n="nav.admin">${tr('nav.admin')}</a> ` : '')
+      + `<a class="btn" href="/account.html">${user.email.split('@')[0]} · ${user.plan === 'free' ? 'Free' : 'Pro'}</a>`;
   }).catch(() => {});
 }
 
@@ -92,7 +93,45 @@ function cockpitDemo(root) {
   restart();
 }
 
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+const usd = (v) => `$${Number(v).toFixed(2)}`;
+
 const pages = {
+  async admin() {
+    const root = document.getElementById('admin');
+    const get = (p) => fetch(p).then(async (r) => { if (!r.ok) throw Object.assign(new Error(), { status: r.status }); return r.json(); });
+    let data;
+    try { data = await Promise.all(['/api/admin/overview', '/api/admin/usage', '/api/admin/messages', '/api/admin/users'].map(get)); }
+    catch (e) {
+      if (e.status === 401) { location.href = '/login.html?next=/admin.html'; return; }
+      root.innerHTML = `<div class="notice warn">${tr('ad.denied')}</div>`; return;
+    }
+    let [o, u, m, users] = data, query = '';
+    const card = (label, value, sub) => `<div class="card stat-card"><span class="muted small">${label}</span><b>${value}</b><span class="faint small">${sub}</span></div>`;
+    const table = (head, rows) => rows.length ? `<div class="doc-table"><table><thead><tr>${head.map((h) => `<th>${tr(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>` : `<p class="muted">${tr('ad.none')}</p>`;
+    const render = () => {
+      const p = o.subscriptions.plans, max = Math.max(0.0001, ...u.days.map((d) => d.usd));
+      root.innerHTML = `<div class="stat-grid">
+        ${card(tr('ad.users'), o.users.total, tr('ad.new', { d7: o.users.new_7d, d30: o.users.new_30d }))}
+        ${card(tr('ad.active'), o.users.active_30d, tr('ad.devices', { n: o.users.devices }))}
+        ${card(tr('ad.subs'), (p.monthly ?? 0) + (p.yearly ?? 0), tr('ad.subsplit', { m: p.monthly ?? 0, y: p.yearly ?? 0, f: p.free ?? 0 }))}
+        ${card(tr('ad.month'), usd(o.usage.month_used_usd), tr('ad.of', { total: o.usage.month_allowance_usd.toFixed(2), req: o.usage.month_requests }))}
+        ${card(tr('ad.remaining'), usd(o.usage.month_remaining_usd), tr('ad.credit', { credit: o.usage.credit_usd.toFixed(2), min: o.usage.audio_minutes_month }))}
+        ${card(tr('ad.alltime'), usd(o.usage.all_time_used_usd), tr('ad.alltimereq', { req: o.usage.all_time_requests }))}</div>
+        <h2>${tr('ad.daily')}</h2>${u.days.length ? `<div class="bars">${u.days.map((d) => `<div title="${d.day}: ${usd(d.usd)} · ${d.requests} · ${d.users}"><i style="height:${Math.max(3, d.usd / max * 100)}%"></i><span>${d.day.slice(5)}</span></div>`).join('')}</div>` : `<p class="muted">${tr('ad.none')}</p>`}
+        ${u.models.length ? `<h2>${tr('ad.models')}</h2>` + table(['ad.c.model', 'ad.c.req', 'ad.month'], u.models.map((x) => `<tr><td>${esc(x.model)}</td><td>${x.requests}</td><td>${usd(x.usd)}</td></tr>`)) : ''}
+        <h2>${tr('ad.userlist')} (${users.users.length})</h2><input class="input" id="admin-q" placeholder="${tr('ad.search')}" value="${esc(query)}" style="max-width:320px;margin-bottom:12px">
+        ${table(['ad.c.email', 'ad.c.plan', 'ad.c.joined', 'ad.c.used', 'ad.c.balance', 'ad.c.req', 'ad.c.last'], users.users.map((x) => `<tr><td>${esc(x.email)}${x.admin ? ' <span class="faint">admin</span>' : ''}</td>
+          <td>${x.plan}${x.status !== 'none' ? ` <span class="faint">${esc(x.status)}</span>` : ''}</td><td>${day(x.created_at)}</td>
+          <td>${usd(x.used_usd)} / ${usd(x.allowance_usd)}</td><td>${usd(x.balance_usd)}</td><td>${x.requests}</td><td>${day(x.last_active)}</td></tr>`))}
+        <h2>${tr('ad.wishes')} (${m.wishes.length})</h2>${table(['ad.c.when', 'ad.c.email', 'ad.c.text'], m.wishes.map((w) => `<tr><td>${day(w.created_at)}</td><td>${w.email ? `<a class="mail" href="mailto:${esc(w.email)}">${esc(w.email)}</a>` : tr('ad.anon')}</td><td style="white-space:pre-wrap">${esc(w.text)}</td></tr>`))}
+        <h2>${tr('ad.waitlist')} (${m.waitlist.length})</h2>${table(['ad.c.when', 'ad.c.email', 'ad.c.topic'], m.waitlist.map((w) => `<tr><td>${day(w.created_at)}</td><td><a class="mail" href="mailto:${esc(w.email)}">${esc(w.email)}</a></td><td>${esc(w.topic)}</td></tr>`))}`;
+      const q = document.getElementById('admin-q');
+      q.addEventListener('change', async () => { query = q.value; users = await get(`/api/admin/users?q=${encodeURIComponent(query)}`); render(); });
+    };
+    render(); window.addEventListener('language', render);
+  },
   pricing() {
     const note = document.getElementById('checkout-note');
     const show = () => { if (location.search.includes('checkout=cancelled')) note.innerHTML = `<div class="notice warn">${tr('pr.cancelled')}</div>`; };

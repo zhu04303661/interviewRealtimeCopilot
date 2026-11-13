@@ -10,8 +10,9 @@ subscriptions in SQLite:
     POST /api/checkout    {plan: "monthly"|"yearly"} Stripe Checkout URL
     POST /api/portal                                Stripe billing portal URL
     POST /api/waitlist    {email, topic}            notify-me sign-ups
-    POST /api/wish        {text, email?}            feature wishlist (stored and emailed to the team)
+    POST /api/wish        {text, email?}            feature wishlist (stored; read in the admin dashboard)
     POST /api/stripe/webhook                        subscription updates from Stripe
+    GET  /api/admin/overview|users|messages|usage   admin dashboard data (signed-in admin accounts only)
 
 Desktop app (Authorization: Bearer <device token>; see billing.py and relay.py):
 
@@ -29,7 +30,6 @@ answers 503 and everything else works.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import hmac
 import json
@@ -44,8 +44,9 @@ from typing import Any
 import aiohttp
 from aiohttp import web
 
-from . import notify, relay
+from . import relay
 from .billing import Billing
+from .billing import month_key as billing_month
 
 STATIC = Path(__file__).resolve().parent.parent.parent / "static"
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}$")
@@ -92,6 +93,8 @@ class Store:
         self.db = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        if "is_admin" not in {row[1] for row in self.db.execute("pragma table_info(users)")}:
+            self.db.execute("alter table users add column is_admin integer not null default 0")
 
     def user_by_email(self, email: str) -> sqlite3.Row | None:
         return self.db.execute("select * from users where email = ?", (email,)).fetchone()
@@ -109,7 +112,7 @@ class Store:
 def public_user(user: sqlite3.Row) -> dict[str, Any]:
     active = user["status"] in ("active", "trialing")
     return {"email": user["email"], "plan": user["plan"] if active else "free", "status": user["status"] or "none",
-            "current_period_end": user["current_period_end"]}
+            "current_period_end": user["current_period_end"], **({"admin": True} if user["is_admin"] else {})}
 
 
 def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stripe.com", openai_upstream: str | None = None,
@@ -282,12 +285,6 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         session = await stripe("/v1/billing_portal/sessions", {"customer": user["stripe_customer"], "return_url": f"{origin}/account.html"})
         return web.json_response({"url": session["url"]})
 
-    tasks: set[asyncio.Task] = set()  # notification emails in flight (kept referenced until done)
-
-    def background(request: web.Request, coro) -> None:
-        tasks.add(task := asyncio.create_task(coro))
-        task.add_done_callback(tasks.discard)
-
     async def waitlist(request: web.Request) -> web.Response:
         if limited(request, f"waitlist:{request.remote}", 10):
             return fail(429, "Too many attempts. Try again later.")
@@ -296,12 +293,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         topic = str(body.get("topic", "download"))[:40]
         if not EMAIL.match(email):
             return fail(422, "Enter a valid email address.")
-        added = store.db.execute("insert or ignore into waitlist values (?, ?, ?)", (email, topic, int(time.time()))).rowcount
-        if added:  # tell the team about each new sign-up (not repeats); in the background so the visitor never waits
-            background(request, notify.notify(
-                f"New sign-up: {email} wants {topic}",
-                f"{email} left their email on {origin} to hear about: {topic}.\nTime (UTC): {time.strftime('%Y-%m-%d %H:%M', time.gmtime())}\n"
-                f"Reply to this email to write to them directly.", reply_to=email))
+        store.db.execute("insert or ignore into waitlist values (?, ?, ?)", (email, topic, int(time.time())))
         return web.json_response({"ok": True})
 
     async def wish(request: web.Request) -> web.Response:
@@ -318,9 +310,6 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         email = email or (user["email"] if user else "")
         store.db.execute("insert into wishes (email, text, page, created_at) values (?, ?, ?, ?)",
                          (email or None, text, str(body.get("page", ""))[:200], int(time.time())))
-        background(request, notify.notify(f"Wishlist: {text[:60]}{'…' if len(text) > 60 else ''}",
-                                          f"From: {email or '(no email left)'}\nTime (UTC): {time.strftime('%Y-%m-%d %H:%M', time.gmtime())}\n\n{text}\n",
-                                          reply_to=email or None))
         return web.json_response({"ok": True})
 
     async def webhook(request: web.Request) -> web.Response:
@@ -352,14 +341,87 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
             return web.FileResponse(path, status=404)
         return web.FileResponse(path)
 
+    # -- admin dashboard (read-only; accounts flagged with `python -m irc_web.admin make-admin EMAIL`) --
+    def admin_only(handler):
+        async def wrapped(request: web.Request) -> web.Response:
+            user = current(request)
+            if not user or not user["is_admin"]:
+                return fail(403 if user else 401, "Admins only.")
+            return await handler(request)
+        return wrapped
+
+    def scalar(sql: str, *params: Any) -> Any:
+        return store.db.execute(sql, params).fetchone()[0]
+
+    @admin_only
+    async def admin_overview(request: web.Request) -> web.Response:
+        now, month = int(time.time()), billing_month()
+        users = store.db.execute("select * from users").fetchall()
+        allowance = sum(billing.allowance(u) for u in users)
+        used = scalar("select coalesce(sum(cost_micro), 0) from usage where month = ?", month)
+        credit = scalar("select coalesce(sum(amount_micro), 0) from credit_grants")
+        plans: dict[str, int] = {}
+        for u in users:
+            key = public_user(u)["plan"]
+            plans[key] = plans.get(key, 0) + 1
+        return web.json_response({
+            "month": month,
+            "users": {"total": len(users), "new_7d": sum(u["created_at"] > now - 7 * 86400 for u in users),
+                      "new_30d": sum(u["created_at"] > now - 30 * 86400 for u in users),
+                      "active_30d": scalar("select count(distinct user_id) from usage where ts > ?", now - 30 * 86400),
+                      "devices": scalar("select count(*) from device_tokens")},
+            "subscriptions": {"plans": plans, "statuses": dict(store.db.execute(
+                "select coalesce(status, 'none'), count(*) from users group by 1").fetchall())},
+            "usage": {"month_used_usd": used / 1e6, "month_allowance_usd": allowance / 1e6, "credit_usd": max(0, credit) / 1e6,
+                      "month_remaining_usd": max(0, allowance - used) / 1e6 + max(0, credit) / 1e6,
+                      "month_requests": scalar("select count(*) from usage where month = ?", month),
+                      "all_time_used_usd": scalar("select coalesce(sum(cost_micro), 0) from usage") / 1e6,
+                      "all_time_requests": scalar("select count(*) from usage"),
+                      "audio_minutes_month": round(scalar("select coalesce(sum(audio_input_tokens + audio_output_tokens), 0) from usage where month = ?", month) / 600, 1)},
+            "messages": {"wishes": scalar("select count(*) from wishes"), "waitlist": scalar("select count(*) from waitlist")},
+        })
+
+    @admin_only
+    async def admin_users(request: web.Request) -> web.Response:
+        q = f"%{request.query.get('q', '').strip().lower()}%"
+        rows = store.db.execute("select * from users where email like ? order by created_at desc limit 500", (q,)).fetchall()
+        result = []
+        for u in rows:
+            summary = billing.summary(u)
+            result.append({**public_user(u), "id": u["id"], "created_at": u["created_at"], "used_usd": summary["used_usd"],
+                           "allowance_usd": summary["allowance_usd"], "balance_usd": summary["balance_usd"], "credit_usd": summary["credit_usd"],
+                           "requests": scalar("select count(*) from usage where user_id = ? and month = ?", u["id"], summary["month"]),
+                           "last_active": scalar("select max(last_used_at) from device_tokens where user_id = ?", u["id"]),
+                           "devices": scalar("select count(*) from device_tokens where user_id = ?", u["id"])})
+        return web.json_response({"users": result})
+
+    @admin_only
+    async def admin_messages(request: web.Request) -> web.Response:
+        wishes = [dict(r) for r in store.db.execute("select id, email, text, page, created_at from wishes order by created_at desc limit 500")]
+        waitlist = [dict(r) for r in store.db.execute("select email, topic, created_at from waitlist order by created_at desc limit 500")]
+        return web.json_response({"wishes": wishes, "waitlist": waitlist})
+
+    @admin_only
+    async def admin_usage(request: web.Request) -> web.Response:
+        since = int(time.time()) - 30 * 86400
+        days = store.db.execute("select strftime('%Y-%m-%d', ts, 'unixepoch') d, count(*) n, sum(cost_micro) c, count(distinct user_id) u "
+                                "from usage where ts > ? group by d order by d", (since,)).fetchall()
+        models = store.db.execute("select model, count(*) n, sum(cost_micro) c from usage where month = ? group by model order by c desc",
+                                  (billing_month(),)).fetchall()
+        return web.json_response({"days": [{"day": d, "requests": n, "usd": c / 1e6, "users": u} for d, n, c, u in days],
+                                  "models": [{"model": m, "requests": n, "usd": c / 1e6} for m, n, c in models]})
+
     app = web.Application(middlewares=[guard], client_max_size=64 * 1024 * 1024)  # transcription uploads
+    app["db_path"] = db_path or os.environ.get("IRC_WEB_DB", "irc-web.sqlite3")
     relay.setup(app, billing, origin, openai_upstream or os.environ.get("IRC_OPENAI_UPSTREAM", "https://api.openai.com"), device_user)
     app.add_routes([
         web.post("/api/v1/auth/{action:register|login}", device_auth), web.post("/api/v1/auth/logout", device_logout),
         web.get("/api/v1/me", device_me), web.post("/api/v1/auth/web-link", web_link), web.get("/auth/link", redeem_link),
         web.post("/api/signup", signup), web.post("/api/login", login), web.post("/api/logout", logout),
         web.get("/api/me", me), web.post("/api/checkout", checkout), web.post("/api/portal", portal),
-        web.post("/api/waitlist", waitlist), web.post("/api/wish", wish), web.post("/api/stripe/webhook", webhook),
+        web.post("/api/waitlist", waitlist), web.post("/api/wish", wish),
+        web.get("/api/admin/overview", admin_overview), web.get("/api/admin/users", admin_users),
+        web.get("/api/admin/messages", admin_messages), web.get("/api/admin/usage", admin_usage), web.post("/api/stripe/webhook", webhook),
         web.get("/", page), web.get("/{name:.+}", page),
     ])
     return app
