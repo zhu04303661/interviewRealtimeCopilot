@@ -180,3 +180,40 @@ footer .wrap { display: flex; gap: 26px; flex-wrap: wrap; align-items: center; }
 .sources { display: grid; gap: 8px; } .src { display: flex; gap: 10px; align-items: center; font-size: 13.5px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.03); }
 .src span:first-child { flex: 1; } .badge-s { font: 600 11px var(--mono); color: var(--warn); } .badge-s.ok { color: var(--good); }
 .src-done { margin-top: 6px; font-size: 13.5px; color: #b6f5d8; }
+
+/* ── tech layer: grid, aurora, stars, spotlight, glowing borders, shimmer ── */
+.bg-grid { position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: .35;
+  background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size: 56px 56px; mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%); }
+.aurora { position: fixed; inset: 0; z-index: -3; pointer-events: none; overflow: hidden; }
+.aurora i { position: absolute; width: 46vw; height: 46vw; border-radius: 50%; filter: blur(90px); opacity: .32; animation: drift 22s ease-in-out infinite alternate; }
+.aurora i:nth-child(1) { background: #6b4bff; left: -10vw; top: -16vw; }
+.aurora i:nth-child(2) { background: #1fb8ff; right: -12vw; top: -8vw; animation-duration: 28s; }
+.aurora i:nth-child(3) { background: #ff3fa4; left: 30vw; top: 40vh; opacity: .12; animation-duration: 34s; }
+@keyframes drift { to { transform: translate(8vw, 6vh) scale(1.15); } }
+#stars { position: fixed; inset: 0; z-index: -2; pointer-events: none; }
+.spot { position: fixed; width: 520px; height: 520px; border-radius: 50%; pointer-events: none; z-index: -1; left: var(--mx, -999px); top: var(--my, -999px);
+  transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(91,140,255,.12), transparent); transition: opacity .3s; }
+.tile .ico, .card .ico { background: linear-gradient(160deg, rgba(124,92,255,.18), rgba(42,212,255,.06)); border-color: rgba(124,92,255,.35); box-shadow: inset 0 0 20px rgba(124,92,255,.2); }
+.tile .ico svg { width: 22px; height: 22px; }
+.tile { transition: transform .25s, border-color .25s, box-shadow .25s; transform-style: preserve-3d; }
+.tile:hover { border-color: rgba(124,92,255,.45); box-shadow: 0 20px 60px -20px rgba(124,92,255,.45); }
+.tile::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(400px circle at var(--x, 50%) var(--y, 50%), rgba(124,92,255,.16), transparent 40%); }
+.tile:hover::before { opacity: 1; }
+.mock, .plan.featured { position: relative; }
+.mock::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: conic-gradient(from var(--angle), transparent 0 70%, #7c5cff, #2ad4ff, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: spin 6s linear infinite; }
+@property --angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes spin { to { --angle: 360deg; } }
+.grad-text { background-size: 200% auto; animation: shimmer 6s linear infinite; }
+@keyframes shimmer { to { background-position: 200% center; } }
+.btn.primary { position: relative; overflow: hidden; }
+.btn.primary::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%);
+  transform: translateX(-120%); animation: sweep 3.8s ease-in-out infinite; }
+@keyframes sweep { 60%, 100% { transform: translateX(120%); } }
+.stats b { font-variant-numeric: tabular-nums; }
+.scan { position: absolute; left: 0; right: 0; height: 60px; pointer-events: none; background: linear-gradient(transparent, rgba(91,140,255,.12), transparent); animation: scan 4s linear infinite; }
+@keyframes scan { from { top: -60px; } to { top: 100%; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

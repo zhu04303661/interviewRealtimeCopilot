@@ -171,8 +171,47 @@ function bindWaitlist(form) {
   });
 }
 
+/** Ambient effects: drifting starfield, cursor spotlight, tile glow that follows the pointer, gentle 3D tilt. */
+function effects() {
+  const canvas = document.getElementById('stars');
+  if (canvas && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+    const size = () => { canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio;
+      stars = Array.from({ length: 90 }, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, r: Math.random() * 1.4 + .3, v: Math.random() * .25 + .05 })); };
+    size(); addEventListener('resize', size);
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const s of stars) {
+        s.y -= s.v * devicePixelRatio; if (s.y < 0) s.y = canvas.height;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r * devicePixelRatio, 0, 7); ctx.fillStyle = `rgba(170,190,255,${.25 + s.r / 3})`; ctx.fill();
+      }
+      requestAnimationFrame(draw);
+    };
+    draw();
+  }
+  addEventListener('pointermove', (e) => { document.documentElement.style.setProperty('--mx', e.clientX + 'px'); document.documentElement.style.setProperty('--my', e.clientY + 'px'); });
+  document.querySelectorAll('.tile, .plan').forEach((tile) => {
+    tile.addEventListener('pointermove', (e) => {
+      const r = tile.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      tile.style.setProperty('--x', `${x * 100}%`); tile.style.setProperty('--y', `${y * 100}%`);
+      tile.style.transform = `perspective(900px) rotateX(${(.5 - y) * 4}deg) rotateY(${(x - .5) * 5}deg) translateY(-2px)`;
+    });
+    tile.addEventListener('pointerleave', () => { tile.style.transform = ''; });
+  });
+  // Count the stats up when they come into view.
+  document.querySelectorAll('.stats b').forEach((b) => {
+    const m = b.textContent.match(/^(~?)(\d+)(.*)$/); if (!m) return;
+    const [, pre, num, post] = m; b.textContent = pre + '0' + post;
+    new IntersectionObserver(([e], o) => { if (!e.isIntersecting) return; o.disconnect(); let i = 0; const end = +num;
+      const step = () => { i = Math.min(end, i + Math.ceil(end / 30)); b.textContent = pre + i + post; if (i < end) requestAnimationFrame(step); }; step(); }).observe(b);
+  });
+  document.querySelectorAll('.mock').forEach((m) => m.append(Object.assign(document.createElement('div'), { className: 'scan' })));
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   chrome();
+  effects();
   applyLanguage();
   document.querySelectorAll('[data-cockpit]').forEach(cockpitDemo);
   document.querySelectorAll('form[data-waitlist]').forEach(bindWaitlist);

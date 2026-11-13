@@ -32,7 +32,9 @@ def page(name: str, title: tuple[str, str], body: str) -> None:
             f'<meta property="og:description" content="Real-time AI interview assistant: live translation, question detection, answers from your resume, coding help from your screen.">'
             f'<link rel="canonical" href="https://copilot.xichiuk.com/{"" if name == "index" else name + ".html"}">'
             f'<script type="application/ld+json">{LD}</script>'
-            f'<link rel="stylesheet" href="/site.css"><script src="/i18n.js" defer></script><script src="/site.js" defer></script></head><body data-page="{name}">')
+            f'<link rel="stylesheet" href="/site.css"><script src="/i18n.js" defer></script><script src="/site.js" defer></script></head><body data-page="{name}">'
+            '<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9d85ff"/><stop offset=".5" stop-color="#5b8cff"/><stop offset="1" stop-color="#3fe0ff"/></linearGradient></defs></svg>'
+            '<div class="bg-grid"></div><div class="aurora"><i></i><i></i><i></i></div><canvas id="stars"></canvas><div class="spot"></div>')
     (STATIC / f"{name}.html").write_text(head + body + "</body></html>\n")
 
 
@@ -67,22 +69,22 @@ COCKPIT = ('<div class="stage"><div class="scene" data-scene>'
            + t("phase.answer", "5 · You answer", "5 · 你来作答") + '</span></div></div>')
 
 SCENARIOS = [
-    ("video", "🎥", "Video interviews on Zoom, Teams or Meet", "Zoom、Teams、Meet 视频面试",
+    ("video", "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"url(#ig)\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 10l5-3v10l-5-3z\"/><rect x=\"2\" y=\"6\" width=\"13\" height=\"12\" rx=\"2\"/></svg>", "Video interviews on Zoom, Teams or Meet", "Zoom、Teams、Meet 视频面试",
      "The copilot hears the meeting and your microphone separately, recognises each question once the interviewer finishes, and streams a one-minute answer built from your resume — while you keep eye contact.",
      "分别听取会议声音和你的麦克风，在面试官说完时识别出完整问题，并基于你的简历给出一分钟内能说完的回答，你可以一直看着镜头。"),
-    ("language", "🌐", "Interviewing in your second language", "用第二语言面试",
+    ("language", "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"url(#ig)\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18\"/></svg>", "Interviewing in your second language", "用第二语言面试",
      "Every interviewer line is translated as it is spoken (English ↔ Chinese), and hints come in both languages, so you understand precisely and answer fluently.",
      "面试官的每句话实时翻译（中英互译），回答提示同时给出两种语言，听得准、答得顺。"),
-    ("technical", "💻", "Technical and coding rounds", "技术面与编程题",
+    ("technical", "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"url(#ig)\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M8 20h8M9 9l-2 2 2 2M15 9l2 2-2 2\"/></svg>", "Technical and coding rounds", "技术面与编程题",
      "Press ⌥S — or let auto-capture do it — and the copilot reads the coding problem, diagram or error on your screen and explains a solution with its trade-offs.",
      "按 ⌥S，或交给自动截屏：读取屏幕上的编程题、架构图或报错，给出解法和取舍。"),
-    ("prep", "📚", "Rehearsing your prepared Q&A", "演练你准备的问答",
+    ("prep", "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"url(#ig)\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 19V5a2 2 0 012-2h12v16H6a2 2 0 00-2 2z\"/><path d=\"M8 7h6M8 11h6\"/></svg>", "Rehearsing your prepared Q&A", "演练你准备的问答",
      "Upload your preparation document and every prepared question is extracted. A spoken AI interviewer asks them in order, at random or improvises, follows up once, and never repeats itself.",
      "上传准备文档，自动提取所有准备好的问题。AI 面试官用语音按顺序、随机或临场提问，每题追问一次，不重复。"),
-    ("midanswer", "✍️", "Getting stuck mid-answer", "回答到一半卡住",
+    ("midanswer", "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"url(#ig)\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z\"/></svg>", "Getting stuck mid-answer", "回答到一半卡住",
      "Already talking? Expand answer continues from what you just said with the most valuable facts you have not mentioned yet, in under a minute.",
      "已经开口但思路断了？「补充回答」会接着你刚说的内容，补上你还没提到的关键事实。"),
-    ("after", "📈", "Improving after every interview", "每场面试后的复盘提升",
+    ("after", "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"url(#ig)\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 3v18h18\"/><path d=\"M7 15l4-4 3 3 5-6\"/></svg>", "Improving after every interview", "每场面试后的复盘提升",
      "Each session ends with a debrief: every question reviewed, what was missing, a stronger spoken version — and the recording to replay.",
      "每场结束都有复盘：逐题点评、指出遗漏，并给出更好的说法，还能回放录音。"),
 ]
