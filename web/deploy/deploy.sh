@@ -1,10 +1,9 @@
 #!/bin/sh
 # Deploy the website to the server (idempotent). Run from the repository root:
-#   sh web/deploy/deploy.sh ubuntu@host ~/.ssh/key.pem
-# Leaves other Caddy sites untouched; adds /etc/caddy/sites/irc-web.conf.
+#   sh web/deploy/deploy.sh ubuntu@host ~/.ssh/key.pem copilot.example.com
+# Leaves other Caddy sites untouched; adds /etc/caddy/sites/irc-web.conf for the domain.
 set -eu
-target=$1; key=$2
-host=${target#*@}
+target=$1; key=$2; host=$3
 ssh_() { ssh -i "$key" -o BatchMode=yes "$target" "$@"; }
 rsync -az --delete -e "ssh -i $key -o BatchMode=yes" --exclude '.venv' --exclude '__pycache__' --exclude '*.sqlite3' --exclude 'tests' \
   web/server web/static "$target:/tmp/irc-web-upload/"
@@ -23,6 +22,8 @@ sudo chown -R ircweb:ircweb /var/lib/irc-web
 if [ ! -f /etc/irc-web.env ]; then
   printf 'IRC_WEB_ORIGIN=https://%s\nIRC_WEB_DB=/var/lib/irc-web/site.sqlite3\nSTRIPE_SECRET_KEY=\nSTRIPE_WEBHOOK_SECRET=\n' "$HOST" | sudo tee /etc/irc-web.env >/dev/null
   sudo chmod 600 /etc/irc-web.env
+else  # keep the Stripe keys; only the public origin follows the domain
+  sudo sed -i "s|^IRC_WEB_ORIGIN=.*|IRC_WEB_ORIGIN=https://$HOST|" /etc/irc-web.env
 fi
 sudo cp /tmp/irc-web-upload/irc-web.service /etc/systemd/system/irc-web.service
 sudo systemctl daemon-reload
