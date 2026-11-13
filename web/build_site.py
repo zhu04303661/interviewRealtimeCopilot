@@ -32,6 +32,9 @@ def page(name: str, title: tuple[str, str], body: str) -> None:
             f'<meta property="og:description" content="Real-time AI interview assistant: live translation, question detection, answers from your resume, coding help from your screen.">'
             f'<link rel="canonical" href="https://copilot.xichiuk.com/{"" if name == "index" else name + ".html"}">'
             f'<script type="application/ld+json">{LD}</script>'
+            f'<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">'
+            f'<link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#06070b">'
+            f'<meta property="og:image" content="https://copilot.xichiuk.com/icon-512.png">'
             f'<link rel="stylesheet" href="/site.css"><script src="/i18n.js" defer></script><script src="/site.js" defer></script></head><body data-page="{name}">'
             '<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9d85ff"/><stop offset=".5" stop-color="#5b8cff"/><stop offset="1" stop-color="#3fe0ff"/></linearGradient></defs></svg>'
             '<div class="bg-grid"></div><div class="aurora"><i></i><i></i><i></i></div><canvas id="stars"></canvas><div class="spot"></div>')
@@ -246,6 +249,9 @@ def build() -> None:
                         ("mock.h3", "The trade-off was a 2-TTI feedback delay, which I mitigated with predictive smoothing.",
                          "代价是 2 个 TTI 的反馈延迟，我用预测平滑来弥补。")]:
         t(key, en, zh)
+    (STATIC / "site.webmanifest").write_text(json.dumps({"name": "Interview Realtime Copilot", "short_name": "IR Copilot", "theme_color": "#06070b",
+        "background_color": "#06070b", "display": "standalone", "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                                                                       {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}]}) + "\n")
     (STATIC / "robots.txt").write_text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /account.html\nSitemap: https://copilot.xichiuk.com/sitemap.xml\n")
     urls = "".join(f"<url><loc>https://copilot.xichiuk.com/{p}</loc></url>" for p in ("", "use-cases.html", "demo.html", "pricing.html", "download.html", "privacy.html"))
     (STATIC / "sitemap.xml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')
