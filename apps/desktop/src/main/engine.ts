@@ -12,6 +12,10 @@ import { createInterface } from 'node:readline';
 export interface EngineOptions {
   engineDir: string;
   dataDir: string;
+  /** Bundled Python interpreter (packaged app); without it the engine runs through uv. */
+  python?: string;
+  /** Files searched in order for OPENAI_API_KEY. */
+  envFiles?: string[];
   /** Electron's proxy resolution for a URL (handles PAC files and system settings). */
   resolveProxy?: (url: string) => Promise<string>;
   log?: (line: string) => void;
@@ -65,10 +69,19 @@ export class Engine {
     const workspace = join(dataDir, 'workspace');
     mkdirSync(accounts, { recursive: true, mode: 0o700 });
     mkdirSync(workspace, { recursive: true, mode: 0o700 });
-    const uv = process.env.IRC_UV ?? 'uv';
-    const child = spawn(uv, ['run', '--project', engineDir, 'python', '-m', 'frlocal', 'serve', '--accounts', accounts, '--workspace', workspace], {
+    const serve = ['-m', 'frlocal', 'serve', '--accounts', accounts, '--workspace', workspace];
+    // Packaged app: the bundled Python runs the bundled engine source. Development: uv runs the engine project.
+    const [command, args] = this.options.python
+      ? [this.options.python, serve]
+      : [process.env.IRC_UV ?? 'uv', ['run', '--project', engineDir, 'python', ...serve]];
+    const child = spawn(command, args, {
       cwd: engineDir,
-      env: { ...process.env, FRLOCAL_TOKEN: this.token, ...(this.proxy ? { FRLOCAL_OPENAI_PROXY: this.proxy } : {}), PATH: `${process.env.HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? ''}` },
+      env: {
+        ...process.env, FRLOCAL_TOKEN: this.token, ...(this.proxy ? { FRLOCAL_OPENAI_PROXY: this.proxy } : {}),
+        ...(this.options.python ? { PYTHONPATH: join(engineDir, 'src'), PYTHONDONTWRITEBYTECODE: '1', PYTHONNOUSERSITE: '1' } : {}),
+        ...(this.options.envFiles ? { FRLOCAL_ENV_FILE: this.options.envFiles.join(':') } : {}),
+        PATH: `${process.env.HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? ''}`,
+      },
       stdio: ['pipe', 'pipe', 'pipe'],  // the engine exits when stdin closes, i.e. when this app does
     });
     this.child = child;

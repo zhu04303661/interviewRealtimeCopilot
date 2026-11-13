@@ -21,7 +21,15 @@
 - In tests (`IRC_E2E=1`) Solve screen never captures the real screen: it uses `IRC_TEST_SCREEN` (an image) or fails.
 - Electron binary download: GitHub may time out via the proxy; `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node node_modules/electron/install.js`.
 
+- macOS package (Apple Silicon, ad-hoc signed, not notarised): `cd apps/desktop && node scripts/package-mac.mjs` → `dist-mac/*.dmg`
+  and `latest.json`. Bundles a uv-managed CPython 3.12 (`uv python install 3.12`) with the engine's locked deps and `engine/src`.
+  Publish: copy both files to `/opt/irc-web/static/downloads/` on the web server (deploy.sh keeps that folder).
+- Website: `python3 web/build_site.py` (all text, EN+ZH) → `web/static`; tests `cd web/server && uv run pytest -q`;
+  deploy `sh web/deploy/deploy.sh ubuntu@<host> <key.pem> copilot.xichiuk.com`.
+
 ## Gotchas
 - The engine watches stdin to detect the parent exiting; spawn it with a stdin pipe, not `ignore`.
 - Never run tests that open the real microphone: use `IRC_FAKE_AUDIO` or `IRC_DENY_MEDIA=1`.
 - `IRC_DATA_DIR` must point at a temporary folder in tests; the default is the user's real data.
+- The packaged app keeps Electron's executable name, so `app.isPackaged` is false; main.ts detects `Resources/engine` instead.
+- The packaged engine reads OPENAI_API_KEY from `<data dir>/openai.env` (Settings → Account), then `~/.env`.

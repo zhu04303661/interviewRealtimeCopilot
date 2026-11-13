@@ -5,7 +5,8 @@
 // through the narrow IPC surface in ../preload/preload.ts.
 import { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, screen, session, shell, systemPreferences } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { Engine } from './engine';
 import { DEFAULTS, type Settings, SettingsStore, type ShortcutId } from './settings';
@@ -19,8 +20,13 @@ if (process.env.IRC_FAKE_AUDIO) {
 }
 
 
-const engineDir = process.env.IRC_ENGINE_DIR ?? resolve(__dirname, '../../../../engine');
+// Packaged: the engine source and a standalone Python live in Contents/Resources (see scripts/package-mac.mjs).
+// (The bundle keeps Electron's executable name, so app.isPackaged is false; detect the bundled engine instead.)
+const bundled = existsSync(join(process.resourcesPath, 'engine', 'src', 'frlocal'));
+const engineDir = process.env.IRC_ENGINE_DIR ?? (bundled ? join(process.resourcesPath, 'engine') : resolve(__dirname, '../../../../engine'));
+const bundledPython = bundled ? join(process.resourcesPath, 'python', 'bin', 'python3') : undefined;
 const dataDir = process.env.IRC_DATA_DIR ?? join(app.getPath('appData'), 'Interview Realtime Copilot');
+const apiKeyFile = join(dataDir, 'openai.env');
 let engine: Engine;
 let mainWindow: BrowserWindow | null = null;
 let cockpit: BrowserWindow | null = null;
@@ -218,6 +224,19 @@ function registerIpc(): void {
   ipcMain.handle('system-audio:start', () => startSystemAudio());
   ipcMain.handle('system-audio:stop', () => stopSystemAudio());
   ipcMain.handle('settings:get', () => settings.value);
+  // OpenAI API key entered in Settings: stored only on this Mac (owner-only file), read by the engine on every call.
+  ipcMain.handle('apikey:status', () => {
+    const own = existsSync(apiKeyFile) && /OPENAI_API_KEY=\S/.test(readFileSync(apiKeyFile, 'utf8'));
+    const env = !!process.env.OPENAI_API_KEY || /^\s*(export\s+)?OPENAI_API_KEY\s*=\s*\S/m.test(existsSync(join(homedir(), '.env')) ? readFileSync(join(homedir(), '.env'), 'utf8') : '');
+    return { configured: own || env, source: own ? 'app' : env ? 'environment' : 'none' };
+  });
+  ipcMain.handle('apikey:set', (_event, key: unknown) => {
+    const value = String(key ?? '').trim();
+    if (!value) { rmSync(apiKeyFile, { force: true }); return; }
+    if (!/^sk-[A-Za-z0-9_\-]{20,}$/.test(value)) throw new Error('This does not look like an OpenAI API key (it starts with "sk-").');
+    writeFileSync(apiKeyFile, `OPENAI_API_KEY=${value}\n`, { mode: 0o600 });
+    chmodSync(apiKeyFile, 0o600);
+  });
   ipcMain.handle('settings:defaults', () => DEFAULTS);
   ipcMain.handle('settings:set', (_event, patch: unknown) => { const value = settings.update(patch); applySettings(value); return value; });
   ipcMain.handle('screen:solve', (_event, origin: 'manual' | 'automatic') => solveScreen(origin === 'automatic' ? 'automatic' : 'manual'));
@@ -234,7 +253,8 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(() => {
-  engine = new Engine({ engineDir, dataDir, resolveProxy: (url) => session.defaultSession.resolveProxy(url) });
+  engine = new Engine({ engineDir, dataDir, python: bundledPython, envFiles: [apiKeyFile, join(homedir(), '.env')],
+    resolveProxy: (url) => session.defaultSession.resolveProxy(url) });
   settings = new SettingsStore(dataDir);
   // getDisplayMedia from the cockpit gets the primary screen with system audio
   // (loopback); the video track is discarded by the renderer.

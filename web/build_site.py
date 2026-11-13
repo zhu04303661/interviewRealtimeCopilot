@@ -105,7 +105,7 @@ def build() -> None:
 <h1>{t("hero.h1a", "Answer every interview question", "每一道面试题，")}<br><span class="grad-text">{t("hero.h1b", "with calm confidence.", "都能从容作答。")}</span></h1>
 {t("hero.lead", "Interview Realtime Copilot listens to the interviewer, translates as they speak, spots each question and streams a concise answer built from your own resume and notes.", "Interview Realtime Copilot 实时聆听面试官、同步翻译、识别每一个问题，并基于你自己的简历和准备资料给出简洁的回答提示。", "p", "lead")}
 <div class="cta"><a class="btn primary lg" href="/download.html">{t("cta.download", "Download for macOS", "下载 macOS 版")}</a><a class="btn lg" href="/demo.html">{t("cta.demo", "Watch the demo", "观看演示")}</a></div>
-<div class="trust">{t("trust.1", "Local-first: your files stay on your Mac", "本地优先：文件只存在你的 Mac")}{t("trust.2", "Hidden from screen sharing", "共享屏幕时不可见")}{t("trust.3", "No API key needed", "无需 API 密钥")}</div>
+<div class="trust">{t("trust.1", "Local-first: your files stay on your Mac", "本地优先：文件只存在你的 Mac")}{t("trust.2", "Hidden from screen sharing", "共享屏幕时不可见")}{t("trust.3", "Native on Apple Silicon", "原生支持 Apple 芯片")}</div>
 </div>{COCKPIT}</div></section>
 
 <section style="padding-top:0"><div class="wrap"><div class="stats reveal">
@@ -184,7 +184,8 @@ def build() -> None:
     page("download", ("Download — Interview Realtime Copilot", "下载 — Interview Realtime Copilot"), f'''
 <section class="hero"><div class="wrap split"><div><span class="eyebrow">{t("dl.eyebrow", "Download", "下载")}</span><h1>{t("dl.h1", "Get the desktop app.", "下载桌面应用。")}</h1>
 {t("dl.lead", "The copilot runs on your Mac, next to your meeting app.", "应用在你的 Mac 上运行，配合会议软件使用。", "p", "lead")}
-<div class="card" style="margin-top:26px">{t("dl.mac", "macOS 14.2 or later", "macOS 14.2 及以上", "h3")}<p class="muted small" id="mac-status" data-i18n="dl.checking">{"Checking for the current build…"}</p><div id="mac-download"></div>
+<div class="card" style="margin-top:26px">{t("dl.mac", "macOS 14.2 or later · Apple Silicon (M1–M4)", "macOS 14.2 及以上 · Apple 芯片（M1–M4）", "h3")}<p class="muted small" id="mac-status" data-i18n="dl.checking">{"Checking for the current build…"}</p><div id="mac-download"></div>
+{t("dl.key", "Preview: add your own OpenAI API key in Settings → Account. With Pro, AI usage will be included and no key is needed.", "预览版：请在「设置 → 账号」中填写你自己的 OpenAI API 密钥。Pro 订阅上线后将包含 AI 费用，无需密钥。", "p", "notice warn small")}
 {t("dl.gatekeeper", "Preview builds are not yet notarised by Apple: after the first launch, open System Settings → Privacy & Security and click “Open Anyway”.", "测试版尚未经 Apple 公证：首次启动后，打开「系统设置 → 隐私与安全性」，点击「仍要打开」。", "p", "faint small")}</div>
 <div class="card" style="margin-top:16px">{t("dl.win", "Windows — coming soon", "Windows——即将推出", "h3")}{t("dl.win.p", "Leave your email and we will tell you when it is ready.", "留下邮箱，发布时通知你。", "p", "muted small")}
 <form class="inline-form" data-waitlist="windows"><input class="input" name="email" type="email" placeholder="you@example.com" required><button class="btn primary">{t("dl.notify", "Notify me", "通知我")}</button><p class="error"></p></form></div></div>

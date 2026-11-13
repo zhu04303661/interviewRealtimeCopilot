@@ -68,7 +68,7 @@ def read_env_file(path: Path) -> dict[str, str]:
 
 
 class OpenAI:
-    def __init__(self, base: str, ws_base: str, env_file: Path, proxy: str | None = None) -> None:
+    def __init__(self, base: str, ws_base: str, env_file: Path | tuple[Path, ...], proxy: str | None = None) -> None:
         self.base = base
         self.ws_base = ws_base
         self.env_file = env_file
@@ -79,7 +79,8 @@ class OpenAI:
 
     def api_key(self) -> str | None:
         key = (os.environ.get("OPENAI_API_KEY") or "").strip()
-        return key or (read_env_file(self.env_file).get("OPENAI_API_KEY") or "").strip() or None
+        files = self.env_file if isinstance(self.env_file, tuple) else (self.env_file,)
+        return key or next((v for f in files if (v := (read_env_file(f).get("OPENAI_API_KEY") or "").strip())), None)
 
     def require_key(self) -> str:
         key = self.api_key()

@@ -13,7 +13,7 @@ set -eu
 sudo id ircweb >/dev/null 2>&1 || sudo useradd --system --home /var/lib/irc-web --shell /usr/sbin/nologin ircweb
 sudo mkdir -p /opt/irc-web /var/lib/irc-web
 sudo rsync -a --delete /tmp/irc-web-upload/server/ /opt/irc-web/server/
-sudo rsync -a --delete /tmp/irc-web-upload/static/ /opt/irc-web/static/
+sudo rsync -a --delete --exclude downloads/ /tmp/irc-web-upload/static/ /opt/irc-web/static/  # keep uploaded installers
 sudo mkdir -p /opt/irc-web/static/downloads
 python3 -c 'import ensurepip' 2>/dev/null || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q python3-venv >/dev/null
 [ -x /opt/irc-web/venv/bin/python ] || sudo python3 -m venv /opt/irc-web/venv

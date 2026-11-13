@@ -11,3 +11,4 @@ apps/desktop/native/bin/
 apps/desktop/tests/audio/wav/
 web/server/.venv/
 *.sqlite3
+apps/desktop/dist-mac/

@@ -18,6 +18,8 @@ const api = {
   stopSystemAudio: () => ipcRenderer.invoke('system-audio:stop'),
   onSystemAudio: (listener: (frame: Uint8Array) => void) => { ipcRenderer.on('system-audio:frame', (_event, frame) => listener(frame)); },
   getSettings: () => ipcRenderer.invoke('settings:get'),
+  apiKeyStatus: () => ipcRenderer.invoke('apikey:status'),
+  setApiKey: (key: string) => ipcRenderer.invoke('apikey:set', key),
   defaultSettings: () => ipcRenderer.invoke('settings:defaults'),
   setSettings: (patch: unknown) => ipcRenderer.invoke('settings:set', patch),
   onSettings: (listener: (value: unknown) => void) => { ipcRenderer.on('settings:changed', (_event, value) => listener(value)); },

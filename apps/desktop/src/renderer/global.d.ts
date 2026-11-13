@@ -19,6 +19,8 @@ interface Window {
     stopSystemAudio(): Promise<void>;
     onSystemAudio(listener: (frame: Uint8Array) => void): void;
     getSettings(): Promise<DeviceSettings>;
+    apiKeyStatus(): Promise<{ configured: boolean; source: 'app' | 'environment' | 'none' }>;
+    setApiKey(key: string): Promise<void>;
     defaultSettings(): Promise<DeviceSettings>;
     setSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;
     onSettings(listener: (value: DeviceSettings) => void): void;

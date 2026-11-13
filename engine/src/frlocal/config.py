@@ -84,7 +84,8 @@ class Settings:
     token: str
     openai_base: str = "https://api.openai.com"
     openai_proxy: str | None = None
-    env_file: Path = field(default_factory=lambda: Path.home() / ".env")
+    # Files searched in order for OPENAI_API_KEY (FRLOCAL_ENV_FILE: paths separated by os.pathsep).
+    env_file: Path | tuple[Path, ...] = field(default_factory=lambda: Path.home() / ".env")
     # Practice interviewer: "realtime" (speech-to-speech), "live" (GPT-Live) or "text" (no voice).
     practice_voice: str = "realtime"
     # Let the candidate interrupt the spoken interviewer. Needs headphones: on
@@ -116,4 +117,5 @@ def settings_from_environment(accounts_dir: Path, workspace_dir: Path) -> Settin
         openai_proxy=os.environ.get("FRLOCAL_OPENAI_PROXY") or None,
         practice_voice=os.environ.get("FRLOCAL_PRACTICE_VOICE", "realtime").strip().lower(),
         practice_barge_in=os.environ.get("FRLOCAL_PRACTICE_BARGE_IN", "").strip() in ("1", "true", "yes"),
+        **({"env_file": tuple(Path(p) for p in files.split(os.pathsep) if p)} if (files := os.environ.get("FRLOCAL_ENV_FILE")) else {}),
     )
