@@ -7,6 +7,7 @@
 // creates a goal, starts a practice session and checks the cockpit: question
 // panel, the spoken interviewer's text, its translation, and that the
 // connection stays up. Prints the app log and removes the folder afterwards.
+import { cloudEnv, signIn, startCloud } from './cloud.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,7 +19,9 @@ const data = mkdtempSync(join(tmpdir(), 'irc-e2e-'));
 const logFile = join(data, 'app.log');
 // IRC_FAKE_AUDIO=<wav>: the answer is "spoken" from this file instead of the microphone.
 const fakeAudio = process.env.IRC_FAKE_AUDIO;
-const env = { ...process.env, IRC_DATA_DIR: data, ...(fakeAudio ? {} : { IRC_DENY_MEDIA: '1' }) };
+const cloud = await startCloud();
+process.on('exit', () => cloud.stop());
+const env = { ...cloudEnv(process.env, cloud), IRC_DATA_DIR: data, ...(fakeAudio ? {} : { IRC_DENY_MEDIA: '1' }) };
 delete env.ELECTRON_RUN_AS_NODE;
 const { openSync } = await import('node:fs');
 const out = openSync(logFile, 'a');
@@ -68,19 +71,19 @@ try {
   const main = await find((u) => u.endsWith('/index.html'));
   await main.waitFor(`document.body.innerText.includes('Sign in')`);
   log('sign-in screen');
-  const registered = await main.evaluate(`window.copilot.request('POST', '/local/auth/register', { owner: 'main', username: 'tester', password: 'irc-test-password-1' })`);
-  if (!registered.ok) throw new Error(registered.error);
+  await signIn((e) => main.evaluate(e));
+  await main.waitFor(`/getting started/i.test(document.body.innerText)`);
   const goal = await main.evaluate(`window.copilot.request('POST', '/api/v3/goals', { role: 'Software Engineering Manager', company: 'AccelerComm', job_description: 'Lead L1 software teams for 5G NR and NTN PHY IP.' })`);
   log('account and goal created');
   await main.evaluate(`window.copilot.startSession({ topology: 'mock', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: [], language: 'en-US' })`);
   const cockpit = await find((u) => u.endsWith('/cockpit.html'));
   log('cockpit opened');
   log('practice questions:', await cockpit.waitFor(`(document.body.innerText.match(/练习题 \\d+\\/(\\d+)/) || [])[1]`, 90000));
-  log('interviewer:', await cockpit.waitFor(`(() => { const e = [...document.querySelectorAll('.entry')].find((x) => x.querySelector('.who')?.textContent.startsWith('Interviewer')); return e?.querySelector('.text')?.textContent; })()`, 60000));
-  log('translation:', await cockpit.waitFor(`document.querySelector('.entry .zh')?.textContent`, 30000));
+  log('interviewer:', await cockpit.waitFor(`(() => { const e = [...document.querySelectorAll('.c-entry')].find((x) => x.querySelector('.stamp')?.textContent.startsWith('Interviewer')); return e?.querySelector('.text')?.textContent; })()`, 60000));
+  log('translation:', await cockpit.waitFor(`document.querySelector('.c-entry .zh')?.textContent`, 30000));
   if (fakeAudio) {
-    log('candidate (from file):', await cockpit.waitFor(`(() => { const e = [...document.querySelectorAll('.entry')].find((x) => x.querySelector('.who')?.textContent.startsWith('You')); return e?.querySelector('.text')?.textContent; })()`, 60000));
-    log('interviewer next turn:', await cockpit.waitFor(`(() => { const t = [...document.querySelectorAll('.entry')].filter((x) => x.querySelector('.who')?.textContent.startsWith('Interviewer')); return t.length >= 2 && t.at(-1).querySelector('.text').textContent; })()`, 60000));
+    log('candidate (from file):', await cockpit.waitFor(`(() => { const e = [...document.querySelectorAll('.c-entry')].find((x) => x.querySelector('.stamp')?.textContent.startsWith('You')); return e?.querySelector('.text')?.textContent; })()`, 60000));
+    log('interviewer next turn:', await cockpit.waitFor(`(() => { const t = [...document.querySelectorAll('.c-entry')].filter((x) => x.querySelector('.stamp')?.textContent.startsWith('Interviewer')); return t.length >= 2 && t.at(-1).querySelector('.text').textContent; })()`, 60000));
   }
   await pause(20000);
   const status = await cockpit.evaluate(`document.querySelector('.status')?.textContent ?? ''`);

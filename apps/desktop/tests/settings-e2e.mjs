@@ -6,6 +6,7 @@
 // checked where they are stored: settings.json for device settings, the
 // engine for account preferences and consents, and the cockpit's applied
 // appearance during a practice session.
+import { cloudEnv, signIn, startCloud } from './cloud.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,7 +19,9 @@ const data = mkdtempSync(join(tmpdir(), 'irc-settings-e2e-'));
 const logFile = join(data, 'app.log');
 // The "screen" for Solve screen is a generated test page image, never the real screen.
 const screenImage = join(data, 'screen.png');
-const env = { ...process.env, IRC_E2E: '1', IRC_DENY_MEDIA: '1', IRC_DATA_DIR: data, IRC_TEST_SCREEN: screenImage };
+const cloud = await startCloud();
+process.on('exit', () => cloud.stop());
+const env = { ...cloudEnv(process.env, cloud), IRC_E2E: '1', IRC_DENY_MEDIA: '1', IRC_DATA_DIR: data, IRC_TEST_SCREEN: screenImage };
 delete env.ELECTRON_RUN_AS_NODE;
 const out = openSync(logFile, 'a');
 const app = spawn(join(here, '../node_modules/.bin/electron'), ['.', `--remote-debugging-port=${port}`], { cwd: join(here, '..'), env, stdio: ['ignore', out, out] });
@@ -71,8 +74,7 @@ let failed = false;
 try {
   const main = await find((u) => u.endsWith('/index.html'));
   await main.waitFor(`document.body.innerText.includes('Sign in')`, 30000, 'sign-in');
-  check((await main.evaluate(`window.copilot.request('POST', '/local/auth/register', { owner: 'main', username: 'tester', password: 'irc-test-password-1' })`)).ok, 'register');
-  await main.evaluate('location.reload()');
+  await signIn((e) => main.evaluate(e));
   await main.waitFor(`/getting started/i.test(document.body.innerText)`, 20000, 'workspace');
   await main.evaluate(`[...document.querySelectorAll('.side-nav button')].find((b) => b.textContent.startsWith('Settings')).click()`);
   await main.waitFor(`!!document.querySelector('.settings nav')`, 10000, 'settings');

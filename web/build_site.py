@@ -105,7 +105,7 @@ def build() -> None:
 <h1>{t("hero.h1a", "Answer every interview question", "每一道面试题，")}<br><span class="grad-text">{t("hero.h1b", "with calm confidence.", "都能从容作答。")}</span></h1>
 {t("hero.lead", "Interview Realtime Copilot listens to the interviewer, translates as they speak, spots each question and streams a concise answer built from your own resume and notes.", "Interview Realtime Copilot 实时聆听面试官、同步翻译、识别每一个问题，并基于你自己的简历和准备资料给出简洁的回答提示。", "p", "lead")}
 <div class="cta"><a class="btn primary lg" href="/download.html">{t("cta.download", "Download for macOS", "下载 macOS 版")}</a><a class="btn lg" href="/demo.html">{t("cta.demo", "Watch the demo", "观看演示")}</a></div>
-<div class="trust">{t("trust.1", "Local-first: your files stay on your Mac", "本地优先：文件只存在你的 Mac")}{t("trust.2", "Hidden from screen sharing", "共享屏幕时不可见")}{t("trust.3", "Native on Apple Silicon", "原生支持 Apple 芯片")}</div>
+<div class="trust">{t("trust.1", "Local-first: your files stay on your Mac", "本地优先：文件只存在你的 Mac")}{t("trust.2", "Hidden from screen sharing", "共享屏幕时不可见")}{t("trust.3", "No API key needed", "无需 API 密钥")}</div>
 </div>{COCKPIT}</div></section>
 
 <section style="padding-top:0"><div class="wrap"><div class="stats reveal">
@@ -163,19 +163,19 @@ def build() -> None:
     page("pricing", ("Pricing — Interview Realtime Copilot", "价格 — Interview Realtime Copilot"), f'''
 <section class="hero"><div class="wrap center"><span class="eyebrow">{t("pr.eyebrow", "Pricing", "价格")}</span>
 <h1>{t("pr.h1a", "Simple plans.", "简单的方案，")}<br><span class="grad-text">{t("pr.h1b", "Cancel anytime.", "随时可取消。")}</span></h1>
-{t("pr.lead", "AI usage is included — no API key, no surprise bills.", "已包含 AI 使用费用——无需 API 密钥，没有意外账单。", "p", "lead")}<div id="checkout-note"></div>
+{t("pr.lead", "AI usage is included as a monthly allowance — no API key, no surprise bills.", "每月包含 AI 使用额度——无需 API 密钥，没有意外账单。", "p", "lead")}<div id="checkout-note"></div>
 <div class="plans">
 <div class="plan">{t("plan.free.name", "Free", "免费版", "h3")}<div class="price">$0</div>{t("plan.free.sub", "Try it on your next practice.", "在下一次练习中试试。", "p", "muted small")}
-<ul><li>{t("plan.free.1", "2 spoken practice sessions a month", "每月 2 次语音练习")}</li><li>{t("plan.free.2", "Live translation and hints", "实时翻译与提示")}</li><li>{t("plan.free.3", "Prepared-question extraction", "自动提取准备题")}</li><li>{t("plan.free.4", "A debrief after each session", "每场会话的复盘")}</li></ul>
+<ul><li>{t("plan.free.1", "$1 of AI usage every month — about 2 practice sessions", "每月 $1 AI 额度，约可做 2 次语音练习")}</li><li>{t("plan.free.2", "Live translation and hints", "实时翻译与提示")}</li><li>{t("plan.free.3", "Prepared-question extraction", "自动提取准备题")}</li><li>{t("plan.free.4", "A debrief after each session", "每场会话的复盘")}</li></ul>
 <a class="btn" href="/download.html">{t("cta.download", "Download for macOS", "下载 macOS 版")}</a></div>
 <div class="plan">{t("plan.monthly.name", "Pro monthly", "Pro 月付", "h3")}<div class="price">$29<small>{t("per.month", " / month", " / 月")}</small></div>{t("plan.monthly.sub", "For an active job search.", "适合正在求职。", "p", "muted small")}
-<ul><li>{t("plan.pro.1", "Unlimited live interviews", "无限次实时面试")}</li><li>{t("plan.pro.2", "Unlimited spoken practice", "无限次语音练习")}</li><li>{t("plan.pro.3", "Solve screen and auto-capture", "截屏解答与自动截屏")}</li><li>{t("plan.pro.4", "Recordings and full debriefs", "录音与完整复盘")}</li></ul>
+<ul><li>{t("plan.pro.1", "$20 of AI usage every month — hours of live interviews", "每月 $20 AI 额度，足够数小时实时面试")}</li><li>{t("plan.pro.2", "Spoken practice and debriefs", "语音练习与复盘")}</li><li>{t("plan.pro.3", "Solve screen and auto-capture", "截屏解答与自动截屏")}</li><li>{t("plan.pro.4", "Recordings and full debriefs", "录音与完整复盘")}</li></ul>
 {plan_cta("monthly", "Subscribe monthly", "订阅月付")}</div>
 <div class="plan featured"><span class="tag">{t("plan.best", "BEST VALUE", "最划算")}</span>{t("plan.yearly.name", "Pro yearly", "Pro 年付", "h3")}<div class="price">$199<small>{t("per.year", " / year", " / 年")}</small></div>{t("plan.yearly.sub", "Save 43% — about $16.60 a month.", "节省 43%，约每月 $16.60。", "p", "muted small")}
 <ul><li>{t("plan.y.1", "Everything in Pro monthly", "包含 Pro 月付全部功能")}</li><li>{t("plan.y.2", "Early access to Windows", "抢先体验 Windows 版")}</li><li>{t("plan.y.3", "Priority support", "优先支持")}</li></ul>
 {plan_cta("yearly", "Subscribe yearly", "订阅年付")}</div></div><p class="error" id="checkout-error"></p></div></section>
 <section style="padding-top:0"><div class="wrap"><h2 class="center">{t("faq.h2", "Questions", "常见问题")}</h2><div class="faq">
-<details><summary>{t("faq.1q", "Do I need my own OpenAI key?", "需要自己的 OpenAI 密钥吗？")}</summary>{t("faq.1a", "No. Pro includes the speech and language model usage.", "不需要，Pro 已包含语音和语言模型的使用费用。", "p")}</details>
+<details><summary>{t("faq.1q", "Do I need my own OpenAI key?", "需要自己的 OpenAI 密钥吗？")}</summary>{t("faq.1a", "No. Every plan includes a monthly AI allowance (Free $1, Pro $20). When it runs out, the app tells you and you can upgrade — or use your own key.", "不需要。每个套餐都含每月 AI 额度（免费 $1，Pro $20），用完时应用会提示你升级，也可以填写自己的密钥。", "p")}</details>
 <details><summary>{t("faq.2q", "Where is my data stored?", "我的数据存在哪里？")}</summary>{t("faq.2a", "On your Mac: documents, transcripts, debriefs and recordings. Only the audio and text needed for a live answer are sent to the AI models during a session.", "在你的 Mac 上：资料、字幕、复盘和录音。只有会话中生成回答所需的音频和文字会发送给 AI 模型。", "p")}</details>
 <details><summary>{t("faq.3q", "Can I cancel?", "可以取消吗？")}</summary>{t("faq.3a", "Yes, anytime from your account page. Pro stays active until the end of the paid period.", "可以，随时在账号页取消，已付费周期内仍可使用 Pro。", "p")}</details>
 <details><summary>{t("faq.4q", "Which platforms are supported?", "支持哪些系统？")}</summary>{t("faq.4a", "macOS 14.2 or later today; Windows is coming.", "目前支持 macOS 14.2 及以上，Windows 即将推出。", "p")}</details>
@@ -185,7 +185,7 @@ def build() -> None:
 <section class="hero"><div class="wrap split"><div><span class="eyebrow">{t("dl.eyebrow", "Download", "下载")}</span><h1>{t("dl.h1", "Get the desktop app.", "下载桌面应用。")}</h1>
 {t("dl.lead", "The copilot runs on your Mac, next to your meeting app.", "应用在你的 Mac 上运行，配合会议软件使用。", "p", "lead")}
 <div class="card" style="margin-top:26px">{t("dl.mac", "macOS 14.2 or later · Apple Silicon (M1–M4)", "macOS 14.2 及以上 · Apple 芯片（M1–M4）", "h3")}<p class="muted small" id="mac-status" data-i18n="dl.checking">{"Checking for the current build…"}</p><div id="mac-download"></div>
-{t("dl.key", "Preview: add your own OpenAI API key in Settings → Account. With Pro, AI usage will be included and no key is needed.", "预览版：请在「设置 → 账号」中填写你自己的 OpenAI API 密钥。Pro 订阅上线后将包含 AI 费用，无需密钥。", "p", "notice warn small")}
+{t("dl.key", "Sign in with your website account: every plan includes a monthly AI allowance, no API key needed. You can also add your own OpenAI key in Settings.", "用网站账号登录即可：每个套餐都包含每月 AI 额度，无需 API 密钥；也可以在设置中填写自己的 OpenAI 密钥。", "p", "notice small")}
 {t("dl.gatekeeper", "Preview builds are not yet notarised by Apple: after the first launch, open System Settings → Privacy & Security and click “Open Anyway”.", "测试版尚未经 Apple 公证：首次启动后，打开「系统设置 → 隐私与安全性」，点击「仍要打开」。", "p", "faint small")}</div>
 <div class="card" style="margin-top:16px">{t("dl.win", "Windows — coming soon", "Windows——即将推出", "h3")}{t("dl.win.p", "Leave your email and we will tell you when it is ready.", "留下邮箱，发布时通知你。", "p", "muted small")}
 <form class="inline-form" data-waitlist="windows"><input class="input" name="email" type="email" placeholder="you@example.com" required><button class="btn primary">{t("dl.notify", "Notify me", "通知我")}</button><p class="error"></p></form></div></div>
@@ -212,7 +212,10 @@ def build() -> None:
                         ("acc.yearly", "Pro yearly", "Pro 年付"), ("acc.renews", "Renews or ends on", "续费或到期日"), ("acc.manage", "Manage billing", "管理订阅"),
                         ("acc.upgrade", "Upgrade to Pro", "升级到 Pro"), ("acc.download", "Download the app", "下载应用"), ("acc.signout", "Sign out", "退出登录"),
                         ("acc.paid", "Payment received — Pro activates as soon as Stripe confirms it, usually within seconds.", "已收到付款——Stripe 确认后立即开通 Pro，通常只需几秒。"),
-                        ("pr.cancelled", "Checkout was cancelled — nothing was charged.", "已取消支付，未产生扣款。")]:
+                        ("pr.cancelled", "Checkout was cancelled — nothing was charged.", "已取消支付，未产生扣款。"),
+                        ("acc.usage", "AI allowance for {month}: ${used} of ${total} used", "{month} AI 额度：已用 ${used} / ${total}"),
+                        ("acc.balance", "Remaining: ${balance}", "剩余：${balance}"), ("acc.credit", "includes ${credit} credit", "含 ${credit} 余额"),
+                        ("acc.empty", "This month's AI allowance is used up. Upgrade to Pro for a larger monthly allowance.", "本月 AI 额度已用完，升级 Pro 可获得更多每月额度。")]:
         t(key, en, zh)
 
     page("privacy", ("Privacy — Interview Realtime Copilot", "隐私 — Interview Realtime Copilot"), f'''

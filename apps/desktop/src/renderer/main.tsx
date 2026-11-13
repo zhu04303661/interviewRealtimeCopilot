@@ -33,44 +33,75 @@ const chosenSources = (goalId: string, docs: Doc[]) => {
 };
 
 // ── sign in ───────────────────────────────────────────────────────────────
-function SignIn({ onSignedIn }: { onSignedIn: (name: string) => void }) {
-  const [mode, setMode] = useState<'sign-in' | 'register'>('sign-in');
-  const [username, setUsername] = useState('');
+/** Signs in to this account's local workspace (goals, documents, sessions), creating it on first use. */
+async function openWorkspace(local: LocalCredentials) {
+  // Create first: a failed sign-in makes the engine pause further attempts for a moment.
+  try { return (await auth('register', local)).account; } catch (e) {
+    if (!/already/i.test((e as Error).message)) throw e;
+    return (await auth('sign-in', local)).account;
+  }
+}
+
+function SignIn({ onSignedIn }: { onSignedIn: (email: string, role: string) => void }) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  // Same rules as the engine (accounts.py): checked here so mistakes show before submitting.
-  const nameProblem = !/^[a-z][a-z0-9._-]{2,31}$/i.test(username.trim())
-    ? 'Username: 3–32 letters, numbers, . _ or -, starting with a letter (no email or Chinese). · 用户名：3–32 位字母、数字或 . _ -，以字母开头（不能用邮箱或中文）。' : '';
-  const passwordProblem = password.length < 15 ? 'Password: at least 15 characters. · 密码：至少 15 个字符。' : '';
+  const [busy, setBusy] = useState(false);
+  const emailProblem = !/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(email.trim()) ? 'Enter a valid email address. · 请输入有效的邮箱。' : '';
+  const passwordProblem = password.length < 10 ? 'Password: at least 10 characters. · 密码至少 10 位。' : '';
   const submit = async () => {
     setError('');
-    if (mode === 'register' && (nameProblem || passwordProblem)) return setError(nameProblem || passwordProblem);
-    try { onSignedIn((await auth(mode, { username, password })).account.username); } catch (e) { setError((e as Error).message); }
+    if (emailProblem || (mode === 'register' && passwordProblem)) return setError(emailProblem || passwordProblem);
+    setBusy(true);
+    try {
+      const { user, local } = await window.copilot.cloudAuth(mode, email.trim(), password);
+      onSignedIn(user.email, (await openWorkspace(local)).role);
+    } catch (e) { setError(String((e as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')); }
+    setBusy(false);
   };
   return (
     <div className="auth">
       <div className="card">
         <div className="logo">IR</div>
-        <h1>{mode === 'sign-in' ? 'Welcome back · 欢迎回来' : 'Create your account · 注册'}</h1>
-        <p className="muted small" style={{ marginTop: 0 }}>Interview Realtime Copilot</p>
-        <label className="field"><span>Username · 用户名</span><input className="input" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus /></label>
-        <label className="field"><span>Password · 密码</span>
+        <h1>{mode === 'login' ? 'Welcome back · 欢迎回来' : 'Create your account · 注册'}</h1>
+        <p className="muted small" style={{ marginTop: 0 }}>Your Interview Realtime Copilot account — the same one as on the website. · 与网站通用的账号。</p>
+        <label className="field"><span>Email · 邮箱</span><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></label>
+        <label className="field"><span>Password · 密码{mode === 'register' && <span className="muted"> ({password.length}/10)</span>}</span>
           <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
-        {mode === 'register' && (
-          <ul className="small muted" style={{ margin: '-4px 0 14px', paddingLeft: 18 }}>
-            <li style={{ color: username && nameProblem ? 'var(--bad)' : undefined }}>Username: 3–32 letters/numbers/. _ -, starts with a letter · 用户名 3–32 位，以字母开头</li>
-            <li style={{ color: password && passwordProblem ? 'var(--bad)' : undefined }}>Password: at least 15 characters ({password.length}/15) · 密码至少 15 位</li>
-          </ul>
-        )}
+        {mode === 'register' && <p className="small muted" style={{ margin: '-4px 0 14px' }}>Free plan included: a monthly AI allowance, no API key needed. · 注册即享免费额度，无需 API 密钥。</p>}
         {error && <p className="error">{error}</p>}
-        <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} onClick={submit}>{mode === 'sign-in' ? 'Sign in · 登录' : 'Create account · 注册'}</button>
+        <button className="btn primary" disabled={busy} style={{ width: '100%', justifyContent: 'center' }} onClick={submit}>
+          {busy ? '…' : mode === 'login' ? 'Sign in · 登录' : 'Create account · 注册'}</button>
         <p className="small muted" style={{ textAlign: 'center', marginBottom: 0 }}>
-          <button className="link" onClick={() => setMode(mode === 'sign-in' ? 'register' : 'sign-in')}>
-            {mode === 'sign-in' ? 'New here? Create an account · 注册新账号' : 'Already registered? Sign in · 已有账号'}</button>
+          <button className="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+            {mode === 'login' ? 'New here? Create an account · 注册新账号' : 'Already registered? Sign in · 已有账号'}</button>
         </p>
       </div>
     </div>
   );
+}
+
+/** Plan, this month's AI allowance and balance, with links to subscribe or manage billing on the website. */
+function CloudPlan() {
+  const [state, setState] = useState<Awaited<ReturnType<typeof window.copilot.cloudStatus>> | null>(null);
+  const refresh = () => window.copilot.cloudStatus().then(setState);
+  useEffect(() => { void refresh(); }, []);
+  const user = state?.user;
+  const pro = user && user.plan !== 'free';
+  return <>
+    <h4 className="setting-group">Plan &amp; AI allowance · 套餐与额度</h4>
+    {!user ? <p className="muted small">{state?.offline ? 'Cannot reach the account service right now. · 暂时无法连接账号服务。' : 'Loading… · 加载中…'}</p> : <>
+      <Setting title={pro ? (user.plan === 'yearly' ? 'Pro yearly · Pro 年付' : 'Pro monthly · Pro 月付') : 'Free · 免费版'}
+        what={`${user.usage.month}: $${user.usage.used_usd.toFixed(2)} of $${user.usage.allowance_usd.toFixed(2)} used · 已用 ${user.usage.used_percent}%` +
+          (user.usage.credit_usd > 0 ? ` · credit $${user.usage.credit_usd.toFixed(2)}` : '')}>
+        <button className="btn sm primary" onClick={() => window.copilot.cloudOpen(pro ? '/account.html' : '/pricing.html')}>{pro ? 'Manage billing · 管理订阅' : 'Subscribe · 订阅'}</button>
+        <button className="btn sm" onClick={refresh}>Refresh · 刷新</button>
+      </Setting>
+      <div className="meter-bar"><i style={{ width: `${user.usage.used_percent}%`, background: user.usage.used_percent >= 90 ? 'var(--bad)' : undefined }} /></div>
+      {user.usage.balance_usd <= 0 && <p className="error small">Your AI allowance for this month is used up. Subscribe for more, or add your own OpenAI key below. · 本月额度已用完，请订阅或在下方填写自己的密钥。</p>}
+    </>}
+  </>;
 }
 
 // ── shared pieces ─────────────────────────────────────────────────────────
@@ -385,8 +416,9 @@ function ApiKeySetting() {
     catch (error) { setMessage(String((error as Error).message ?? error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')); }
   };
   return <>
-    <h4 className="setting-group">OpenAI API key · OpenAI 密钥</h4>
-    <Setting title="API key · 密钥" what={status?.source === 'app' ? 'Saved on this Mac · 已保存在本机' : status?.source === 'environment' ? 'Using OPENAI_API_KEY from the environment or ~/.env · 使用环境变量或 ~/.env 中的密钥' : 'Required for transcription and hints · 转写和回答提示需要密钥'}>
+    <h4 className="setting-group">Your own OpenAI key (optional) · 自己的 OpenAI 密钥（可选）</h4>
+    <p className="muted small">With your own key, AI requests go straight to OpenAI and do not use your allowance. · 填写后直接连接 OpenAI，不占用额度。</p>
+    <Setting title="API key · 密钥" what={status?.source === 'app' ? 'Saved on this Mac · 已保存在本机' : status?.source === 'environment' ? 'Using OPENAI_API_KEY from the environment or ~/.env · 使用环境变量或 ~/.env 中的密钥' : 'Not set — using your plan allowance · 未设置，使用套餐额度'}>
       <input className="input" type="password" placeholder="sk-…" value={key} onChange={(e) => setKey(e.target.value)} style={{ width: 220 }} />
       <button className="btn sm primary" disabled={!key.trim()} onClick={() => save(key)}>Save · 保存</button>
       {status?.source === 'app' && <button className="btn sm" onClick={() => save('')}>Remove · 移除</button>}
@@ -546,8 +578,9 @@ function SettingsPage({ username, role, signOut }: { username: string; role: str
         {section === 'account' && <>
           <h2>Account · 账号</h2>
           <h4 className="setting-group">Account · 账号</h4>
-          <Setting title={username} what={role === 'admin' ? 'Local administrator · 本机管理员' : 'Local account · 本机账号'}>
+          <Setting title={username} what="Signed in with your website account · 已用网站账号登录">
             <button className="btn sm" onClick={signOut}>Sign out · 退出登录</button></Setting>
+          <CloudPlan />
           <ApiKeySetting />
           <h4 className="setting-group">Local workspace · 本地工作区</h4>
           <p className="muted small">This computer stores your workspace: goals, documents, sessions and debriefs. Live AI uses the OpenAI project configured for the engine. · 目标、资料、会话和复盘都保存在本机。</p>
@@ -784,10 +817,16 @@ function Shell({ username, role, signOut }: { username: string; role: string; si
 
 function App() {
   const [user, setUser] = useState<{ username: string; role: string } | null | undefined>(undefined);
-  useEffect(() => { auth('session').then((s) => setUser(s?.account ?? null)).catch(() => setUser(null)); }, []);
+  useEffect(() => {
+    void window.copilot.cloudStatus().then(async (cloud) => {
+      if (!cloud.signedIn || !cloud.local) return setUser(null);
+      setUser({ username: cloud.email!, role: (await openWorkspace(cloud.local)).role });
+    }).catch(() => setUser(null));
+  }, []);
   if (user === undefined) return <div className="auth"><span className="muted">Starting… · 正在启动…</span></div>;
-  if (!user) return <SignIn onSignedIn={(username) => setUser({ username, role: 'member' })} />;
-  return <Shell username={user.username} role={user.role} signOut={() => void auth('sign-out', {}).then(() => setUser(null))} />;
+  if (!user) return <SignIn onSignedIn={(username, role) => setUser({ username, role })} />;
+  return <Shell username={user.username} role={user.role}
+    signOut={() => void Promise.allSettled([auth('sign-out', {}), window.copilot.cloudSignOut()]).then(() => setUser(null))} />;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

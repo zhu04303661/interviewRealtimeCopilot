@@ -5,7 +5,9 @@
   realtime interview (transcription, translation, question extraction, answer hints, speech-to-speech practice).
 - `apps/desktop/` — Electron 45 + React 19 + TypeScript desktop app. `src/main` starts the engine and owns windows/IPC,
   `src/preload` is the only renderer bridge (`window.copilot`), `src/renderer` has the main window and the cockpit.
-- Planned: `cloud/` (accounts, Stripe subscriptions, OpenAI relay), `web/` (site, bilingual manual, downloads).
+- `web/` — website + cloud service (`web/server/irc_web`): accounts, Stripe, device tokens, metered OpenAI relay
+  (`relay.py`), allowances/credit/usage/prices and the encrypted OpenAI key (`billing.py`), admin CLI (`admin.py`).
+  The app signs in with the website account; AI goes through the relay unless the user set their own key in Settings.
 
 ## Commands
 - Engine tests: `cd engine && uv run pytest -q` (fake OpenAI, no network); lint: `uvx ruff check src tests`.
@@ -26,6 +28,9 @@
   Publish: copy both files to `/opt/irc-web/static/downloads/` on the web server (deploy.sh keeps that folder).
 - Website: `python3 web/build_site.py` (all text, EN+ZH) → `web/static`; tests `cd web/server && uv run pytest -q`;
   deploy `sh web/deploy/deploy.sh ubuntu@<host> <key.pem> copilot.xichiuk.com`.
+
+- E2E tests start a local test cloud (`tests/cloud.mjs`: web/server on a free port, temp DB, real OpenAI via ~/.env and the
+  macOS proxy) and sign in there; `node tests/quota-e2e.mjs` checks the used-up-allowance path.
 
 ## Gotchas
 - The engine watches stdin to detect the parent exiting; spawn it with a stdin pipe, not `ignore`.

@@ -217,3 +217,5 @@ footer .wrap { display: flex; gap: 26px; flex-wrap: wrap; align-items: center; }
 .scan { position: absolute; left: 0; right: 0; height: 60px; pointer-events: none; background: linear-gradient(transparent, rgba(91,140,255,.12), transparent); animation: scan 4s linear infinite; }
 @keyframes scan { from { top: -60px; } to { top: 100%; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.usage-bar { height: 8px; border-radius: 999px; background: var(--panel-2); overflow: hidden; margin: 8px 0 8px; }
+.usage-bar i { display: block; height: 100%; background: var(--grad); border-radius: inherit; }

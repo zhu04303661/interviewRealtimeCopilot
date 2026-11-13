@@ -7,6 +7,7 @@
 // computer audio is tests/fixtures/question.wav. Uses a temporary data folder
 // that is deleted afterwards. Each step prints what it observed; the first
 // failing step stops the run.
+import { cloudEnv, startCloud } from './cloud.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,10 +33,12 @@ if (!resume) {
     '## How do you build a high-performance team?', 'Clear ownership, design reviews, CI on target hardware, and coaching team leads.', '',
     '## Why do you want to work at AccelerComm?', 'Their 5G NR and NTN physical-layer IP sits where real-time PHY and rigorous software meet.'].join('\n'));
 }
-const env = { ...process.env, IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'fixtures/answer.wav'),
+const cloud = await startCloud();
+const env = { ...cloudEnv(process.env, cloud), IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'fixtures/answer.wav'),
   IRC_TEST_SYSTEM_AUDIO: join(here, 'fixtures/question.wav') };
 delete env.ELECTRON_RUN_AS_NODE;
 const out = openSync(logFile, 'a');
+process.on('exit', () => cloud.stop());
 const app = spawn(join(here, '../node_modules/.bin/electron'), ['.', `--remote-debugging-port=${port}`], { cwd: join(here, '..'), env, stdio: ['ignore', out, out] });
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1).padStart(5)}s]`, ...a);
@@ -100,19 +103,29 @@ try {
   // ── account ───────────────────────────────────────────────────────────
   await main.waitFor(`document.body.innerText.includes('Sign in')`, 30000, 'sign-in screen');
   await shot(main, '0-sign-in');
-  const auth = (path, body) => main.evaluate(`window.copilot.request('POST', '/local/auth/${path}', ${JSON.stringify({ owner: 'main', ...body })})`);
-  check((await auth('register', { username: 'tester', password: 'irc-test-password-1' })).ok, 'register failed');
-  check((await auth('register', { username: 'tester', password: 'irc-test-password-1' })).error?.includes('already'), 'duplicate username accepted');
-  await auth('sign-out', {});
-  await pause(2100); // the engine pauses briefly after a failed attempt
-  const wrong = await auth('sign-in', { username: 'tester', password: 'wrong-password-123' });
-  check(!wrong.ok && /incorrect/.test(wrong.error), 'wrong password accepted');
-  await pause(2100);
-  check((await auth('sign-in', { username: 'tester', password: 'irc-test-password-1' })).ok, 'sign-in failed');
-  await main.evaluate('location.reload()');
-  await pause(1500);
-  await main.waitFor(`/getting started/i.test(document.body.innerText)`, 20000, 'workspace screen');
-  log('account: register, duplicate rejected, sign out, wrong password rejected, sign in, workspace shown');
+  // The real sign-in form, against the test cloud (React inputs need the native value setter plus an input event).
+  const fill = (index, value) => main.evaluate(`(() => { const i = document.querySelectorAll('.auth input')[${index}];
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(value)}); i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  const press = (label) => main.evaluate(`[...document.querySelectorAll('.auth button')].find((b) => b.textContent.includes(${JSON.stringify(label)})).click()`);
+  const submitForm = async (mode, email, password) => {
+    if (mode === 'register' && !(await main.evaluate(`document.body.innerText.includes('Create your account')`))) await press('Create an account');
+    if (mode === 'login' && await main.evaluate(`document.body.innerText.includes('Create your account')`)) await press('Already registered');
+    await fill(0, email); await fill(1, password);
+    await press(mode === 'register' ? 'Create account' : 'Sign in');
+  };
+  await submitForm('register', 'tester@example.com', 'irc-test-password-1');
+  await main.waitFor(`/getting started/i.test(document.body.innerText)`, 30000, 'workspace after registering')
+    .catch(async (e) => { throw new Error(`${e.message}; screen: ${(await main.evaluate('document.body.innerText')).replace(/\n+/g, ' | ').slice(0, 300)}`); });
+  await main.evaluate(`window.copilot.cloudSignOut().then(() => location.reload())`);
+  await main.waitFor(`document.body.innerText.includes('Welcome back')`, 20000, 'sign-in after signing out');
+  await submitForm('login', 'tester@example.com', 'wrong-password-123');
+  await main.waitFor(`/incorrect/i.test(document.querySelector('.auth .error')?.textContent ?? '')`, 20000, 'wrong-password error');
+  await submitForm('register', 'tester@example.com', 'irc-test-password-1');
+  await main.waitFor(`/already exists/i.test(document.querySelector('.auth .error')?.textContent ?? '')`, 20000, 'duplicate-account error');
+  await submitForm('login', 'tester@example.com', 'irc-test-password-1');
+  await main.waitFor(`/getting started/i.test(document.body.innerText)`, 30000, 'workspace after signing in');
+  check((await main.evaluate(`window.copilot.cloudStatus()`)).user?.plan === 'free', 'cloud account is not on the free plan');
+  log('account (cloud): register, sign out, wrong password and duplicate rejected, sign in, workspace shown');
 
   // ── goal and knowledge sources ────────────────────────────────────────
   const goal = await main.evaluate(`window.copilot.request('POST', '/api/v3/goals', { role: 'Software Engineering Manager', company: 'AccelerComm',
@@ -224,12 +237,16 @@ try {
   for (const s of sessions) log(`history: ${s.topology} → ${s.status}${s.headline ? ` "${s.headline}"` : ''}${s.failure_reason ? ` (${s.failure_reason})` : ''}`);
   check(sessions.every((s) => s.status === 'ready'), 'a Debrief was not generated');
   await main.evaluate(`[...document.querySelectorAll('.side-nav button')].find((b) => b.textContent.startsWith('History')).click()`);
-  await main.waitFor(`document.querySelectorAll('.list-row').length === 2`, 10000, 'history list');
+  await main.waitFor(`document.querySelectorAll('.list-row').length === 2`, 10000, 'history list')
+    .catch(async (e) => { throw new Error(`${e.message}; rows: ${await main.evaluate(`document.querySelectorAll('.list-row').length`)}; screen: ${(await main.evaluate(`document.querySelector('.content')?.innerText ?? ''`)).replace(/\n+/g, ' | ').slice(0, 300)}`); });
   await shot(main, '4-history');
   await main.evaluate(`document.querySelector('.list-row').click()`);
   check(await main.waitFor(`!!document.querySelector('.content audio')`, 10000, 'recording player'), 'no recording player');
   log(`history: report shown "${(await main.waitFor(`(() => { const t = document.querySelector('.content').innerText; return t.includes('Strengths') && t; })()`, 10000, 'report view')).replace(/\n+/g, ' ').slice(0, 160)}"`);
   await shot(main, '5-debrief');
+  const usage = (await main.evaluate(`window.copilot.cloudStatus()`)).user.usage;
+  check(usage.used_usd > 0, 'AI usage was not metered by the cloud');
+  log(`cloud: this run used $${usage.used_usd.toFixed(4)} of the $${usage.allowance_usd} free allowance (all AI calls via the relay)`);
   log('PASS');
 } catch (error) {
   failed = true;

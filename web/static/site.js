@@ -147,6 +147,10 @@ const pages = {
       document.getElementById('panel').innerHTML = `<p><b>${user.email}</b></p>
         <p>${tr('acc.plan')}: <b>${tr(pro ? (user.plan === 'yearly' ? 'acc.yearly' : 'acc.monthly') : 'acc.free')}</b> <span class="faint">${user.status !== 'none' ? '(' + user.status + ')' : ''}</span></p>
         ${until ? `<p class="muted">${tr('acc.renews')}: ${until}</p>` : ''}
+        ${user.usage ? `<p style="margin-top:22px">${tr('acc.usage', { month: user.usage.month, used: user.usage.used_usd.toFixed(2), total: user.usage.allowance_usd.toFixed(2) })}</p>
+        <div class="usage-bar"><i style="width:${user.usage.used_percent}%"></i></div>
+        <p class="muted small">${tr('acc.balance', { balance: user.usage.balance_usd.toFixed(2) })}${user.usage.credit_usd > 0 ? ' · ' + tr('acc.credit', { credit: user.usage.credit_usd.toFixed(2) }) : ''}</p>
+        ${user.usage.balance_usd <= 0 ? `<div class="notice warn">${tr('acc.empty')}</div>` : ''}` : ''}
         <div class="cta">${pro ? `<button class="btn primary" id="portal">${tr('acc.manage')}</button>` : `<a class="btn primary" href="/pricing.html">${tr('acc.upgrade')}</a>`}
         <a class="btn" href="/download.html">${tr('acc.download')}</a><button class="btn" id="logout">${tr('acc.signout')}</button></div><p class="error" id="error"></p>`;
       document.getElementById('logout').onclick = async () => { await api('/api/logout', {}); location.href = '/'; };

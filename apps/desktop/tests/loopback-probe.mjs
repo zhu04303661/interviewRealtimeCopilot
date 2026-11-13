@@ -1,5 +1,5 @@
 // Diagnostic: does Live mode hear computer audio? Uses an app already started with
-// --remote-debugging-port=<port> (IRC_E2E=1, IRC_FAKE_AUDIO for the microphone), starts
+// --remote-debugging-port=<port> (IRC_E2E=1, IRC_FAKE_AUDIO for the microphone) and already signed in, starts
 // a Live session, plays <wav> on the speakers with afplay, and prints the
 // computer-audio level meter and the interviewer transcript.
 //
@@ -34,7 +34,7 @@ async function connect(url) {
 
 const main = await find((u) => u.endsWith('index.html'));
 for (let i = 0; i < 50 && !(await main.ev(`document.body.innerText.includes('Sign in') || document.body.innerText.includes('Goals')`)); i++) await pause(300);
-await main.ev(`window.copilot.request('POST', '/local/auth/register', { owner: 'main', username: 'tester', password: 'irc-test-password-1' })`);
+if (!(await main.ev(`document.body.innerText.includes('Goals')`))) throw new Error('Sign in to the app first (the probe does not create accounts).');
 const goal = await main.ev(`window.copilot.request('POST', '/api/v3/goals', { role: 'Engineer', company: 'Example' })`);
 await main.ev(`window.copilot.startSession({ topology: 'general', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: [], language: 'en-US' })`);
 const cockpit = await find((u) => u.endsWith('cockpit.html'));

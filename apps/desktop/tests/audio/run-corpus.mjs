@@ -3,6 +3,7 @@
 // cockpit shows against the scenario's expectations. Writes a JSON report.
 //
 //   npm run build && node tests/audio/build-corpus.mjs && node tests/audio/run-corpus.mjs [id ...]
+import { cloudEnv, signIn, startCloud } from '../cloud.mjs';
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,7 +16,9 @@ const { scenarios } = JSON.parse(readFileSync(join(here, 'corpus.json'), 'utf8')
 const selected = scenarios.filter((s) => !only.length || only.includes(s.id));
 const port = 19674;
 const data = mkdtempSync(join(tmpdir(), 'irc-corpus-'));
-const env = { ...process.env, IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'wav/silence.wav') };
+const cloud = await startCloud();
+process.on('exit', () => cloud.stop());
+const env = { ...cloudEnv(process.env, cloud), IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'wav/silence.wav') };
 delete env.ELECTRON_RUN_AS_NODE;
 const logFd = openSync(join(data, 'app.log'), 'a');
 const app = spawn(join(here, '../../node_modules/.bin/electron'), ['.', `--remote-debugging-port=${port}`], { cwd: join(here, '../..'), env, stdio: ['ignore', logFd, logFd] });
@@ -81,7 +84,8 @@ const results = [];
 try {
   const main = await find((u) => u.endsWith('index.html'));
   for (let i = 0; i < 50 && !(await main.ev(`document.body.innerText.includes('Sign in')`)); i++) await pause(300);
-  await main.ev(`window.copilot.request('POST', '/local/auth/register', { owner: 'main', username: 'tester', password: 'irc-test-password-1' })`);
+  await signIn((e) => main.ev(e));
+  for (let i = 0; i < 60 && !(await main.ev(`/getting started/i.test(document.body.innerText)`)); i++) await new Promise((r) => setTimeout(r, 300));
   const goal = await main.ev(`window.copilot.request('POST', '/api/v3/goals', { role: 'Software Engineering Manager', company: 'AccelerComm',
     job_description: 'Lead L1 software teams building 5G NR and NTN physical-layer IP.' })`);
   for (const scenario of selected) {

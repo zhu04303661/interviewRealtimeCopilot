@@ -8,6 +8,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
+import { Cloud } from './cloud';
 import { Engine } from './engine';
 import { DEFAULTS, type Settings, SettingsStore, type ShortcutId } from './settings';
 
@@ -27,6 +28,7 @@ const engineDir = process.env.IRC_ENGINE_DIR ?? (bundled ? join(process.resource
 const bundledPython = bundled ? join(process.resourcesPath, 'python', 'bin', 'python3') : undefined;
 const dataDir = process.env.IRC_DATA_DIR ?? join(app.getPath('appData'), 'Interview Realtime Copilot');
 const apiKeyFile = join(dataDir, 'openai.env');
+let cloud: Cloud;
 let engine: Engine;
 let mainWindow: BrowserWindow | null = null;
 let cockpit: BrowserWindow | null = null;
@@ -224,6 +226,11 @@ function registerIpc(): void {
   ipcMain.handle('system-audio:start', () => startSystemAudio());
   ipcMain.handle('system-audio:stop', () => stopSystemAudio());
   ipcMain.handle('settings:get', () => settings.value);
+  ipcMain.handle('cloud:status', () => cloud.status());
+  ipcMain.handle('cloud:auth', (_event, mode: unknown, email: unknown, password: unknown) =>
+    cloud.authenticate(mode === 'register' ? 'register' : 'login', String(email ?? ''), String(password ?? '')));
+  ipcMain.handle('cloud:sign-out', () => cloud.signOut());
+  ipcMain.handle('cloud:open', (_event, next: unknown) => cloud.open(typeof next === 'string' && next.startsWith('/') ? next : '/account.html'));
   // OpenAI API key entered in Settings: stored only on this Mac (owner-only file), read by the engine on every call.
   ipcMain.handle('apikey:status', () => {
     const own = existsSync(apiKeyFile) && /OPENAI_API_KEY=\S/.test(readFileSync(apiKeyFile, 'utf8'));
@@ -253,7 +260,9 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(() => {
-  engine = new Engine({ engineDir, dataDir, python: bundledPython, envFiles: [apiKeyFile, join(homedir(), '.env')],
+  cloud = new Cloud(dataDir);
+  // Key search order: the user's own key (direct to OpenAI), then the cloud device token (metered relay), then ~/.env (development).
+  engine = new Engine({ engineDir, dataDir, python: bundledPython, envFiles: [apiKeyFile, cloud.providerFile, join(homedir(), '.env')],
     resolveProxy: (url) => session.defaultSession.resolveProxy(url) });
   settings = new SettingsStore(dataDir);
   // getDisplayMedia from the cockpit gets the primary screen with system audio

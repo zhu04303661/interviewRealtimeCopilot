@@ -35,6 +35,8 @@ class ProviderError(Exception):
 
 
 def describe_failure(status: int | None = None, code: str | None = None) -> str:
+    if status == 402 or code == "quota_exceeded":
+        return "Your monthly AI allowance is used up. Subscribe in Settings → Account to continue."
     if status == 401 or code == "invalid_api_key":
         return "OpenAI rejected the configured API key."
     if status in (403, 404) or code == "model_not_found":
@@ -69,18 +71,38 @@ def read_env_file(path: Path) -> dict[str, str]:
 
 class OpenAI:
     def __init__(self, base: str, ws_base: str, env_file: Path | tuple[Path, ...], proxy: str | None = None) -> None:
-        self.base = base
-        self.ws_base = ws_base
+        self._base = base
+        self._ws_base = ws_base
         self.env_file = env_file
         self._proxy = proxy
         self._session: aiohttp.ClientSession | None = None
 
     # -- configuration -------------------------------------------------------
 
+    def _provider(self) -> tuple[str | None, str]:
+        """(key, base URL), re-read on every call: OPENAI_API_KEY from the environment, else the first env file
+        with a key. That file may also set FRLOCAL_OPENAI_BASE, e.g. the cloud relay with a device token as key."""
+        if key := (os.environ.get("OPENAI_API_KEY") or "").strip():
+            return key, self._base
+        for path in self.env_file if isinstance(self.env_file, tuple) else (self.env_file,):
+            values = read_env_file(path)
+            if key := (values.get("OPENAI_API_KEY") or "").strip():
+                return key, (values.get("FRLOCAL_OPENAI_BASE") or "").strip().rstrip("/") or self._base
+        return None, self._base
+
+    @property
+    def base(self) -> str:
+        return self._provider()[1]
+
+    @property
+    def ws_base(self) -> str:
+        base = self._provider()[1]
+        if base == self._base:
+            return self._ws_base
+        return "wss://" + base[8:] if base.startswith("https://") else "ws://" + base[7:] if base.startswith("http://") else base
+
     def api_key(self) -> str | None:
-        key = (os.environ.get("OPENAI_API_KEY") or "").strip()
-        files = self.env_file if isinstance(self.env_file, tuple) else (self.env_file,)
-        return key or next((v for f in files if (v := (read_env_file(f).get("OPENAI_API_KEY") or "").strip())), None)
+        return self._provider()[0]
 
     def require_key(self) -> str:
         key = self.api_key()

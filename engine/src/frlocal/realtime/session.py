@@ -481,7 +481,10 @@ class InterviewSession:
                 raise
             except Exception as error:
                 log.info("Mock interviewer failed: %s", error)
-                self.emit("error", {"code": "internal", "message": "interviewer generation failed", "retry": {"state": "exhausted"}})
+                # Provider messages (allowance used up, key rejected) are written for the user; show them as they are.
+                message = str(error) if isinstance(error, ProviderError) else "interviewer generation failed"
+                self.emit("error", {"code": "provider" if isinstance(error, ProviderError) else "internal", "message": message,
+                                    "retry": {"state": "exhausted"}})
                 return
             if self.ended or not self.connected:
                 return

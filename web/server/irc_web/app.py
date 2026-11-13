@@ -12,8 +12,17 @@ subscriptions in SQLite:
     POST /api/waitlist    {email, topic}            notify-me sign-ups
     POST /api/stripe/webhook                        subscription updates from Stripe
 
+Desktop app (Authorization: Bearer <device token>; see billing.py and relay.py):
+
+    POST /api/v1/auth/register|login {email, password, device}  -> {token, user}
+    POST /api/v1/auth/logout                        revoke this device token
+    GET  /api/v1/me                                 account, plan and this month's usage/balance
+    POST /api/v1/auth/web-link {next}               one-time link that signs the browser in
+    *    /api/v1/openai/v1/...                      metered OpenAI relay
+
 Configuration (environment): IRC_WEB_DB, IRC_WEB_ORIGIN (public https origin),
-STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET. Without Stripe keys, checkout
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, IRC_WEB_SECRET (encrypts the stored OpenAI key),
+IRC_OPENAI_UPSTREAM, IRC_FREE_ALLOWANCE_USD, IRC_PRO_ALLOWANCE_USD. Without Stripe keys, checkout
 answers 503 and everything else works.
 """
 
@@ -32,6 +41,9 @@ from typing import Any
 
 import aiohttp
 from aiohttp import web
+
+from . import relay
+from .billing import Billing
 
 STATIC = Path(__file__).resolve().parent.parent.parent / "static"
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}$")
@@ -97,8 +109,10 @@ def public_user(user: sqlite3.Row) -> dict[str, Any]:
             "current_period_end": user["current_period_end"]}
 
 
-def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stripe.com") -> web.Application:
+def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stripe.com", openai_upstream: str | None = None,
+              billing: Billing | None = None) -> web.Application:
     store = Store(db_path or os.environ.get("IRC_WEB_DB", "irc-web.sqlite3"))
+    billing = billing or Billing(store.db)
     origin = os.environ.get("IRC_WEB_ORIGIN", "http://localhost:8090").rstrip("/")
     stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
     webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
@@ -110,7 +124,8 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
     @web.middleware
     async def guard(request: web.Request, handler):
         # State-changing requests must come from our own pages (or be Stripe's signed webhook).
-        if (request.method == "POST" and request.path != "/api/stripe/webhook"
+        # (The app's /api/v1 calls carry a Bearer token and no cookies, so they are not subject to this check.)
+        if (request.method == "POST" and request.path != "/api/stripe/webhook" and not request.path.startswith("/api/v1/")
                 and request.headers.get("Origin", "").rstrip("/") != origin):
             return fail(403, "Cross-site request refused.")
         response = await handler(request)
@@ -171,9 +186,55 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         response.del_cookie("irc_session", path="/")
         return response
 
+    def account(user: sqlite3.Row) -> dict[str, Any]:
+        return {**public_user(user), "usage": billing.summary(user)}
+
     async def me(request: web.Request) -> web.Response:
         user = current(request)
-        return web.json_response({"user": public_user(user) if user else None, "payments": bool(stripe_key)})
+        return web.json_response({"user": account(user) if user else None, "payments": bool(stripe_key)})
+
+    def device_user(request: web.Request) -> sqlite3.Row | None:
+        auth = request.headers.get("Authorization", "")
+        return billing.user_for_token(auth[7:].strip()) if auth.startswith("Bearer ") else None
+
+    async def device_auth(request: web.Request) -> web.Response:
+        body = await request.json()
+        name = str(body.get("device") or "desktop")
+        if request.match_info["action"] == "register":
+            response = await signup(request)
+        else:
+            response = await login(request)
+        if response.status != 200:
+            return response
+        user = store.user_by_email(str(body.get("email", "")).strip().lower())
+        return web.json_response({"token": billing.issue_token(user["id"], name), "user": account(user)})
+
+    async def device_logout(request: web.Request) -> web.Response:
+        billing.revoke_token(request.headers.get("Authorization", "")[7:].strip())
+        return web.json_response({"ok": True})
+
+    async def device_me(request: web.Request) -> web.Response:
+        user = device_user(request)
+        return web.json_response({"user": account(user)}) if user else fail(401, "Sign in again.")
+
+    async def web_link(request: web.Request) -> web.Response:
+        user = device_user(request)
+        if not user:
+            return fail(401, "Sign in again.")
+        target = str((await request.json()).get("next") or "/account.html")
+        target = target if target.startswith("/") and not target.startswith("//") else "/account.html"
+        return web.json_response({"url": f"{origin}/auth/link?code={billing.issue_web_link(user['id'])}&next={target}"})
+
+    async def redeem_link(request: web.Request) -> web.Response:
+        user_id = billing.redeem_web_link(request.query.get("code", ""))
+        target = request.query.get("next", "/account.html")
+        target = target if target.startswith("/") and not target.startswith("//") else "/account.html"
+        if not user_id:
+            raise web.HTTPFound("/login.html?next=" + target)
+        response = web.HTTPFound(target)
+        response.set_cookie("irc_session", store.start_session(user_id), max_age=SESSION_DAYS * 86400, httponly=True, samesite="Lax",
+                            secure=origin.startswith("https://"), path="/")
+        raise response
 
     async def stripe(path: str, form: dict[str, str]) -> dict[str, Any]:
         async with aiohttp.ClientSession() as http, http.post(f"{stripe_api}{path}", data=form,
@@ -256,8 +317,11 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
             return web.FileResponse(path, status=404)
         return web.FileResponse(path)
 
-    app = web.Application(middlewares=[guard], client_max_size=256 * 1024)
+    app = web.Application(middlewares=[guard], client_max_size=64 * 1024 * 1024)  # transcription uploads
+    relay.setup(app, billing, origin, openai_upstream or os.environ.get("IRC_OPENAI_UPSTREAM", "https://api.openai.com"), device_user)
     app.add_routes([
+        web.post("/api/v1/auth/{action:register|login}", device_auth), web.post("/api/v1/auth/logout", device_logout),
+        web.get("/api/v1/me", device_me), web.post("/api/v1/auth/web-link", web_link), web.get("/auth/link", redeem_link),
         web.post("/api/signup", signup), web.post("/api/login", login), web.post("/api/logout", logout),
         web.get("/api/me", me), web.post("/api/checkout", checkout), web.post("/api/portal", portal),
         web.post("/api/waitlist", waitlist), web.post("/api/stripe/webhook", webhook),

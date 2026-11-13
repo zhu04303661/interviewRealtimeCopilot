@@ -5,6 +5,7 @@
 //
 // Computer audio is tests/fixtures/question-long.wav (pauses of 0.4–0.6 s
 // inside the sentence); the microphone is the answer fixture. Real OpenAI.
+import { cloudEnv, signIn, startCloud } from './cloud.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, openSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,7 +15,9 @@ import { setTimeout as pause } from 'node:timers/promises';
 const here = import.meta.dirname;
 const port = 19673;
 const data = mkdtempSync(join(tmpdir(), 'irc-segmentation-'));
-const env = { ...process.env, IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'fixtures/answer.wav'),
+const cloud = await startCloud();
+process.on('exit', () => cloud.stop());
+const env = { ...cloudEnv(process.env, cloud), IRC_E2E: '1', IRC_DATA_DIR: data, IRC_FAKE_AUDIO: join(here, 'fixtures/answer.wav'),
   IRC_TEST_SYSTEM_AUDIO: join(here, 'fixtures/question-long.wav') };
 delete env.ELECTRON_RUN_AS_NODE;
 const app = spawn(join(here, '../node_modules/.bin/electron'), ['.', `--remote-debugging-port=${port}`],
@@ -48,7 +51,8 @@ let failed = false;
 try {
   const main = await find((u) => u.endsWith('index.html'));
   for (let i = 0; i < 50 && !(await main.ev(`document.body.innerText.includes('Sign in')`)); i++) await pause(300);
-  await main.ev(`window.copilot.request('POST', '/local/auth/register', { owner: 'main', username: 'tester', password: 'irc-test-password-1' })`);
+  await signIn((e) => main.ev(e));
+  for (let i = 0; i < 60 && !(await main.ev(`/getting started/i.test(document.body.innerText)`)); i++) await new Promise((r) => setTimeout(r, 300));
   const goal = await main.ev(`window.copilot.request('POST', '/api/v3/goals', { role: 'Engineer', company: 'Example' })`);
   await main.ev(`window.copilot.startSession({ topology: 'general', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: [], language: 'en-US' })`);
   const t0 = Date.now();

@@ -17,7 +17,7 @@ sudo rsync -a --delete --exclude downloads/ /tmp/irc-web-upload/static/ /opt/irc
 sudo mkdir -p /opt/irc-web/static/downloads
 python3 -c 'import ensurepip' 2>/dev/null || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q python3-venv >/dev/null
 [ -x /opt/irc-web/venv/bin/python ] || sudo python3 -m venv /opt/irc-web/venv
-sudo /opt/irc-web/venv/bin/pip install -q --disable-pip-version-check 'aiohttp==3.14.5'
+sudo /opt/irc-web/venv/bin/pip install -q --disable-pip-version-check 'aiohttp==3.14.5' 'cryptography==46.0.3'
 sudo chown -R ircweb:ircweb /var/lib/irc-web
 if [ ! -f /etc/irc-web.env ]; then
   printf 'IRC_WEB_ORIGIN=https://%s\nIRC_WEB_DB=/var/lib/irc-web/site.sqlite3\nSTRIPE_SECRET_KEY=\nSTRIPE_WEBHOOK_SECRET=\n' "$HOST" | sudo tee /etc/irc-web.env >/dev/null
@@ -25,6 +25,8 @@ if [ ! -f /etc/irc-web.env ]; then
 else  # keep the Stripe keys; only the public origin follows the domain
   sudo sed -i "s|^IRC_WEB_ORIGIN=.*|IRC_WEB_ORIGIN=https://$HOST|" /etc/irc-web.env
 fi
+# Secret that encrypts the stored OpenAI key: generated once on the server, never leaves it.
+sudo grep -q '^IRC_WEB_SECRET=.' /etc/irc-web.env || printf 'IRC_WEB_SECRET=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" | sudo tee -a /etc/irc-web.env >/dev/null
 sudo cp /tmp/irc-web-upload/irc-web.service /etc/systemd/system/irc-web.service
 sudo systemctl daemon-reload
 sudo systemctl enable -q irc-web

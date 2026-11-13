@@ -21,6 +21,10 @@ interface Window {
     getSettings(): Promise<DeviceSettings>;
     apiKeyStatus(): Promise<{ configured: boolean; source: 'app' | 'environment' | 'none' }>;
     setApiKey(key: string): Promise<void>;
+    cloudStatus(): Promise<{ signedIn: boolean; email?: string; user?: CloudUser; offline?: boolean; local?: LocalCredentials }>;
+    cloudAuth(mode: 'register' | 'login', email: string, password: string): Promise<{ user: CloudUser; local: LocalCredentials }>;
+    cloudSignOut(): Promise<void>;
+    cloudOpen(next: string): Promise<void>;
     defaultSettings(): Promise<DeviceSettings>;
     setSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;
     onSettings(listener: (value: DeviceSettings) => void): void;
@@ -31,3 +35,7 @@ interface Window {
     testImportPaths(kind: 'resume' | 'material', paths: string[]): Promise<any[]>;
   };
 }
+
+type LocalCredentials = { username: string; password: string };
+type CloudUser = { email: string; plan: 'free' | 'monthly' | 'yearly'; status: string; current_period_end: number | null;
+  usage: { month: string; allowance_usd: number; used_usd: number; credit_usd: number; balance_usd: number; used_percent: number } };
