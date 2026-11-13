@@ -51,6 +51,18 @@ function cockpitDemo(root) {
     const alive = () => id === run;
     const type = async (node, text, speed) => { node.classList.add('typing'); for (const ch of text) { if (!alive()) return; node.textContent += ch; await wait(speed); } node.classList.remove('typing'); };
     body.innerHTML = '';
+    // Step 1: the user's own resume and notes are uploaded and prepared.
+    speak(null); phase('upload');
+    const sources = el(`<div class="sources fade-in"><span class="stamp">${tr('up.title')}</span></div>`);
+    body.append(sources);
+    for (const [file, size] of [['Resume_Zhu_Enqing.pdf', '2 pages'], ['AccelerComm_Interview_Prep.md', '115k chars'], ['System_Model_Framework.pdf', '38 pages']]) {
+      const row = el(`<div class="src fade-in"><span>📄 ${file}</span><span class="faint">${size}</span><span class="badge-s">${tr('up.reading')}</span></div>`);
+      sources.append(row); await wait(500); if (!alive()) return;
+      row.querySelector('.badge-s').textContent = tr('up.ready'); row.querySelector('.badge-s').classList.add('ok');
+    }
+    sources.append(el(`<div class="src-done fade-in">${tr('up.done')}</div>`));
+    await wait(1800); if (!alive()) return;
+    body.innerHTML = '';
     const en = window.I18N.en, zh = window.I18N.zh;
     const other = lang === 'zh' ? en : zh;  // the translation line is in the other language
     const line = el(`<div class="line fade-in"><span class="stamp">${tr('mock.interviewer')}</span><div class="text"></div><div class="tr"></div></div>`);

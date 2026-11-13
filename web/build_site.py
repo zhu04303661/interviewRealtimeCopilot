@@ -45,10 +45,10 @@ COCKPIT = ('<div class="stage"><div class="scene" data-scene>'
            + t("mock.listening", "Listening", "聆听中") + '<span class="stealth">' + t("scene.hidden", "Hidden from screen share", "共享屏幕不可见")
            + '</span></div><div class="mock-body"></div><div class="mock-foot">' + t("mock.solve", "Solve screen ⌥S", "截屏解答 ⌥S")
            + '<span class="clock">00:00</span></div></div></div>'
-           '<div class="phases"><span data-phase="hear">' + t("phase.hear", "1 · Hears the question", "1 · 听到问题") + '</span><span data-phase="understand">'
-           + t("phase.understand", "2 · Understands it", "2 · 理解问题") + '</span><span data-phase="hint">'
-           + t("phase.hint", "3 · Hints your answer", "3 · 提示回答") + '</span><span data-phase="answer">'
-           + t("phase.answer", "4 · You answer", "4 · 你来作答") + '</span></div></div>')
+           '<div class="phases"><span data-phase="upload">' + t("phase.upload", "1 · Upload resume & notes", "1 · 上传简历和资料") + '</span><span data-phase="hear">' + t("phase.hear", "2 · Hears the question", "2 · 听到问题") + '</span><span data-phase="understand">'
+           + t("phase.understand", "3 · Understands it", "3 · 理解问题") + '</span><span data-phase="hint">'
+           + t("phase.hint", "4 · Hints your answer", "4 · 提示回答") + '</span><span data-phase="answer">'
+           + t("phase.answer", "5 · You answer", "5 · 你来作答") + '</span></div></div>')
 
 SCENARIOS = [
     ("video", "🎥", "Video interviews on Zoom, Teams or Meet", "Zoom、Teams、Meet 视频面试",
@@ -206,6 +206,9 @@ def build() -> None:
     page("404", ("Not found — Interview Realtime Copilot", "页面不存在 — Interview Realtime Copilot"), f'''
 <div class="wrap center" style="padding:140px 28px">{t("nf.h1", "Page not found", "页面不存在", "h1")}<a class="btn primary" href="/">{t("nf.home", "Back to home", "返回首页")}</a></div>''')
 
+    for key, en, zh in [("up.title", "Knowledge sources", "知识来源"), ("up.reading", "Reading…", "读取中…"), ("up.ready", "Ready", "已就绪"),
+                        ("up.done", "151 prepared questions found — the copilot answers from these.", "已提取 151 道准备题——副驾将据此作答。")]:
+        t(key, en, zh)
     # Shared chrome and the cockpit demo script.
     for key, en, zh in [("nav.scenarios", "Use cases", "使用场景"), ("nav.demo", "Demo", "演示"), ("nav.pricing", "Pricing", "价格"), ("nav.download", "Download", "下载"),
                         ("nav.signin", "Sign in", "登录"), ("nav.start", "Get started", "开始使用"), ("foot.privacy", "Privacy", "隐私"), ("foot.terms", "Terms", "条款"),
