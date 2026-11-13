@@ -148,3 +148,32 @@ footer .wrap { display: flex; gap: 26px; flex-wrap: wrap; align-items: center; }
   .bento { grid-template-columns: 1fr; } .tile, .tile.wide, .tile.full { grid-column: span 1; }
   .stats { grid-template-columns: 1fr 1fr; } nav.links { display: none; }
 }
+
+/* demo scene: a video meeting with the cockpit floating above it */
+.scene { position: relative; height: 560px; }
+.meeting { position: absolute; inset: 40px 120px 40px 0; border-radius: 18px; background: #111318; border: 1px solid var(--line-2); overflow: hidden;
+  box-shadow: 0 40px 100px -30px rgba(0,0,0,.9); display: flex; flex-direction: column; }
+.meeting-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.rec { width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
+.tiles { flex: 1; display: grid; grid-template-rows: 1.4fr 1fr; gap: 8px; padding: 10px; }
+.tile-v { position: relative; border-radius: 12px; background: linear-gradient(160deg, #1d2130, #141720); display: grid; place-items: center; border: 2px solid transparent; transition: border-color .3s, box-shadow .3s; }
+.tile-v.speaking { border-color: #3ddc97; box-shadow: 0 0 0 4px rgba(61,220,151,.15); }
+.avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: linear-gradient(135deg, #3a4160, #262b3d); color: #cfd5ea; }
+.avatar.me { width: 48px; height: 48px; font-size: 14px; }
+.tile-v .name { position: absolute; left: 10px; bottom: 8px; font-size: 12px; background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 6px; }
+.wave { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 2px; align-items: flex-end; height: 12px; opacity: 0; }
+.wave i { width: 3px; background: #3ddc97; border-radius: 2px; animation: eq .8s ease-in-out infinite; } .wave i:nth-child(2) { animation-delay: .15s } .wave i:nth-child(3) { animation-delay: .3s }
+.tile-v.speaking .wave { opacity: 1; }
+.controls { display: flex; justify-content: center; gap: 10px; padding: 10px; border-top: 1px solid var(--line); }
+.controls span { width: 34px; height: 34px; border-radius: 50%; background: #23262e; display: grid; place-items: center; font-size: 14px; }
+.controls .leave { background: #e5484d; color: #fff; }
+.scene .mock { position: absolute; right: 0; top: 0; width: 64%; max-width: 420px; }
+.scene .mock-body { min-height: 380px; }
+.stealth { margin-left: auto; font: 600 10.5px var(--mono); color: #3ddc97; border: 1px solid rgba(61,220,151,.4); padding: 2px 8px; border-radius: 999px; }
+.phases { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.phases span { font: 600 12px var(--mono); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--faint); transition: all .3s; }
+.phases span.on { color: #fff; border-color: transparent; background: var(--grad); box-shadow: 0 6px 20px -6px rgba(124,92,255,.7); }
+@media (max-width: 960px) { .scene { height: auto; } .meeting { position: relative; inset: auto; height: 300px; } .scene .mock { position: relative; width: 100%; max-width: none; margin-top: -40px; } }
+.scene .meeting { inset: 50px 34% 30px 0; }
+.scene .mock { width: 58%; top: 0; }
+.scene .mock-body { min-height: 0; height: 420px; overflow: hidden; mask-image: linear-gradient(#000 85%, transparent); }

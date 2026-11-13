@@ -44,6 +44,9 @@ function cockpitDemo(root) {
   let seconds = 0, run = 0;
   setInterval(() => { seconds++; clock.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; }, 1000);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const scene = root.closest('[data-scene]')?.parentElement;
+  const speak = (who) => scene?.querySelectorAll('.tile-v').forEach((tile) => tile.classList.toggle('speaking', tile.dataset.speaker === who));
+  const phase = (name) => scene?.querySelectorAll('.phases span').forEach((chip) => chip.classList.toggle('on', chip.dataset.phase === name));
   async function play(id) {
     const alive = () => id === run;
     const type = async (node, text, speed) => { node.classList.add('typing'); for (const ch of text) { if (!alive()) return; node.textContent += ch; await wait(speed); } node.classList.remove('typing'); };
@@ -52,18 +55,22 @@ function cockpitDemo(root) {
     const other = lang === 'zh' ? en : zh;  // the translation line is in the other language
     const line = el(`<div class="line fade-in"><span class="stamp">${tr('mock.interviewer')}</span><div class="text"></div><div class="tr"></div></div>`);
     body.append(line);
+    speak('interviewer'); phase('hear');
     await type(line.querySelector('.text'), (lang === 'zh' ? zh : en)['mock.q'], 24); if (!alive()) return;
+    speak(null); phase('understand');
     await wait(350); line.querySelector('.tr').textContent = other['mock.q'];
     await wait(600); if (!alive()) return;
     body.append(el(`<div class="q fade-in"><span class="stamp">${tr('mock.question')}</span><div style="margin-top:7px">${(lang === 'zh' ? zh : en)['mock.q']}</div></div>`));
     await wait(500);
+    phase('hint');
     const hint = el('<div class="hint fade-in"></div>'); body.append(hint);
     for (const [label, dict] of [['EN', en], ['中文', zh]]) {
       hint.append(el(`<div class="langtag">${label}</div>`));
       const ul = el('<ul></ul>'); hint.append(ul);
       for (const key of ['mock.h1', 'mock.h2', 'mock.h3']) { const li = el('<li></li>'); ul.append(li); await type(li, dict[key], 12); if (!alive()) return; }
     }
-    await wait(6000); if (alive()) play(id);
+    phase('answer'); speak('me');
+    await wait(6000); speak(null); if (alive()) play(id);
   }
   const restart = () => { run++; play(run); };
   window.addEventListener('language', restart);

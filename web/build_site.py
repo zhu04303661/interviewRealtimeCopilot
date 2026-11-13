@@ -31,9 +31,24 @@ def page(name: str, title: tuple[str, str], body: str) -> None:
     (STATIC / f"{name}.html").write_text(head + body + "</body></html>\n")
 
 
-COCKPIT = ('<div class="stage"><div class="mock" data-cockpit><div class="mock-head"><span class="dot"></span>'
-           + t("mock.listening", "Listening", "聆听中") + '<span class="meter"><i></i><i></i><i></i><i></i></span></div>'
-           '<div class="mock-body"></div><div class="mock-foot">' + t("mock.solve", "Solve screen ⌥S", "截屏解答 ⌥S") + '<span class="clock">00:00</span></div></div></div>')
+COCKPIT = ('<div class="stage"><div class="scene" data-scene>'
+           # The meeting the candidate is in (what the interviewer and candidate see on the call).
+           '<div class="meeting"><div class="meeting-bar"><span class="rec"></span>' + t("scene.call", "Interview · AccelerComm", "面试 · AccelerComm")
+           + '<span class="spacer"></span><span class="faint">45:12</span></div>'
+           '<div class="tiles"><div class="tile-v" data-speaker="interviewer"><div class="avatar">AK</div><span class="name">'
+           + t("scene.interviewer", "Interviewer", "面试官") + '</span><span class="wave"><i></i><i></i><i></i></span></div>'
+           '<div class="tile-v" data-speaker="me"><div class="avatar me">ZE</div><span class="name">' + t("scene.you", "You", "你")
+           + '</span><span class="wave"><i></i><i></i><i></i></span></div></div>'
+           '<div class="controls"><span>🎙</span><span>📷</span><span>🖥</span><span class="leave">✕</span></div></div>'
+           # The cockpit floating above it; never captured by screen sharing.
+           '<div class="mock" data-cockpit><div class="mock-head"><span class="dot"></span>'
+           + t("mock.listening", "Listening", "聆听中") + '<span class="stealth">' + t("scene.hidden", "Hidden from screen share", "共享屏幕不可见")
+           + '</span></div><div class="mock-body"></div><div class="mock-foot">' + t("mock.solve", "Solve screen ⌥S", "截屏解答 ⌥S")
+           + '<span class="clock">00:00</span></div></div></div>'
+           '<div class="phases"><span data-phase="hear">' + t("phase.hear", "1 · Hears the question", "1 · 听到问题") + '</span><span data-phase="understand">'
+           + t("phase.understand", "2 · Understands it", "2 · 理解问题") + '</span><span data-phase="hint">'
+           + t("phase.hint", "3 · Hints your answer", "3 · 提示回答") + '</span><span data-phase="answer">'
+           + t("phase.answer", "4 · You answer", "4 · 你来作答") + '</span></div></div>')
 
 SCENARIOS = [
     ("video", "🎥", "Video interviews on Zoom, Teams or Meet", "Zoom、Teams、Meet 视频面试",
