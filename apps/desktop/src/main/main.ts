@@ -227,6 +227,7 @@ function registerIpc(): void {
   ipcMain.handle('system-audio:stop', () => stopSystemAudio());
   ipcMain.handle('settings:get', () => settings.value);
   ipcMain.handle('cloud:status', () => cloud.status());
+  ipcMain.handle('support:email', () => shell.openExternal(`mailto:linkyourfuture2026@outlook.com?subject=${encodeURIComponent(`Interview Realtime Copilot ${app.getVersion()} — help`)}`));
   ipcMain.handle('cloud:auth', (_event, mode: unknown, email: unknown, password: unknown) =>
     cloud.authenticate(mode === 'register' ? 'register' : 'login', String(email ?? ''), String(password ?? '')));
   ipcMain.handle('cloud:sign-out', () => cloud.signOut());

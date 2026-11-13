@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 STATIC = Path(__file__).parent / "static"
+SUPPORT_EMAIL = "linkyourfuture2026@outlook.com"
 STRINGS: dict[str, dict[str, str]] = {"en": {}, "zh": {}}
 
 
@@ -44,6 +45,8 @@ def page(name: str, title: tuple[str, str], body: str) -> None:
 LD = json.dumps({"@context": "https://schema.org", "@graph": [
     {"@type": "SoftwareApplication", "name": "Interview Realtime Copilot", "applicationCategory": "BusinessApplication", "operatingSystem": "macOS 14.2+",
      "description": "AI interview assistant (AI面试助手) that listens to live interviews, translates English and Chinese in real time, detects each question and suggests answers from your own resume; solves coding questions from your screen; spoken mock interviews and debriefs.",
+     "publisher": {"@type": "Organization", "name": "Interview Realtime Copilot", "url": "https://copilot.xichiuk.com",
+                   "contactPoint": {"@type": "ContactPoint", "contactType": "customer support", "email": SUPPORT_EMAIL, "availableLanguage": ["English", "Chinese"]}},
      "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free"}, {"@type": "Offer", "price": "29", "priceCurrency": "USD", "name": "Pro monthly"},
                 {"@type": "Offer", "price": "199", "priceCurrency": "USD", "name": "Pro yearly"}]},
     {"@type": "FAQPage", "mainEntity": [
@@ -182,6 +185,7 @@ def build() -> None:
 <details><summary>{t("faq.2q", "Where is my data stored?", "我的数据存在哪里？")}</summary>{t("faq.2a", "On your Mac: documents, transcripts, debriefs and recordings. Only the audio and text needed for a live answer are sent to the AI models during a session.", "在你的 Mac 上：资料、字幕、复盘和录音。只有会话中生成回答所需的音频和文字会发送给 AI 模型。", "p")}</details>
 <details><summary>{t("faq.3q", "Can I cancel?", "可以取消吗？")}</summary>{t("faq.3a", "Yes, anytime from your account page. Pro stays active until the end of the paid period.", "可以，随时在账号页取消，已付费周期内仍可使用 Pro。", "p")}</details>
 <details><summary>{t("faq.4q", "Which platforms are supported?", "支持哪些系统？")}</summary>{t("faq.4a", "macOS 14.2 or later today; Windows is coming.", "目前支持 macOS 14.2 及以上，Windows 即将推出。", "p")}</details>
+<details><summary>{t("faq.5q", "How do I get help?", "遇到问题怎么联系你们？")}</summary><p>{t("faq.5a", "Email us at", "请发邮件至")} <a class="mail" href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>{t("faq.5b", " — we usually reply within one business day.", "，我们通常在一个工作日内回复。")}</p></details>
 </div></div></section>''')
 
     page("download", ("Download — Interview Realtime Copilot", "下载 — Interview Realtime Copilot"), f'''
@@ -226,6 +230,7 @@ def build() -> None:
 {t("pv.1t", "Stored on your Mac", "保存在你的 Mac 上", "h3")}{t("pv.1p", "Goals, documents, extracted questions, transcripts, debriefs and recordings are kept in the app's local data folder.", "目标、资料、提取的问题、字幕、复盘和录音都保存在应用的本地数据文件夹中。", "p", "muted")}
 {t("pv.2t", "Sent for processing", "处理时发送的内容", "h3")}{t("pv.2p", "During a session you start, audio and the text needed to answer — the question and relevant passages of your materials — are sent to the speech and language models. Nothing is sent when no session is running.", "在你开始的会话中，音频和生成回答所需的文字（问题及资料中的相关段落）会发送给语音和语言模型。没有会话时不发送任何内容。", "p", "muted")}
 {t("pv.3t", "This website", "本网站", "h3")}{t("pv.3p", "We store your email, a password hash and your subscription status. Payments are processed by Stripe; we never see your card number.", "我们保存你的邮箱、密码哈希和订阅状态。付款由 Stripe 处理，我们不会接触你的卡号。", "p", "muted")}
+{t("pv.4t", "Contact", "联系我们", "h3")}<p class="muted">{t("pv.4p", "Questions about privacy or your data:", "关于隐私或数据的问题：")} <a class="mail" href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></p>
 {t("pv.note", "This is a plain-language summary, not legal advice. A full policy will be published before general availability.", "以上为通俗说明，并非法律文件。正式发布前将公布完整的隐私政策。", "p", "faint small")}</div>''')
     page("terms", ("Terms — Interview Realtime Copilot", "条款 — Interview Realtime Copilot"), f'''
 <div class="wrap" style="max-width:820px;padding:80px 28px">{t("tm.h1", "Terms", "服务条款", "h1")}
@@ -238,7 +243,7 @@ def build() -> None:
         t(key, en, zh)
     # Shared chrome and the cockpit demo script.
     for key, en, zh in [("nav.scenarios", "Use cases", "使用场景"), ("nav.demo", "Demo", "演示"), ("nav.pricing", "Pricing", "价格"), ("nav.download", "Download", "下载"),
-                        ("nav.signin", "Sign in", "登录"), ("nav.start", "Get started", "开始使用"), ("foot.privacy", "Privacy", "隐私"), ("foot.terms", "Terms", "条款"),
+                        ("nav.signin", "Sign in", "登录"), ("nav.start", "Get started", "开始使用"), ("foot.privacy", "Privacy", "隐私"), ("foot.support", "Support", "联系客服"), ("foot.terms", "Terms", "条款"),
                         ("mock.interviewer", "Interviewer", "面试官"), ("mock.question", "Question", "问题"),
                         ("mock.q", "How did you split the uplink processing between the FPGA and the DSP, and what were the latency trade-offs?",
                          "你是如何在 FPGA 和 DSP 之间划分上行处理的？延迟上做了哪些取舍？"),
@@ -262,8 +267,9 @@ def build() -> None:
 - [Demo](https://copilot.xichiuk.com/demo.html)
 - [Pricing](https://copilot.xichiuk.com/pricing.html)
 - [Download](https://copilot.xichiuk.com/download.html)
-""")
-    (STATIC / "i18n.js").write_text("// Generated by web/build_site.py — edit the strings there.\nwindow.I18N = "
+- Support: {SUPPORT_EMAIL}
+""".replace("{SUPPORT_EMAIL}", SUPPORT_EMAIL))
+    (STATIC / "i18n.js").write_text(f"// Generated by web/build_site.py — edit the strings there.\nwindow.SUPPORT_EMAIL = {json.dumps(SUPPORT_EMAIL)};\nwindow.I18N = "
                                     + json.dumps(STRINGS, ensure_ascii=False, indent=0) + ";\n")
     print(f"{len(STRINGS['en'])} strings")
 

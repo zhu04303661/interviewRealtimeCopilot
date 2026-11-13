@@ -25,6 +25,7 @@ interface Window {
     cloudAuth(mode: 'register' | 'login', email: string, password: string): Promise<{ user: CloudUser; local: LocalCredentials }>;
     cloudSignOut(): Promise<void>;
     cloudOpen(next: string): Promise<void>;
+    contactSupport(): Promise<void>;
     defaultSettings(): Promise<DeviceSettings>;
     setSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;
     onSettings(listener: (value: DeviceSettings) => void): void;

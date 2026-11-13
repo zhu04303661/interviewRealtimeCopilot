@@ -578,6 +578,7 @@ function SettingsPage({ username, role, signOut }: { username: string; role: str
         {section === 'account' && <>
           <h2>Account · 账号</h2>
           <h4 className="setting-group">Account · 账号</h4>
+          <Setting title="Help &amp; support · 帮助与客服" what="linkyourfuture2026@outlook.com"><button className="btn sm" onClick={() => void window.copilot.contactSupport()}>Email us · 发邮件</button></Setting>
           <Setting title={username} what="Signed in with your website account · 已用网站账号登录">
             <button className="btn sm" onClick={signOut}>Sign out · 退出登录</button></Setting>
           <CloudPlan />
@@ -797,7 +798,7 @@ function Shell({ username, role, signOut }: { username: string; role: string; si
           <span className="crumb">{title}</span><span className="spacer" />
           {error && <span className="error">{error}</span>}
           {route.page !== 'goal' && <button className="btn primary" onClick={() => start('general')}><Radio /> Go Live · 实时面试</button>}
-          <button className="btn ghost" title="Help · 帮助"><CircleHelp /></button>
+          <button className="btn ghost" title="Help — email linkyourfuture2026@outlook.com · 帮助：发邮件给客服" onClick={() => void window.copilot.contactSupport()}><CircleHelp /></button>
         </div>
         <div className="content">
           {route.page === 'goals' && <GoalsPage goals={goals} docs={docs} sessions={sessions} open={(id) => setRoute({ page: 'goal', goalId: id })} newGoal={() => setCreating(true)} />}

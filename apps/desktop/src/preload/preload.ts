@@ -23,6 +23,7 @@ const api = {
   cloudAuth: (mode: 'register' | 'login', email: string, password: string) => ipcRenderer.invoke('cloud:auth', mode, email, password),
   cloudSignOut: () => ipcRenderer.invoke('cloud:sign-out'),
   cloudOpen: (next: string) => ipcRenderer.invoke('cloud:open', next),
+  contactSupport: () => ipcRenderer.invoke('support:email'),
   setApiKey: (key: string) => ipcRenderer.invoke('apikey:set', key),
   defaultSettings: () => ipcRenderer.invoke('settings:defaults'),
   setSettings: (patch: unknown) => ipcRenderer.invoke('settings:set', patch),

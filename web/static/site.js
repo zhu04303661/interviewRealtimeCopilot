@@ -30,7 +30,7 @@ function chrome() {
     <a class="btn primary" href="/download.html" data-i18n="nav.start"></a></div></header>`));
   document.body.append(el(`<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>
     <a href="/use-cases.html" data-i18n="nav.scenarios"></a><a href="/pricing.html" data-i18n="nav.pricing"></a><a href="/download.html" data-i18n="nav.download"></a>
-    <a href="/privacy.html" data-i18n="foot.privacy"></a><a href="/terms.html" data-i18n="foot.terms"></a><span>© ${new Date().getFullYear()}</span></div></footer>`));
+    <a href="/privacy.html" data-i18n="foot.privacy"></a><a href="mailto:${window.SUPPORT_EMAIL}"><span data-i18n="foot.support"></span> · ${window.SUPPORT_EMAIL}</a><a href="/terms.html" data-i18n="foot.terms"></a><span>© ${new Date().getFullYear()}</span></div></footer>`));
   document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; localStorage.setItem('lang', lang); applyLanguage(); }));
   api('/api/me').then(({ user }) => {
     if (user) document.getElementById('account-slot').innerHTML = `<a class="btn" href="/account.html">${user.email.split('@')[0]} · ${user.plan === 'free' ? 'Free' : 'Pro'}</a>`;
