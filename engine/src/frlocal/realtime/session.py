@@ -421,7 +421,7 @@ class InterviewSession:
                     produced = True
                     self.emit("turn.token", {"turn_id": turn_id, "delta": delta})
                 if not produced:
-                    raise ProviderError("OpenAI returned no text for this request.")
+                    raise ProviderError("The AI engine returned no answer for this request.")
                 self.emit("turn.done", {"turn_id": turn_id, "rag": {"outcome": "used" if refs else "none", "refs": refs[:8]}})
             except asyncio.CancelledError:
                 raise

@@ -14,8 +14,8 @@ DOCS = [
              blocks=[
                  ("p", "Interview Realtime Copilot is a Mac app that helps you through real job interviews. It listens to the interviewer, translates as they speak, recognises each question and shows a short answer built from your own resume and notes. It also rehearses with you before the interview and reviews every session afterwards.",
                   "Interview Realtime Copilot 是一款 Mac 应用，帮助你应对真实的求职面试：实时聆听面试官、同步翻译、识别每个问题，并基于你自己的简历和准备资料给出简短的回答。面试前陪你演练，面试后为每场会话做复盘。"),
-                 ("note", "New here? Install the app, sign in with your website account, create a goal and add your resume — then start a practice session. Every plan includes a monthly AI allowance; no API key is needed.",
-                  "第一次使用？安装应用，用网站账号登录，创建目标并上传简历，然后开始一次语音练习。每个套餐都包含每月 AI 额度，无需 API 密钥。"),
+                 ("note", "New here? Install the app, sign in with your website account, create a goal and add your resume — then start a practice session. The realtime AI engine is ready as soon as you sign in; every plan includes a monthly allowance.",
+                  "第一次使用？安装应用，用网站账号登录，创建目标并上传简历，然后开始一次语音练习。登录即可使用实时 AI 引擎，每个套餐都包含每月额度。"),
                  ("h2", "The loop: Prepare, Practise, Perform, Review", "使用循环：准备、练习、实战、复盘"),
                  ("p", "Everything in the app follows the same four steps for each job you apply for. Go round the loop once per interview.",
                   "应用的一切都围绕每个求职目标的四个步骤展开，每场面试走一轮。"),
@@ -60,13 +60,13 @@ DOCS = [
                  ("note", "After changing a permission in System Settings, quit and reopen the app so macOS applies it.", "在系统设置中更改权限后，请退出并重新打开应用，使其生效。"),
              ]),
         dict(slug="plans", title=("Plans and AI allowance", "套餐与 AI 额度"),
-             lead=("Every plan includes a monthly AI allowance — no API key needed.", "每个套餐都包含每月 AI 额度，无需 API 密钥。"),
+             lead=("Every plan includes a monthly allowance of the realtime AI engine — nothing to set up.", "每个套餐都包含每月实时 AI 引擎额度，无需任何配置。"),
              blocks=[
                  ("table", [("Plan", "套餐"), ("Price", "价格"), ("AI allowance per month", "每月 AI 额度")], [
                      [("Free", "免费版"), "$0", "$1"], [("Pro monthly", "Pro 月付"), ("$29 / month", "$29 / 月"), "$20"], [("Pro yearly", "Pro 年付"), ("$199 / year", "$199 / 年"), "$20"]]),
                  ("ul", [("The allowance resets on the 1st of each month (UTC). Settings → Account shows what you have used and what is left.", "额度在每月 1 日（UTC）重置；「设置 → 账号」显示已用和剩余额度。"),
                          ("Spoken practice uses the most (realtime voice); live hints and translation use less; debriefs cost a few cents.", "语音练习消耗最多（实时语音），实时提示和翻译较少，复盘每次只需几美分。"),
-                         ("When the allowance is used up, the cockpit says so. Subscribe, or add your own OpenAI key in Settings → Account (requests then go straight to OpenAI and do not count against the allowance).", "额度用完时面试窗口会提示。你可以订阅，或在「设置 → 账号」填写自己的 OpenAI 密钥（之后直接连接 OpenAI，不占额度）。")]),
+                         ("When the allowance is used up, the cockpit says so; subscribe to Pro for a larger monthly allowance.", "额度用完时面试窗口会提示，订阅 Pro 即可获得更多每月额度。")]),
                  ("h2", "Subscribe or manage billing", "订阅与管理"),
                  ("p", "In Settings → Account click Subscribe (or Manage billing). The website opens already signed in; payment is handled by Stripe. Cancel anytime — Pro stays active until the end of the paid period.",
                   "在「设置 → 账号」点「订阅」（或「管理订阅」），网站会自动登录打开，付款由 Stripe 处理。可随时取消，已付费周期内仍可使用 Pro。"),
@@ -170,7 +170,7 @@ DOCS = [
              lead=("What stays on your Mac and what is sent for processing.", "哪些内容留在本机，哪些会发送处理。"),
              blocks=[
                  ("ul", [("On your Mac: goals, documents, extracted questions, transcripts, debriefs and recordings.", "保存在本机：目标、资料、提取的问题、字幕、复盘和录音。"),
-                         ("Sent during a session you start: audio and the text needed to answer (the question and relevant passages of your materials), to the speech and language models.", "在你开始的会话中发送：音频和回答所需的文字（问题及资料中的相关段落），发送给语音和语言模型。"),
+                         ("Processed during a session you start: audio and the text needed to answer (the question and relevant passages of your materials), by our AI engine on our servers and trusted AI processing partners.", "在你开始的会话中处理：音频和回答所需的文字（问题及资料中的相关段落），由运行在我们服务器及受信任 AI 处理合作方上的 AI 引擎处理。"),
                          ("Our server keeps your email, a password hash, your plan and usage amounts. Payments are processed by Stripe.", "我们的服务器只保存邮箱、密码哈希、套餐和用量；付款由 Stripe 处理。")]),
              ]),
         dict(slug="settings", title=("Settings reference", "设置说明"),
@@ -182,7 +182,7 @@ DOCS = [
                      [("Defaults", "默认设置"), ("Answer language, coding language, playbook.", "回答语言、编程语言、回答风格。")],
                      [("Privacy & Stealth", "隐私与隐身"), ("Hide from screen sharing, permissions, auto-capture, AI memory.", "共享屏幕时隐藏、系统权限、自动截屏、AI 记忆。")],
                      [("Shortcuts", "快捷键"), ("Nine shortcuts, click to rebind, reset.", "九个快捷键，点击重新绑定、恢复默认。")],
-                     [("Account", "账号"), ("Plan and allowance, subscribe, your own OpenAI key, sign out, support.", "套餐与额度、订阅、自己的 OpenAI 密钥、退出登录、联系客服。")]]),
+                     [("Account", "账号"), ("Plan and allowance, subscribe, sign out, support.", "套餐与额度、订阅、退出登录、联系客服。")]]),
              ]),
     ]),
     ("help", "Troubleshooting and FAQ", "故障排查与常见问题", [
@@ -192,7 +192,7 @@ DOCS = [
                  ("table", [("Problem", "问题"), ("What to do", "解决办法")], [
                      [("The Computer meter does not move in Live", "实时面试中「Computer」音量条不动"), ("Allow System Audio Recording for the app, quit and reopen it, and check the meeting's sound plays through this Mac.", "为应用开启「系统录音」权限，退出并重新打开，确认会议声音从这台 Mac 播放。")],
                      [("The Mic meter does not move", "「Mic」音量条不动"), ("Allow the microphone in System Settings → Privacy & Security → Microphone; check the input device in macOS Sound settings.", "在「系统设置 → 隐私与安全性 → 麦克风」中允许，并检查 macOS 声音设置中的输入设备。")],
-                     [("“Your monthly AI allowance is used up”", "提示「本月 AI 额度已用完」"), ("Subscribe in Settings → Account, wait for next month, or add your own OpenAI key.", "在「设置 → 账号」订阅、等待下月重置，或填写自己的 OpenAI 密钥。")],
+                     [("“Your monthly AI allowance is used up”", "提示「本月 AI 额度已用完」"), ("Subscribe in Settings → Account, or wait for next month's allowance.", "在「设置 → 账号」订阅，或等待下月额度重置。")],
                      [("macOS says the app cannot be opened", "macOS 提示无法打开应用"), ("System Settings → Privacy & Security → Open Anyway (preview builds are not notarised yet).", "「系统设置 → 隐私与安全性 → 仍要打开」（测试版尚未公证）。")],
                      [("Cannot reach the account service", "无法连接账号服务"), ("Check your internet connection or proxy; the app keeps you signed in and retries.", "检查网络或代理；应用会保持登录并自动重试。")],
                      [("A continuous question is split into pieces", "一个连续的问题被切成几段"), ("Usually a very long pause; the copilot still answers the combined question. Tell us if it keeps happening.", "通常是停顿过长；副驾仍会把它们合并作答。如果反复出现请告诉我们。")]]),

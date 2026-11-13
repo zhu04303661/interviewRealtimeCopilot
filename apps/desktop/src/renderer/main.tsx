@@ -69,7 +69,7 @@ function SignIn({ onSignedIn }: { onSignedIn: (email: string, role: string) => v
         <label className="field"><span>Email · 邮箱</span><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></label>
         <label className="field"><span>Password · 密码{mode === 'register' && <span className="muted"> ({password.length}/10)</span>}</span>
           <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
-        {mode === 'register' && <p className="small muted" style={{ margin: '-4px 0 14px' }}>Free plan included: a monthly AI allowance, no API key needed. · 注册即享免费额度，无需 API 密钥。</p>}
+        {mode === 'register' && <p className="small muted" style={{ margin: '-4px 0 14px' }}>Free plan included: a monthly allowance of our realtime AI engine. · 注册即享实时 AI 引擎免费额度。</p>}
         {error && <p className="error">{error}</p>}
         <button className="btn primary" disabled={busy} style={{ width: '100%', justifyContent: 'center' }} onClick={submit}>
           {busy ? '…' : mode === 'login' ? 'Sign in · 登录' : 'Create account · 注册'}</button>
@@ -99,7 +99,7 @@ function CloudPlan() {
         <button className="btn sm" onClick={refresh}>Refresh · 刷新</button>
       </Setting>
       <div className="meter-bar"><i style={{ width: `${user.usage.used_percent}%`, background: user.usage.used_percent >= 90 ? 'var(--bad)' : undefined }} /></div>
-      {user.usage.balance_usd <= 0 && <p className="error small">Your AI allowance for this month is used up. Subscribe for more, or add your own OpenAI key below. · 本月额度已用完，请订阅或在下方填写自己的密钥。</p>}
+      {user.usage.balance_usd <= 0 && <p className="error small">Your AI allowance for this month is used up. Subscribe to Pro for more. · 本月额度已用完，订阅 Pro 可获得更多额度。</p>}
     </>}
   </>;
 }
@@ -404,29 +404,6 @@ function contrast(a: string, b: string): number {
 }
 const rgba = (hex: string, alpha: number) => { const n = Number.parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`; };
 
-function ApiKeySetting() {
-  const [status, setStatus] = useState<{ configured: boolean; source: string } | null>(null);
-  const [key, setKey] = useState('');
-  const [message, setMessage] = useState('');
-  const refresh = () => window.copilot.apiKeyStatus().then(setStatus);
-  useEffect(() => { void refresh(); }, []);
-  const save = async (value: string) => {
-    setMessage('');
-    try { await window.copilot.setApiKey(value); setKey(''); await refresh(); setMessage(value ? 'Saved · 已保存' : 'Removed · 已移除'); }
-    catch (error) { setMessage(String((error as Error).message ?? error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')); }
-  };
-  return <>
-    <h4 className="setting-group">Your own OpenAI key (optional) · 自己的 OpenAI 密钥（可选）</h4>
-    <p className="muted small">With your own key, AI requests go straight to OpenAI and do not use your allowance. · 填写后直接连接 OpenAI，不占用额度。</p>
-    <Setting title="API key · 密钥" what={status?.source === 'app' ? 'Saved on this Mac · 已保存在本机' : status?.source === 'environment' ? 'Using OPENAI_API_KEY from the environment or ~/.env · 使用环境变量或 ~/.env 中的密钥' : 'Not set — using your plan allowance · 未设置，使用套餐额度'}>
-      <input className="input" type="password" placeholder="sk-…" value={key} onChange={(e) => setKey(e.target.value)} style={{ width: 220 }} />
-      <button className="btn sm primary" disabled={!key.trim()} onClick={() => save(key)}>Save · 保存</button>
-      {status?.source === 'app' && <button className="btn sm" onClick={() => save('')}>Remove · 移除</button>}
-    </Setting>
-    {message && <p className="muted small">{message}</p>}
-  </>;
-}
-
 function Setting({ title, children, what, icon }: { title: string; what?: React.ReactNode; children?: React.ReactNode; icon?: React.ReactNode }) {
   return <div className="setting">{icon && <div className="icon-tile">{icon}</div>}<div className="what"><b>{title}</b>{what && <span>{what}</span>}</div>{children}</div>;
 }
@@ -582,9 +559,8 @@ function SettingsPage({ username, role, signOut }: { username: string; role: str
           <Setting title={username} what="Signed in with your website account · 已用网站账号登录">
             <button className="btn sm" onClick={signOut}>Sign out · 退出登录</button></Setting>
           <CloudPlan />
-          <ApiKeySetting />
           <h4 className="setting-group">Local workspace · 本地工作区</h4>
-          <p className="muted small">This computer stores your workspace: goals, documents, sessions and debriefs. Live AI uses the OpenAI project configured for the engine. · 目标、资料、会话和复盘都保存在本机。</p>
+          <p className="muted small">This computer stores your workspace: goals, documents, sessions and debriefs. · 目标、资料、会话和复盘都保存在本机。</p>
           <Setting title="Delete account · 删除账号" what="Account deletion is unavailable in this local build. · 本地版暂不支持删除账号。"><button className="btn sm" disabled>Delete account… · 删除账号…</button></Setting>
           {role === 'admin' && accounts.length > 0 && <>
             <h4 className="setting-group">Local accounts · 本机账号</h4>

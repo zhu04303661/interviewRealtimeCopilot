@@ -168,7 +168,7 @@ def build() -> None:
 <h1>{t("hero.h1a", "Answer every interview question", "每一道面试题，")}<br><span class="grad-text">{t("hero.h1b", "with calm confidence.", "都能从容作答。")}</span></h1>
 {t("hero.lead", "Interview Realtime Copilot listens to the interviewer, translates as they speak, spots each question and streams a concise answer built from your own resume and notes.", "Interview Realtime Copilot 实时聆听面试官、同步翻译、识别每一个问题，并基于你自己的简历和准备资料给出简洁的回答提示。", "p", "lead")}
 <div class="cta"><a class="btn primary lg" href="/download.html">{t("cta.download", "Download for macOS", "下载 macOS 版")}</a><a class="btn lg" href="/demo.html">{t("cta.demo", "Watch the demo", "观看演示")}</a></div>
-<div class="trust">{t("trust.1", "Local-first: your files stay on your Mac", "本地优先：文件只存在你的 Mac")}{t("trust.2", "Hidden from screen sharing", "共享屏幕时不可见")}{t("trust.3", "No API key needed", "无需 API 密钥")}</div>
+<div class="trust">{t("trust.1", "Local-first: your files stay on your Mac", "本地优先：文件只存在你的 Mac")}{t("trust.2", "Hidden from screen sharing", "共享屏幕时不可见")}{t("trust.3", "Powered by a realtime AI engine", "超强实时 AI 引擎驱动")}</div>
 </div>{COCKPIT}</div></section>
 
 <section style="padding-top:0"><div class="wrap"><div class="stats reveal">
@@ -200,6 +200,13 @@ def build() -> None:
 <li>{t("priv.3", "The cockpit is excluded from screen sharing and recordings.", "面试窗口不会出现在共享屏幕和录屏中。")}</li></ul></div>
 <div class="glass reveal">{t("priv.card.t", "Answers only from what is true", "只说真实的经历", "h3")}{t("priv.card.p", "Hints use facts from your resume and notes. When something is not in your materials, the copilot tells you how to answer honestly instead of inventing experience.", "回答提示只引用你简历和资料中的事实。资料里没有的内容，它会建议你如何如实回答，而不是编造经历。", "p", "muted")}</div></div></section>
 
+<section id="wishlist"><div class="wrap split"><div class="reveal"><span class="eyebrow">{t("wish.eyebrow", "Wishlist", "许愿单")}</span>
+<h2>{t("wish.h2", "Tell us what to build next.", "告诉我们下一步做什么。")}</h2>
+{t("wish.lead", "A feature you need, an interview type we should support, something that annoyed you — every wish is read by the team.", "需要的功能、希望支持的面试类型、用着不顺手的地方——每一条心愿团队都会认真阅读。", "p", "lead")}</div>
+<form class="glass reveal wish-form"><label class="field">{t("wish.text", "Your wish", "你的心愿")}<textarea class="input" name="text" rows="5" required minlength="5" maxlength="3000" data-i18n-placeholder="wish.placeholder"></textarea></label>
+<label class="field">{t("wish.email", "Email (optional, so we can reply)", "邮箱（选填，方便我们回复）")}<input class="input" name="email" type="email" placeholder="you@example.com"></label>
+<button class="btn primary">{t("wish.send", "Send my wish", "提交心愿")}</button><p class="error"></p></form></div></section>
+
 <section><div class="wrap"><div class="final reveal"><h2>{t("final.h2", "Walk into your next interview prepared.", "带着准备，走进下一场面试。")}</h2>
 {t("final.p", "Start free with two practice sessions a month. Upgrade when the interviews get real.", "每月 2 次免费练习，面试真正来临时再升级。", "p", "lead")}
 <div class="cta" style="justify-content:center"><a class="btn primary lg" href="/download.html">{t("cta.start", "Get started free", "免费开始")}</a><a class="btn lg" href="/pricing.html">{t("cta.pricing", "See pricing", "查看价格")}</a></div></div></div></section>''')
@@ -226,7 +233,7 @@ def build() -> None:
     page("pricing", ("Pricing — Interview Realtime Copilot", "价格 — Interview Realtime Copilot"), f'''
 <section class="hero"><div class="wrap center"><span class="eyebrow">{t("pr.eyebrow", "Pricing", "价格")}</span>
 <h1>{t("pr.h1a", "Simple plans.", "简单的方案，")}<br><span class="grad-text">{t("pr.h1b", "Cancel anytime.", "随时可取消。")}</span></h1>
-{t("pr.lead", "AI usage is included as a monthly allowance — no API key, no surprise bills.", "每月包含 AI 使用额度——无需 API 密钥，没有意外账单。", "p", "lead")}<div id="checkout-note"></div>
+{t("pr.lead", "Our realtime AI engine is included as a monthly allowance — nothing to set up, no surprise bills.", "每月包含实时 AI 引擎使用额度——无需任何配置，没有意外账单。", "p", "lead")}<div id="checkout-note"></div>
 <div class="plans">
 <div class="plan">{t("plan.free.name", "Free", "免费版", "h3")}<div class="price">$0</div>{t("plan.free.sub", "Try it on your next practice.", "在下一次练习中试试。", "p", "muted small")}
 <ul><li>{t("plan.free.1", "$1 of AI usage every month — about 2 practice sessions", "每月 $1 AI 额度，约可做 2 次语音练习")}</li><li>{t("plan.free.2", "Live translation and hints", "实时翻译与提示")}</li><li>{t("plan.free.3", "Prepared-question extraction", "自动提取准备题")}</li><li>{t("plan.free.4", "A debrief after each session", "每场会话的复盘")}</li></ul>
@@ -238,8 +245,8 @@ def build() -> None:
 <ul><li>{t("plan.y.1", "Everything in Pro monthly", "包含 Pro 月付全部功能")}</li><li>{t("plan.y.2", "Early access to Windows", "抢先体验 Windows 版")}</li><li>{t("plan.y.3", "Priority support", "优先支持")}</li></ul>
 {plan_cta("yearly", "Subscribe yearly", "订阅年付")}</div></div><p class="error" id="checkout-error"></p></div></section>
 <section style="padding-top:0"><div class="wrap"><h2 class="center">{t("faq.h2", "Questions", "常见问题")}</h2><div class="faq">
-<details><summary>{t("faq.1q", "Do I need my own OpenAI key?", "需要自己的 OpenAI 密钥吗？")}</summary>{t("faq.1a", "No. Every plan includes a monthly AI allowance (Free $1, Pro $20). When it runs out, the app tells you and you can upgrade — or use your own key.", "不需要。每个套餐都含每月 AI 额度（免费 $1，Pro $20），用完时应用会提示你升级，也可以填写自己的密钥。", "p")}</details>
-<details><summary>{t("faq.2q", "Where is my data stored?", "我的数据存在哪里？")}</summary>{t("faq.2a", "On your Mac: documents, transcripts, debriefs and recordings. Only the audio and text needed for a live answer are sent to the AI models during a session.", "在你的 Mac 上：资料、字幕、复盘和录音。只有会话中生成回答所需的音频和文字会发送给 AI 模型。", "p")}</details>
+<details><summary>{t("faq.1q", "Do I need to set anything up for the AI?", "AI 需要我自己配置什么吗？")}</summary>{t("faq.1a", "No. Sign in and the realtime AI engine is ready. Every plan includes a monthly allowance (Free $1, Pro $20); when it runs out, the app tells you and you can upgrade.", "不需要。登录即可使用实时 AI 引擎。每个套餐都含每月额度（免费 $1，Pro $20），用完时应用会提示你升级。", "p")}</details>
+<details><summary>{t("faq.2q", "Where is my data stored?", "我的数据存在哪里？")}</summary>{t("faq.2a", "On your Mac: documents, transcripts, debriefs and recordings. Only the audio and text needed for a live answer are processed by our AI engine during a session.", "在你的 Mac 上：资料、字幕、复盘和录音。只有会话中生成回答所需的音频和文字会交给我们的 AI 引擎处理。", "p")}</details>
 <details><summary>{t("faq.3q", "Can I cancel?", "可以取消吗？")}</summary>{t("faq.3a", "Yes, anytime from your account page. Pro stays active until the end of the paid period.", "可以，随时在账号页取消，已付费周期内仍可使用 Pro。", "p")}</details>
 <details><summary>{t("faq.4q", "Which platforms are supported?", "支持哪些系统？")}</summary>{t("faq.4a", "macOS 14.2 or later today; Windows is coming.", "目前支持 macOS 14.2 及以上，Windows 即将推出。", "p")}</details>
 <details><summary>{t("faq.5q", "How do I get help?", "遇到问题怎么联系你们？")}</summary><p>{t("faq.5a", "Email us at", "请发邮件至")} <a class="mail" href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>{t("faq.5b", " — we usually reply within one business day.", "，我们通常在一个工作日内回复。")}</p></details>
@@ -249,7 +256,7 @@ def build() -> None:
 <section class="hero"><div class="wrap split"><div><span class="eyebrow">{t("dl.eyebrow", "Download", "下载")}</span><h1>{t("dl.h1", "Get the desktop app.", "下载桌面应用。")}</h1>
 {t("dl.lead", "The copilot runs on your Mac, next to your meeting app.", "应用在你的 Mac 上运行，配合会议软件使用。", "p", "lead")}
 <div class="card" style="margin-top:26px">{t("dl.mac", "macOS 14.2 or later · Apple Silicon (M1–M4)", "macOS 14.2 及以上 · Apple 芯片（M1–M4）", "h3")}<p class="muted small" id="mac-status" data-i18n="dl.checking">{"Checking for the current build…"}</p><div id="mac-download"></div>
-{t("dl.key", "Sign in with your website account: every plan includes a monthly AI allowance, no API key needed. You can also add your own OpenAI key in Settings.", "用网站账号登录即可：每个套餐都包含每月 AI 额度，无需 API 密钥；也可以在设置中填写自己的 OpenAI 密钥。", "p", "notice small")}
+{t("dl.key", "Just sign in with your website account — the realtime AI engine is ready, with a monthly allowance on every plan.", "用网站账号登录即可——实时 AI 引擎即刻可用，每个套餐都包含每月额度。", "p", "notice small")}
 {t("dl.gatekeeper", "Preview builds are not yet notarised by Apple: after the first launch, open System Settings → Privacy & Security and click “Open Anyway”.", "测试版尚未经 Apple 公证：首次启动后，打开「系统设置 → 隐私与安全性」，点击「仍要打开」。", "p", "faint small")}</div>
 <div class="card" style="margin-top:16px">{t("dl.win", "Windows — coming soon", "Windows——即将推出", "h3")}{t("dl.win.p", "Leave your email and we will tell you when it is ready.", "留下邮箱，发布时通知你。", "p", "muted small")}
 <form class="inline-form" data-waitlist="windows"><input class="input" name="email" type="email" placeholder="you@example.com" required><button class="btn primary">{t("dl.notify", "Notify me", "通知我")}</button><p class="error"></p></form></div></div>
@@ -285,7 +292,7 @@ def build() -> None:
     page("privacy", ("Privacy — Interview Realtime Copilot", "隐私 — Interview Realtime Copilot"), f'''
 <div class="wrap" style="max-width:820px;padding:80px 28px">{t("pv.h1", "Privacy", "隐私", "h1")}
 {t("pv.1t", "Stored on your Mac", "保存在你的 Mac 上", "h3")}{t("pv.1p", "Goals, documents, extracted questions, transcripts, debriefs and recordings are kept in the app's local data folder.", "目标、资料、提取的问题、字幕、复盘和录音都保存在应用的本地数据文件夹中。", "p", "muted")}
-{t("pv.2t", "Sent for processing", "处理时发送的内容", "h3")}{t("pv.2p", "During a session you start, audio and the text needed to answer — the question and relevant passages of your materials — are sent to the speech and language models. Nothing is sent when no session is running.", "在你开始的会话中，音频和生成回答所需的文字（问题及资料中的相关段落）会发送给语音和语言模型。没有会话时不发送任何内容。", "p", "muted")}
+{t("pv.2t", "Sent for processing", "处理时发送的内容", "h3")}{t("pv.2p", "During a session you start, audio and the text needed to answer — the question and relevant passages of your materials — are processed by our AI engine, which runs on our servers and on trusted AI processing partners bound by data-protection terms. Nothing is sent when no session is running.", "在你开始的会话中，音频和生成回答所需的文字（问题及资料中的相关段落）会交给我们的 AI 引擎处理，引擎运行在我们的服务器及受数据保护条款约束的 AI 处理合作方上。没有会话时不发送任何内容。", "p", "muted")}
 {t("pv.3t", "This website", "本网站", "h3")}{t("pv.3p", "We store your email, a password hash and your subscription status. Payments are processed by Stripe; we never see your card number.", "我们保存你的邮箱、密码哈希和订阅状态。付款由 Stripe 处理，我们不会接触你的卡号。", "p", "muted")}
 {t("pv.4t", "Contact", "联系我们", "h3")}<p class="muted">{t("pv.4p", "Questions about privacy or your data:", "关于隐私或数据的问题：")} <a class="mail" href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></p>
 {t("pv.note", "This is a plain-language summary, not legal advice. A full policy will be published before general availability.", "以上为通俗说明，并非法律文件。正式发布前将公布完整的隐私政策。", "p", "faint small")}</div>''')
@@ -299,7 +306,9 @@ def build() -> None:
                         ("up.done", "151 prepared questions found — the copilot answers from these.", "已提取 151 道准备题——副驾将据此作答。")]:
         t(key, en, zh)
     # Shared chrome and the cockpit demo script.
-    for key, en, zh in [("nav.scenarios", "Use cases", "使用场景"), ("nav.demo", "Demo", "演示"), ("nav.pricing", "Pricing", "价格"), ("nav.download", "Download", "下载"),
+    for key, en, zh in [("wish.placeholder", "e.g. Support Windows · live captions for Teams · a system-design whiteboard…", "例如：支持 Windows · Teams 实时字幕 · 系统设计白板……"),
+                        ("wish.thanks", "Thank you — your wish is on its way to the team.", "谢谢！你的心愿已送达团队。"), ("foot.wishlist", "Wishlist", "许愿单"),
+                        ("nav.scenarios", "Use cases", "使用场景"), ("nav.demo", "Demo", "演示"), ("nav.pricing", "Pricing", "价格"), ("nav.download", "Download", "下载"),
                         ("nav.signin", "Sign in", "登录"), ("nav.start", "Get started", "开始使用"), ("foot.privacy", "Privacy", "隐私"), ("foot.support", "Support", "联系客服"), ("foot.terms", "Terms", "条款"),
                         ("mock.interviewer", "Interviewer", "面试官"), ("mock.question", "Question", "问题"),
                         ("mock.q", "How did you split the uplink processing between the FPGA and the DSP, and what were the latency trade-offs?",

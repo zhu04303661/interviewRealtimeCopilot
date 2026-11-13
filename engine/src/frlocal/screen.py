@@ -33,7 +33,7 @@ async def analyze_screen(openai: OpenAI, settings: Settings, *, image: bytes, mi
     result = {"analysisId": analysis_id, "title": "", "summary": "", "error": "", "kind": "", "dedup": False, "solve": "not_requested"}
     solve = purpose == "solve"
     if not openai.api_key():
-        return {**result, "status": "failed", "error": "Configure OPENAI_API_KEY to analyze screenshots."}
+        return {**result, "status": "failed", "error": "Sign in to use Solve screen."}
     task = ("Identify the visible interview question and give a concise, actionable explanation in the language of the question."
             if solve else "Summarize the visible interview context in the language of the screenshot.")
     try:

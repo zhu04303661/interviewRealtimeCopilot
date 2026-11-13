@@ -104,9 +104,9 @@ class RealtimeVoiceAgent:
             await asyncio.wait_for(self.started.wait(), self._limits.live_start_timeout_s)
         except TimeoutError:
             await self.close()
-            raise ProviderError("The OpenAI Realtime API did not start the practice session in time.") from None
+            raise ProviderError("The realtime AI engine did not start the practice session in time.") from None
         if self.closed:
-            raise ProviderError(self._failure or "The OpenAI Realtime API rejected the practice session.")
+            raise ProviderError(self._failure or "The realtime AI engine could not start the practice session.")
         self._tasks.append(loop.create_task(self._keep_stream_alive()))
         await self._send({"type": "response.create", "response": {"instructions": self._greeting}})
 
@@ -208,7 +208,7 @@ class RealtimeVoiceAgent:
             error = event.get("error") or {}
             log.warning("Realtime voice agent error: %s %s", error.get("code"), error.get("message"))
             if not self.started.is_set():
-                self._failure = error.get("message") or "The OpenAI Realtime API rejected the practice session."
+                self._failure = error.get("message") or "The realtime AI engine could not start the practice session."
 
     def _interrupt(self) -> None:
         """The candidate talked over the interviewer: stop playback and drop what they did not hear."""

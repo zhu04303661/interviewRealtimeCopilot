@@ -98,7 +98,7 @@ class TranscriptionStream:
         if self.state == "closed" or self._finishing:
             return
         if self._queued_bytes + len(pcm) > self._limits.max_queued_audio_bytes:
-            self.stop("OpenAI transcription could not keep up with the audio stream.")
+            self.stop("Live transcription could not keep up with the audio stream.")
             return
         self._queue.append(pcm)
         self._queued_bytes += len(pcm)
@@ -160,7 +160,7 @@ class TranscriptionStream:
             self._socket = await asyncio.wait_for(self._openai.transcription_socket(self._key),
                                                   self._limits.asr_connect_timeout_s)
         except TimeoutError:
-            self.stop("Timed out connecting to OpenAI transcription.")
+            self.stop("Timed out connecting to live transcription.")
             return
         except ProviderError as error:
             self.stop(str(error))
@@ -183,7 +183,7 @@ class TranscriptionStream:
             pass
         finally:
             ready.cancel()
-        self.stop("The OpenAI transcription connection closed.")
+        self.stop("The live transcription connection closed.")
 
     async def _configure(self) -> None:
         config = self._hints.session_config(self._model, minimal=self._minimal_config)
@@ -191,7 +191,7 @@ class TranscriptionStream:
 
     def _connect_timed_out(self) -> None:
         if self.state == "connecting":
-            self.stop("Timed out connecting to OpenAI transcription.")
+            self.stop("Timed out connecting to live transcription.")
 
     def _handle(self, event: dict) -> None:
         kind = event.get("type")
@@ -253,7 +253,7 @@ class TranscriptionStream:
                 if self._finishing and not self._queue and not self._commit_pending and not self._awaiting:
                     self._finished.set()
         except (aiohttp.ClientError, ConnectionError, RuntimeError):
-            self.stop("Could not send audio to OpenAI transcription.")
+            self.stop("Could not send audio to live transcription.")
 
     async def _commit(self) -> None:
         if self._turn_bytes >= self._limits.min_turn_bytes:

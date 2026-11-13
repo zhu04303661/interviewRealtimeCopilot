@@ -101,3 +101,34 @@ def test_signature_rejects_old_or_wrong():
     old = int(time.time()) - 3600
     header = f"t={old},v1=" + hmac.new(b"whsec_test", f"{old}.".encode() + payload, hashlib.sha256).hexdigest()
     assert not verify_stripe_signature(payload, header, "whsec_test")
+
+
+async def test_waitlist_emails_the_team_once(site, monkeypatch):
+    import asyncio
+
+    from irc_web import notify
+    sent = []
+    monkeypatch.setenv("IRC_SMTP_HOST", "smtp.test")
+    monkeypatch.setenv("IRC_NOTIFY_TO", "support@example.com")
+    monkeypatch.setattr(notify, "_send", lambda subject, body, reply_to: sent.append((subject, reply_to)))
+    assert (await post(site, "/api/waitlist", {"email": "d@example.com", "topic": "windows"})).status == 200
+    assert (await post(site, "/api/waitlist", {"email": "d@example.com", "topic": "windows"})).status == 200  # repeat: no second email
+    await asyncio.sleep(0.1)
+    assert sent == [("New sign-up: d@example.com wants windows", "d@example.com")]
+
+
+async def test_wishlist_is_stored_and_emailed(site, monkeypatch):
+    import asyncio
+
+    from irc_web import notify
+    sent = []
+    monkeypatch.setenv("IRC_SMTP_HOST", "smtp.test")
+    monkeypatch.setenv("IRC_NOTIFY_TO", "support@example.com")
+    monkeypatch.setattr(notify, "_send", lambda subject, body, reply_to: sent.append((subject, body, reply_to)))
+    assert (await post(site, "/api/wish", {"text": "hi"})).status == 422
+    assert (await post(site, "/api/wish", {"text": "Please support Windows", "email": "bad"})).status == 422
+    assert (await post(site, "/api/wish", {"text": "Please support Windows and Teams captions", "email": "W@example.com"})).status == 200
+    assert (await post(site, "/api/wish", {"text": "Anonymous idea: dark mode for the docs"})).status == 200
+    await asyncio.sleep(0.1)
+    assert sent[0][0].startswith("Wishlist: Please support Windows") and sent[0][2] == "w@example.com" and "Teams captions" in sent[0][1]
+    assert sent[1][2] is None and "(no email left)" in sent[1][1]

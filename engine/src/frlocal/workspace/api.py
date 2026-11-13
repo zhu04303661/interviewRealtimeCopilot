@@ -223,7 +223,7 @@ class WorkspaceApi:
                 fail(404, "Local file was not found.")
             return envelope({"url": f"{PUBLIC_ORIGIN}/local-files/{item['id']}"})
         if key == "GET model-list":
-            return envelope([{"id": self.settings.models.coaching, "name": "OpenAI GPT-5.4 mini"}] if self.openai.api_key() else [])
+            return envelope([{"id": self.settings.models.coaching, "name": "Realtime AI engine"}] if self.openai.api_key() else [])
         if key == "GET preference/get":
             return envelope(state["preferences"])
         if key == "POST preference/update":

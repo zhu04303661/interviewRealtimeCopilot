@@ -38,12 +38,12 @@ def describe_failure(status: int | None = None, code: str | None = None) -> str:
     if status == 402 or code == "quota_exceeded":
         return "Your monthly AI allowance is used up. Subscribe in Settings → Account to continue."
     if status == 401 or code == "invalid_api_key":
-        return "OpenAI rejected the configured API key."
+        return "The AI engine could not verify your sign-in. Sign out and sign in again."
     if status in (403, 404) or code == "model_not_found":
-        return "This OpenAI project does not have access to the requested model."
+        return "This AI feature is temporarily unavailable. Please try again shortly."
     if status == 429 or code in ("insufficient_quota", "rate_limit_exceeded"):
-        return "The OpenAI project is over its rate or usage limit."
-    return "The local backend could not complete the OpenAI request."
+        return "The AI engine is busy right now. Please try again in a moment."
+    return "The AI engine could not be reached. Check your internet connection."
 
 
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
@@ -107,7 +107,7 @@ class OpenAI:
     def require_key(self) -> str:
         key = self.api_key()
         if not key:
-            raise ProviderError("Set OPENAI_API_KEY in the local backend to use live transcription and AI coaching.")
+            raise ProviderError("Sign in to use the AI engine.")
         return key
 
     async def set_proxy(self, proxy: str | None) -> None:
@@ -181,7 +181,7 @@ class OpenAI:
             raise ProviderError(describe_failure()) from error
         text = output_text(payload)
         if not text:
-            raise ProviderError("OpenAI returned no text for this request.")
+            raise ProviderError("The AI engine returned no answer for this request.")
         return text
 
     async def stream(self, body: dict[str, Any], *, timeout: float, key: str | None = None) -> AsyncIterator[str]:
@@ -240,7 +240,7 @@ class OpenAI:
         except aiohttp.WSServerHandshakeError as error:
             raise ProviderError(describe_failure(error.status)) from error
         except (TimeoutError, aiohttp.ClientError) as error:
-            raise ProviderError("Could not connect to the OpenAI Realtime API.") from error
+            raise ProviderError("Could not connect to the realtime AI engine.") from error
 
     async def live_socket(self, key: str) -> aiohttp.ClientWebSocketResponse:
         """Open a GPT-Live voice session WebSocket (``session.start`` is sent by the caller)."""
@@ -252,7 +252,7 @@ class OpenAI:
         except aiohttp.WSServerHandshakeError as error:
             raise ProviderError(describe_failure(error.status)) from error
         except (TimeoutError, aiohttp.ClientError) as error:
-            raise ProviderError("Could not connect to OpenAI GPT-Live.") from error
+            raise ProviderError("Could not connect to the realtime AI engine.") from error
 
     async def transcription_socket(self, key: str) -> aiohttp.ClientWebSocketResponse:
         """Open a realtime transcription WebSocket."""
@@ -264,7 +264,7 @@ class OpenAI:
         except aiohttp.WSServerHandshakeError as error:
             raise ProviderError(describe_failure(error.status)) from error
         except (TimeoutError, aiohttp.ClientError) as error:
-            raise ProviderError("Could not connect to OpenAI transcription.") from error
+            raise ProviderError("Could not connect to live transcription.") from error
 
 
 def output_text(payload: Any) -> str:

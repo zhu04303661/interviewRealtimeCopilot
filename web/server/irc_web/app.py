@@ -10,6 +10,7 @@ subscriptions in SQLite:
     POST /api/checkout    {plan: "monthly"|"yearly"} Stripe Checkout URL
     POST /api/portal                                Stripe billing portal URL
     POST /api/waitlist    {email, topic}            notify-me sign-ups
+    POST /api/wish        {text, email?}            feature wishlist (stored and emailed to the team)
     POST /api/stripe/webhook                        subscription updates from Stripe
 
 Desktop app (Authorization: Bearer <device token>; see billing.py and relay.py):
@@ -28,6 +29,7 @@ answers 503 and everything else works.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -42,7 +44,7 @@ from typing import Any
 import aiohttp
 from aiohttp import web
 
-from . import relay
+from . import notify, relay
 from .billing import Billing
 
 STATIC = Path(__file__).resolve().parent.parent.parent / "static"
@@ -58,6 +60,7 @@ create table if not exists users (id integer primary key, email text unique not 
   created_at integer not null, stripe_customer text, plan text, status text, current_period_end integer);
 create table if not exists sessions (token text primary key, user_id integer not null, expires_at integer not null);
 create table if not exists waitlist (email text not null, topic text not null, created_at integer not null, primary key (email, topic));
+create table if not exists wishes (id integer primary key, email text, text text not null, page text, created_at integer not null);
 create table if not exists stripe_events (id text primary key, received_at integer not null);
 """
 
@@ -279,6 +282,12 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         session = await stripe("/v1/billing_portal/sessions", {"customer": user["stripe_customer"], "return_url": f"{origin}/account.html"})
         return web.json_response({"url": session["url"]})
 
+    tasks: set[asyncio.Task] = set()  # notification emails in flight (kept referenced until done)
+
+    def background(request: web.Request, coro) -> None:
+        tasks.add(task := asyncio.create_task(coro))
+        task.add_done_callback(tasks.discard)
+
     async def waitlist(request: web.Request) -> web.Response:
         if limited(request, f"waitlist:{request.remote}", 10):
             return fail(429, "Too many attempts. Try again later.")
@@ -287,7 +296,31 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         topic = str(body.get("topic", "download"))[:40]
         if not EMAIL.match(email):
             return fail(422, "Enter a valid email address.")
-        store.db.execute("insert or ignore into waitlist values (?, ?, ?)", (email, topic, int(time.time())))
+        added = store.db.execute("insert or ignore into waitlist values (?, ?, ?)", (email, topic, int(time.time()))).rowcount
+        if added:  # tell the team about each new sign-up (not repeats); in the background so the visitor never waits
+            background(request, notify.notify(
+                f"New sign-up: {email} wants {topic}",
+                f"{email} left their email on {origin} to hear about: {topic}.\nTime (UTC): {time.strftime('%Y-%m-%d %H:%M', time.gmtime())}\n"
+                f"Reply to this email to write to them directly.", reply_to=email))
+        return web.json_response({"ok": True})
+
+    async def wish(request: web.Request) -> web.Response:
+        if limited(request, f"wish:{request.remote}", 10, 3600):
+            return fail(429, "Too many attempts. Try again later.")
+        body = await request.json()
+        text = str(body.get("text", "")).strip()
+        email = str(body.get("email", "")).strip().lower()
+        if not 5 <= len(text) <= 3000:
+            return fail(422, "Describe your idea in 5 to 3000 characters.")
+        if email and not EMAIL.match(email):
+            return fail(422, "Enter a valid email address, or leave it empty.")
+        user = current(request)
+        email = email or (user["email"] if user else "")
+        store.db.execute("insert into wishes (email, text, page, created_at) values (?, ?, ?, ?)",
+                         (email or None, text, str(body.get("page", ""))[:200], int(time.time())))
+        background(request, notify.notify(f"Wishlist: {text[:60]}{'…' if len(text) > 60 else ''}",
+                                          f"From: {email or '(no email left)'}\nTime (UTC): {time.strftime('%Y-%m-%d %H:%M', time.gmtime())}\n\n{text}\n",
+                                          reply_to=email or None))
         return web.json_response({"ok": True})
 
     async def webhook(request: web.Request) -> web.Response:
@@ -326,7 +359,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         web.get("/api/v1/me", device_me), web.post("/api/v1/auth/web-link", web_link), web.get("/auth/link", redeem_link),
         web.post("/api/signup", signup), web.post("/api/login", login), web.post("/api/logout", logout),
         web.get("/api/me", me), web.post("/api/checkout", checkout), web.post("/api/portal", portal),
-        web.post("/api/waitlist", waitlist), web.post("/api/stripe/webhook", webhook),
+        web.post("/api/waitlist", waitlist), web.post("/api/wish", wish), web.post("/api/stripe/webhook", webhook),
         web.get("/", page), web.get("/{name:.+}", page),
     ])
     return app

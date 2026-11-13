@@ -74,7 +74,7 @@ def setup(app: web.Application, billing: Billing, origin: str, upstream: str, cu
         tail = request.match_info["tail"]
         key = billing.openai_key()
         if not key:
-            return fail(503, "The AI service is not configured yet.", "not_configured")
+            return fail(503, "The AI engine is temporarily unavailable.", "not_configured")
         if billing.balance_micro(user) <= 0:
             return web.json_response(quota_body(origin), status=402)
         if tail in WS_PATHS:
@@ -128,7 +128,7 @@ def setup(app: web.Application, billing: Billing, origin: str, upstream: str, cu
             up = await request.app["openai_http"].ws_connect(f"{ws_upstream}/{tail}", params=request.query, headers=headers, heartbeat=30,
                                                           max_msg_size=0, **proxy)
         except aiohttp.WSServerHandshakeError as error:
-            return fail(error.status or 502, "OpenAI refused the connection.", "upstream")
+            return fail(error.status or 502, "The AI engine is temporarily unavailable.", "upstream")
         down = web.WebSocketResponse(heartbeat=30, max_msg_size=0)
         await down.prepare(request)
 

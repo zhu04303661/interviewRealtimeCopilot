@@ -38,3 +38,6 @@
 - `IRC_DATA_DIR` must point at a temporary folder in tests; the default is the user's real data.
 - The packaged app keeps Electron's executable name, so `app.isPackaged` is false; main.ts detects `Resources/engine` instead.
 - The packaged engine reads OPENAI_API_KEY from `<data dir>/openai.env` (Settings → Account), then `~/.env`.
+- User-facing wording never names the AI provider or models (say "realtime AI engine"); the privacy text says audio is processed
+  by our AI engine and trusted AI processing partners. Code, comments and logs may name OpenAI.
+- Team notifications (notify-me sign-ups, wishlist) go by SMTP: set IRC_SMTP_HOST/PORT/USER/PASSWORD/FROM and IRC_NOTIFY_TO in /etc/irc-web.env.

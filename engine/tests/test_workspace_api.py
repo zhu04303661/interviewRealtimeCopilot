@@ -120,7 +120,7 @@ async def test_session_start_requires_a_key_and_a_supported_mode(signed_in, monk
     assert "speaker separation" in phone["detail"]
     monkeypatch.delenv("OPENAI_API_KEY")
     missing = await b.call("POST", "/api/v3/sessions", json={"topology": "general", "goal_id": goal["goal_id"]}, expect=422)
-    assert "OPENAI_API_KEY" in missing["detail"]
+    assert "Sign in" in missing["detail"]
     assert (await b.call("GET", "/api/model-list"))["data"] == []
 
 

@@ -80,9 +80,9 @@ class LiveConversation:
             await asyncio.wait_for(self.started.wait(), self._limits.live_start_timeout_s)
         except TimeoutError:
             await self.close()
-            raise ProviderError("OpenAI GPT-Live did not start the session in time.") from None
+            raise ProviderError("The realtime AI engine did not start the session in time.") from None
         if self.closed:
-            raise ProviderError("OpenAI GPT-Live rejected the practice session.")
+            raise ProviderError("The realtime AI engine could not start the practice session.")
         self._tasks.append(loop.create_task(self._keep_stream_alive()))
         # The startup developer message makes the greeting likely; this asks for it explicitly.
         await self._send({"type": "session.commentary.append", "delegation_id": None, "content": self._greeting})
@@ -184,7 +184,7 @@ class LiveConversation:
             error = event.get("error") or {}
             log.warning("GPT-Live error: %s %s", error.get("code"), error.get("message"))
             if not self.started.is_set():
-                return error.get("message") or "OpenAI GPT-Live rejected the practice session."
+                return error.get("message") or "The realtime AI engine could not start the practice session."
         elif kind == "session.closed":
             return "closed"
         return None
