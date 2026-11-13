@@ -55,7 +55,7 @@ function cockpitDemo(root) {
     speak(null); phase('upload');
     const sources = el(`<div class="sources fade-in"><span class="stamp">${tr('up.title')}</span></div>`);
     body.append(sources);
-    for (const [file, size] of [['Resume_Zhu_Enqing.pdf', '2 pages'], ['AccelerComm_Interview_Prep.md', '115k chars'], ['System_Model_Framework.pdf', '38 pages']]) {
+    for (const [file, size] of [['Resume_Li_Ming.pdf', '2 pages'], ['AccelerComm_Interview_Prep.md', '115k chars'], ['System_Model_Framework.pdf', '38 pages']]) {
       const row = el(`<div class="src fade-in"><span>📄 ${file}</span><span class="faint">${size}</span><span class="badge-s">${tr('up.reading')}</span></div>`);
       sources.append(row); await wait(500); if (!alive()) return;
       row.querySelector('.badge-s').textContent = tr('up.ready'); row.querySelector('.badge-s').classList.add('ok');

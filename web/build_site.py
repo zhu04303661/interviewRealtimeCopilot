@@ -37,7 +37,7 @@ COCKPIT = ('<div class="stage"><div class="scene" data-scene>'
            + '<span class="spacer"></span><span class="faint">45:12</span></div>'
            '<div class="tiles"><div class="tile-v" data-speaker="interviewer"><div class="avatar">AK</div><span class="name">'
            + t("scene.interviewer", "Interviewer", "面试官") + '</span><span class="wave"><i></i><i></i><i></i></span></div>'
-           '<div class="tile-v" data-speaker="me"><div class="avatar me">ZE</div><span class="name">' + t("scene.you", "You", "你")
+           '<div class="tile-v" data-speaker="me"><div class="avatar me">LM</div><span class="name">' + t("scene.you", "You", "你")
            + '</span><span class="wave"><i></i><i></i><i></i></span></div></div>'
            '<div class="controls"><span>🎙</span><span>📷</span><span>🖥</span><span class="leave">✕</span></div></div>'
            # The cockpit floating above it; never captured by screen sharing.
