@@ -244,3 +244,25 @@ footer .wrap { display: flex; gap: 26px; flex-wrap: wrap; align-items: center; }
 .docs-toc { display: grid; gap: 8px; } .docs-toc a { color: var(--faint); font-size: 13.5px; } .docs-toc a.on, .docs-toc a:hover { color: #b8c4ff; }
 @media (max-width: 1100px) { .docs { grid-template-columns: 220px minmax(0, 1fr); } .docs-toc { display: none; } }
 @media (max-width: 760px) { .docs { grid-template-columns: 1fr; } .docs-nav { position: static; max-height: none; } .doc-cards { grid-template-columns: 1fr; } }
+
+/* ── wide screens: use the width instead of a fixed 1180px column ── */
+.wrap { max-width: min(1400px, 92vw); }
+.hero-grid { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: clamp(40px, 4vw, 80px); }
+.scene { height: clamp(520px, 34vw, 700px); }
+.scene .meeting { inset: 50px 30% 40px 0; }
+.scene .mock { width: 60%; max-width: 520px; }
+.scene .mock-body { height: calc(clamp(520px, 34vw, 700px) - 150px); }
+.stats div { border-left: 0; } .stats > div + div { border-left: 1px solid var(--line); }
+@media (min-width: 1600px) {
+  :root { font-size: 17px; }
+  .wrap { max-width: min(1560px, 90vw); }
+  h1 { font-size: clamp(64px, 4.6vw, 96px); }
+  h2 { font-size: clamp(40px, 3vw, 60px); }
+  .lead { font-size: 21px; max-width: 760px; }
+  .tile { padding: 36px; } .tile h3 { font-size: 21px; }
+}
+@media (min-width: 2200px) { :root { font-size: 18px; } .wrap { max-width: 1800px; } }
+@media (max-width: 960px) { .stats > div + div { border-left: 0; } .stats > div:nth-child(n+3) { border-top: 1px solid var(--line); } .stats > div:nth-child(even) { border-left: 1px solid var(--line); } }
+.hero h1 { font-size: clamp(40px, 4.6vw, 74px); } html[lang="zh-CN"] .hero h1 > span { white-space: nowrap; }
+@media (min-width: 1600px) { .hero h1 { font-size: clamp(64px, 3.7vw, 86px); } }
+@media (max-width: 960px) { .hero h1 { font-size: clamp(36px, 9vw, 60px); } .hero h1 > span { white-space: normal; } }

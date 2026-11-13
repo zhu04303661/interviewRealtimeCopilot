@@ -2,6 +2,8 @@
 document.documentElement.classList.add('js');  // enables scroll reveal; content stays visible without JS
 const LANGS = { en: 'English', zh: '中文' };
 let lang = localStorage.getItem('lang') || (navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en');
+const urlLang = new URLSearchParams(location.search).get('lang');  // ?lang=en|zh: share a link in one language
+if (urlLang in LANGS) { lang = urlLang; localStorage.setItem('lang', lang); }
 const tr = (key, vars = {}) => Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, v), (window.I18N[lang] || {})[key] ?? window.I18N.en[key] ?? key);
 
 function applyLanguage() {
