@@ -271,6 +271,8 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
             "line_items[0][price_data][unit_amount]": str(plan["amount"]),
             "line_items[0][price_data][recurring][interval]": plan["interval"],
             "line_items[0][price_data][product_data][name]": plan["name"],
+            # Stripe Tax / Managed Payments need the product's tax category: software as a service, personal use.
+            "line_items[0][price_data][product_data][tax_code]": os.environ.get("STRIPE_TAX_CODE", "txcd_10103000"),
             "metadata[plan]": key, "subscription_data[metadata][plan]": key,
         }
         if user["stripe_customer"]:
