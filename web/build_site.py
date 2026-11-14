@@ -88,8 +88,8 @@ LD = json.dumps({"@context": "https://schema.org", "@graph": [
      "description": "AI interview assistant (AI面试助手) that listens to live interviews, translates English and Chinese in real time, detects each question and suggests answers from your own resume; solves coding questions from your screen; spoken mock interviews and debriefs.",
      "publisher": {"@type": "Organization", "name": "Interview Realtime Copilot", "url": "https://copilot.xichiuk.com",
                    "contactPoint": {"@type": "ContactPoint", "contactType": "customer support", "email": SUPPORT_EMAIL, "availableLanguage": ["English", "Chinese"]}},
-     "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free"}, {"@type": "Offer", "price": "29", "priceCurrency": "USD", "name": "Pro monthly"},
-                {"@type": "Offer", "price": "199", "priceCurrency": "USD", "name": "Pro yearly"}]},
+     "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "GBP", "name": "Free"}, {"@type": "Offer", "price": "25", "priceCurrency": "GBP", "name": "Pro monthly"},
+                {"@type": "Offer", "price": "169", "priceCurrency": "GBP", "name": "Pro yearly"}]},
     {"@type": "FAQPage", "mainEntity": [
         {"@type": "Question", "name": "What is an AI interview assistant (面试外挂 / AI面试助手)?", "acceptedAnswer": {"@type": "Answer", "text": "A desktop app that listens to your live interview, recognises each question and shows a short answer drawn from your own resume and notes, with English–Chinese translation."}},
         {"@type": "Question", "name": "Can it help if my English is not fluent?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every interviewer line is translated into Chinese as it is spoken, and hints give natural English you can say directly."}},
@@ -274,17 +274,17 @@ def build() -> None:
 <h1>{t("pr.h1a", "Simple plans.", "简单的方案，")}<br><span class="grad-text">{t("pr.h1b", "Cancel anytime.", "随时可取消。")}</span></h1>
 {t("pr.lead", "Our realtime AI engine is included as a monthly allowance — nothing to set up, no surprise bills.", "每月包含实时 AI 引擎使用额度——无需任何配置，没有意外账单。", "p", "lead")}<div id="checkout-note"></div>
 <div class="plans">
-<div class="plan">{t("plan.free.name", "Free", "免费版", "h3")}<div class="price">$0</div>{t("plan.free.sub", "Try it on your next practice.", "在下一次练习中试试。", "p", "muted small")}
-<ul><li>{t("plan.free.1", "$1 of AI usage every month — about 2 practice sessions", "每月 $1 AI 额度，约可做 2 次语音练习")}</li><li>{t("plan.free.2", "Live translation and hints", "实时翻译与提示")}</li><li>{t("plan.free.3", "Prepared-question extraction", "自动提取准备题")}</li><li>{t("plan.free.4", "A debrief after each session", "每场会话的复盘")}</li></ul>
+<div class="plan">{t("plan.free.name", "Free", "免费版", "h3")}<div class="price">£0</div>{t("plan.free.sub", "Try it on your next practice.", "在下一次练习中试试。", "p", "muted small")}
+<ul><li>{t("plan.free.1", "A monthly AI allowance — about 2 practice sessions", "每月 AI 额度，约可做 2 次语音练习")}</li><li>{t("plan.free.2", "Live translation and hints", "实时翻译与提示")}</li><li>{t("plan.free.3", "Prepared-question extraction", "自动提取准备题")}</li><li>{t("plan.free.4", "A debrief after each session", "每场会话的复盘")}</li></ul>
 <a class="btn" href="/download.html">{t("cta.download", "Download for macOS", "下载 macOS 版")}</a></div>
-<div class="plan">{t("plan.monthly.name", "Pro monthly", "Pro 月付", "h3")}<div class="price">$29<small>{t("per.month", " / month", " / 月")}</small></div>{t("plan.monthly.sub", "For an active job search.", "适合正在求职。", "p", "muted small")}
-<ul><li>{t("plan.pro.1", "$20 of AI usage every month — hours of live interviews", "每月 $20 AI 额度，足够数小时实时面试")}</li><li>{t("plan.pro.2", "Spoken practice and debriefs", "语音练习与复盘")}</li><li>{t("plan.pro.3", "Solve screen and auto-capture", "截屏解答与自动截屏")}</li><li>{t("plan.pro.4", "Recordings and full debriefs", "录音与完整复盘")}</li></ul>
+<div class="plan">{t("plan.monthly.name", "Pro monthly", "Pro 月付", "h3")}<div class="price">£25<small>{t("per.month", " / month", " / 月")}</small></div>{t("plan.monthly.sub", "For an active job search.", "适合正在求职。", "p", "muted small")}
+<ul><li>{t("plan.pro.1", "20× the free AI allowance every month — hours of live interviews", "每月 AI 额度为免费版的 20 倍，足够数小时实时面试")}</li><li>{t("plan.pro.2", "Spoken practice and debriefs", "语音练习与复盘")}</li><li>{t("plan.pro.3", "Solve screen and auto-capture", "截屏解答与自动截屏")}</li><li>{t("plan.pro.4", "Recordings and full debriefs", "录音与完整复盘")}</li></ul>
 {plan_cta("monthly", "Subscribe monthly", "订阅月付")}</div>
-<div class="plan featured"><span class="tag">{t("plan.best", "BEST VALUE", "最划算")}</span>{t("plan.yearly.name", "Pro yearly", "Pro 年付", "h3")}<div class="price">$199<small>{t("per.year", " / year", " / 年")}</small></div>{t("plan.yearly.sub", "Save 43% — about $16.60 a month.", "节省 43%，约每月 $16.60。", "p", "muted small")}
+<div class="plan featured"><span class="tag">{t("plan.best", "BEST VALUE", "最划算")}</span>{t("plan.yearly.name", "Pro yearly", "Pro 年付", "h3")}<div class="price">£169<small>{t("per.year", " / year", " / 年")}</small></div>{t("plan.yearly.sub", "Save 43% — about £14 a month.", "节省 43%，约每月 £14。", "p", "muted small")}
 <ul><li>{t("plan.y.1", "Everything in Pro monthly", "包含 Pro 月付全部功能")}</li><li>{t("plan.y.2", "Early access to Windows", "抢先体验 Windows 版")}</li><li>{t("plan.y.3", "Priority support", "优先支持")}</li></ul>
-{plan_cta("yearly", "Subscribe yearly", "订阅年付")}</div></div><p class="error" id="checkout-error"></p></div></section>
+{plan_cta("yearly", "Subscribe yearly", "订阅年付")}</div></div>{t("pr.tax", "Prices are in pounds sterling and exclude tax; your local VAT or sales tax is added at checkout.", "价格以英镑计，不含税；结账时会按你所在地区加收增值税或销售税。", "p", "faint small")}<p class="error" id="checkout-error"></p></div></section>
 <section style="padding-top:0"><div class="wrap"><h2 class="center">{t("faq.h2", "Questions", "常见问题")}</h2><div class="faq">
-<details><summary>{t("faq.1q", "Do I need to set anything up for the AI?", "AI 需要我自己配置什么吗？")}</summary>{t("faq.1a", "No. Sign in and the realtime AI engine is ready. Every plan includes a monthly allowance (Free $1, Pro $20); when it runs out, the app tells you and you can upgrade.", "不需要。登录即可使用实时 AI 引擎。每个套餐都含每月额度（免费 $1，Pro $20），用完时应用会提示你升级。", "p")}</details>
+<details><summary>{t("faq.1q", "Do I need to set anything up for the AI?", "AI 需要我自己配置什么吗？")}</summary>{t("faq.1a", "No. Sign in and the realtime AI engine is ready. Every plan includes a monthly allowance (Pro has 20 times the free one); when it runs out, the app tells you and you can upgrade.", "不需要。登录即可使用实时 AI 引擎。每个套餐都含每月额度（Pro 是免费版的 20 倍），用完时应用会提示你升级。", "p")}</details>
 <details><summary>{t("faq.2q", "Where is my data stored?", "我的数据存在哪里？")}</summary>{t("faq.2a", "On your Mac: documents, transcripts, debriefs and recordings. Only the audio and text needed for a live answer are processed by our AI engine during a session.", "在你的 Mac 上：资料、字幕、复盘和录音。只有会话中生成回答所需的音频和文字会交给我们的 AI 引擎处理。", "p")}</details>
 <details><summary>{t("faq.3q", "Can I cancel?", "可以取消吗？")}</summary>{t("faq.3a", "Yes, anytime from your account page. Pro stays active until the end of the paid period.", "可以，随时在账号页取消，已付费周期内仍可使用 Pro。", "p")}</details>
 <details><summary>{t("faq.4q", "Which platforms are supported?", "支持哪些系统？")}</summary>{t("faq.4a", "macOS 14.2 or later today; Windows is coming.", "目前支持 macOS 14.2 及以上，Windows 即将推出。", "p")}</details>
@@ -323,8 +323,8 @@ def build() -> None:
                         ("acc.upgrade", "Upgrade to Pro", "升级到 Pro"), ("acc.download", "Download the app", "下载应用"), ("acc.signout", "Sign out", "退出登录"),
                         ("acc.paid", "Payment received — Pro activates as soon as Stripe confirms it, usually within seconds.", "已收到付款——Stripe 确认后立即开通 Pro，通常只需几秒。"),
                         ("pr.cancelled", "Checkout was cancelled — nothing was charged.", "已取消支付，未产生扣款。"),
-                        ("acc.usage", "AI allowance for {month}: ${used} of ${total} used", "{month} AI 额度：已用 ${used} / ${total}"),
-                        ("acc.balance", "Remaining: ${balance}", "剩余：${balance}"), ("acc.credit", "includes ${credit} credit", "含 ${credit} 余额"),
+                        ("acc.usage", "AI allowance for {month}: {percent}% used", "{month} AI 额度：已用 {percent}%"),
+                        ("acc.balance", "Remaining: {percent}%", "剩余：{percent}%"), ("acc.credit", "plus extra credit on your account", "另有账户余额"),
                         ("acc.empty", "This month's AI allowance is used up. Upgrade to Pro for a larger monthly allowance.", "本月 AI 额度已用完，升级 Pro 可获得更多每月额度。")]:
         t(key, en, zh)
 
@@ -388,7 +388,7 @@ def build() -> None:
     urls = "".join(f"<url><loc>{SITE}/{prefix}{p}</loc></url>" for p in public for prefix in ("", "zh/"))
     (STATIC / "sitemap.xml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')
     (STATIC / "llms.txt").write_text("""# Interview Realtime Copilot
-> AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro $29/month or $199/year.
+> AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro £25/month or £169/year (plus local tax).
 
 - [Use cases](https://copilot.xichiuk.com/use-cases.html): cross-language interviews, expert answers, last-minute preparation, coding questions from the screen
 - [Demo](https://copilot.xichiuk.com/demo.html)

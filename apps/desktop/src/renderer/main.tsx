@@ -93,8 +93,8 @@ function CloudPlan() {
     <h4 className="setting-group">Plan &amp; AI allowance · 套餐与额度</h4>
     {!user ? <p className="muted small">{state?.offline ? 'Cannot reach the account service right now. · 暂时无法连接账号服务。' : 'Loading… · 加载中…'}</p> : <>
       <Setting title={pro ? (user.plan === 'yearly' ? 'Pro yearly · Pro 年付' : 'Pro monthly · Pro 月付') : 'Free · 免费版'}
-        what={`${user.usage.month}: $${user.usage.used_usd.toFixed(2)} of $${user.usage.allowance_usd.toFixed(2)} used · 已用 ${user.usage.used_percent}%` +
-          (user.usage.credit_usd > 0 ? ` · credit $${user.usage.credit_usd.toFixed(2)}` : '')}>
+        what={`AI allowance for ${user.usage.month}: ${user.usage.used_percent}% used · 本月额度已用 ${user.usage.used_percent}%` +
+          (user.usage.credit_usd > 0 ? ' · plus extra credit · 另有余额' : '')}>
         <button className="btn sm primary" onClick={() => window.copilot.cloudOpen(pro ? '/account.html' : '/pricing.html')}>{pro ? 'Manage billing · 管理订阅' : 'Subscribe · 订阅'}</button>
         <button className="btn sm" onClick={refresh}>Refresh · 刷新</button>
       </Setting>

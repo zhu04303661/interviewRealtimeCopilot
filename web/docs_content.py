@@ -63,7 +63,9 @@ DOCS = [
              lead=("Every plan includes a monthly allowance of the realtime AI engine — nothing to set up.", "每个套餐都包含每月实时 AI 引擎额度，无需任何配置。"),
              blocks=[
                  ("table", [("Plan", "套餐"), ("Price", "价格"), ("AI allowance per month", "每月 AI 额度")], [
-                     [("Free", "免费版"), "$0", "$1"], [("Pro monthly", "Pro 月付"), ("$29 / month", "$29 / 月"), "$20"], [("Pro yearly", "Pro 年付"), ("$199 / year", "$199 / 年"), "$20"]]),
+                     [("Free", "免费版"), "£0", ("About 2 practice sessions", "约 2 次语音练习")], [("Pro monthly", "Pro 月付"), ("£25 / month", "£25 / 月"), ("20× the free allowance", "免费版的 20 倍")],
+                     [("Pro yearly", "Pro 年付"), ("£169 / year", "£169 / 年"), ("20× the free allowance", "免费版的 20 倍")]]),
+                 ("p", "Prices exclude tax; your local VAT or sales tax is added at checkout.", "价格不含税，结账时会按你所在地区加收增值税或销售税。"),
                  ("ul", [("The allowance resets on the 1st of each month (UTC). Settings → Account shows what you have used and what is left.", "额度在每月 1 日（UTC）重置；「设置 → 账号」显示已用和剩余额度。"),
                          ("Spoken practice uses the most (realtime voice); live hints and translation use less; debriefs cost a few cents.", "语音练习消耗最多（实时语音），实时提示和翻译较少，复盘每次只需几美分。"),
                          ("When the allowance is used up, the cockpit says so; subscribe to Pro for a larger monthly allowance.", "额度用完时面试窗口会提示，订阅 Pro 即可获得更多每月额度。")]),

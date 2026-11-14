@@ -52,9 +52,10 @@ from .billing import month_key as billing_month
 STATIC = Path(__file__).resolve().parent.parent.parent / "static"
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}$")
 SESSION_DAYS = 30
-PLANS = {  # amounts in cents
-    "monthly": {"amount": 2900, "interval": "month", "name": "Interview Realtime Copilot Pro (monthly)"},
-    "yearly": {"amount": 19900, "interval": "year", "name": "Interview Realtime Copilot Pro (yearly)"},
+CURRENCY = "gbp"
+PLANS = {  # amounts in pence, before tax (Stripe adds the buyer's local tax at checkout)
+    "monthly": {"amount": 2500, "interval": "month", "name": "Interview Realtime Copilot Pro (monthly)"},
+    "yearly": {"amount": 16900, "interval": "year", "name": "Interview Realtime Copilot Pro (yearly)"},
 }
 KDF = {"n": 2**14, "r": 8, "p": 1, "dklen": 32}
 SCHEMA = """
@@ -267,7 +268,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         form = {
             "mode": "subscription", "client_reference_id": str(user["id"]), "customer_email": user["email"],
             "success_url": f"{origin}/account.html?checkout=success", "cancel_url": f"{origin}/pricing.html?checkout=cancelled",
-            "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": "usd",
+            "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": CURRENCY,
             "line_items[0][price_data][unit_amount]": str(plan["amount"]),
             "line_items[0][price_data][recurring][interval]": plan["interval"],
             "line_items[0][price_data][product_data][name]": plan["name"],

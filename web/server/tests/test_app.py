@@ -74,7 +74,7 @@ async def test_checkout_webhook_and_portal(site):
     response = await post(site, "/api/checkout", {"plan": "yearly"})
     assert (await response.json())["url"].startswith("https://checkout.stripe.test")
     _, form = site.stripe_calls[-1]
-    assert form["mode"] == "subscription" and form["line_items[0][price_data][unit_amount]"] == "19900"
+    assert form["mode"] == "subscription" and form["line_items[0][price_data][unit_amount]"] == "16900" and form["line_items[0][price_data][currency]"] == "gbp"
     assert form["line_items[0][price_data][recurring][interval]"] == "year"
     user_id = form["client_reference_id"]
     event = json.dumps({"id": "evt_1", "type": "checkout.session.completed",
