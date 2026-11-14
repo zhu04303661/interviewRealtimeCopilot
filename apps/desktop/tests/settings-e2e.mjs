@@ -212,6 +212,11 @@ try {
   const notice = await cockpit.waitFor(`[...document.querySelectorAll('.c-banner')].map((b) => b.textContent).find((t) => /screen|屏幕/i.test(t))`, 15000, 'solve-screen feedback');
   const answer = await cockpit.waitFor(`(() => { const a = document.querySelector('.c-answer'); return a && a.innerText.length > 40 && !a.querySelector('.typing') && a.innerText; })()`, 90000, 'screen answer');
   check(/two ?sum|hash|O\(n\)/i.test(answer), `screen answer does not address the test problem: ${answer.slice(0, 200)}`);
+  // The answer carries runnable code in the coding language chosen in Settings (C++ above), shown as a code block.
+  const code = await cockpit.evaluate(`(() => { const c = document.querySelector('.c-answer .c-code'); return c ? { language: c.querySelector('.c-code-head span').textContent, source: c.querySelector('pre').innerText } : null; })()`);
+  check(code && code.source.length > 60, 'Solve screen returned no code block');
+  check(/c\+\+|cpp/i.test(code.language) && /vector|unordered_map|#include/.test(code.source), `code is not C++: ${code.language} ${code.source.slice(0, 120)}`);
+  check(/Complexity/.test(answer) && /Edge cases/.test(answer) && /思路/.test(answer), 'answer lacks complexity, edge cases or the Chinese summary');
   await shot(cockpit, 's7-cockpit');
   log(`Cockpit: background ${bg}, live update to 75%, Solve screen "${notice}" → answer "${answer.replace(/\n+/g, ' ').slice(0, 140)}"`);
   await main.evaluate('window.copilot.endSession()');

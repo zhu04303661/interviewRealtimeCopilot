@@ -40,3 +40,5 @@
 - The packaged engine reads OPENAI_API_KEY from `<data dir>/openai.env` (Settings → Account), then `~/.env`.
 - User-facing wording never names the AI provider or models (say "realtime AI engine"); the privacy text says audio is processed
   by our AI engine and trusted AI processing partners. Code, comments and logs may name OpenAI.
+- Coding-round evaluation (real OpenAI, generated problem images, returned code is executed): `cd engine && uv run python evals/coding_screen.py`;
+  C++ check: `cd engine/evals && uv run --project .. python coding_screen_cpp.py`.

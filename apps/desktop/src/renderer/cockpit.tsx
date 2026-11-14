@@ -77,18 +77,31 @@ function reduce(state: State, frame: Frame): State {
   }
 }
 
-/** Minimal Markdown for answer hints: **bold** headings and "- " bullets. */
+/** Minimal Markdown for answer hints: **bold** headings, "- " bullets and fenced code blocks (with a copy button). */
 function Hint({ text }: { text: string }) {
   const blocks: React.ReactElement[] = [];
   let bullets: string[] = [];
+  let code: string[] | null = null;
+  let codeLanguage = '';
   const flush = () => { if (bullets.length) blocks.push(<ul key={blocks.length}>{bullets.map((b, i) => <li key={i}>{b}</li>)}</ul>); bullets = []; };
+  const flushCode = () => {
+    const source = (code ?? []).join('\n');
+    blocks.push(<div className="c-code" key={blocks.length}>
+      <div className="c-code-head"><span>{codeLanguage || 'code'}</span><button onClick={() => void navigator.clipboard.writeText(source)}>Copy · 复制</button></div>
+      <pre><code>{source}</code></pre></div>);
+    code = null;
+  };
   for (const line of text.split('\n')) {
+    const fence = line.match(/^\s*```\s*([\w+#-]*)\s*$/);
+    if (fence) { if (code) flushCode(); else { flush(); code = []; codeLanguage = fence[1]; } continue; }
+    if (code) { code.push(line); continue; }
     const bold = line.match(/^\*\*(.+)\*\*$/);
     if (bold) { flush(); blocks.push(<div className="lang" key={blocks.length}>{bold[1]}</div>); }
     else if (/^\s*[-*] /.test(line)) bullets.push(line.replace(/^\s*[-*] /, '').replace(/\*\*/g, ''));
     else if (line.trim()) { flush(); blocks.push(<p key={blocks.length} style={{ margin: '4px 0' }}>{line.replace(/\*\*/g, '')}</p>); }
   }
   flush();
+  if (code) flushCode();  // still streaming: show what has arrived
   return <>{blocks}</>;
 }
 

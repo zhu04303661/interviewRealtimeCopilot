@@ -482,6 +482,8 @@ class WorkspaceApi:
     async def screen(self, username: str, request: web.Request, session_id: str) -> web.Response:
         async with self.store.open(username) as workspace:
             session = dict(lookup(workspace.state["sessions"], session_id, "Session"))
+            prefs = workspace.state["prefs"]
+            coding_language = prefs.get("coding_language") or prefs.get("default_coding_language")
         if session.get("ended_at"):
             fail(409, "The interview has already ended.")
         upload = await read_multipart(request, max_bytes=self.settings.limits.max_screenshot_bytes)
@@ -492,7 +494,7 @@ class WorkspaceApi:
         if purpose not in ("context", "solve") or origin not in ("manual", "automatic") or len(command_id) > 100:
             fail(422, "Invalid screen analysis request.")
         return raw(await analyze_screen(
-            self.openai, self.settings, image=upload.data, mime=upload.content_type, purpose=purpose,
+            self.openai, self.settings, image=upload.data, mime=upload.content_type, purpose=purpose, coding_language=coding_language,
             publish=lambda analysis_id, text: self.engine.publish_screen_answer(username, session_id, analysis_id, text)))
 
     async def session(self, workspace: Workspace, request: web.Request, parts: list[str]) -> web.Response:

@@ -23,8 +23,10 @@ class Models:
     understanding: str = "gpt-5.4-mini"
     # Speaker labels for each finished utterance (file transcription with diarization).
     diarization: str = "gpt-4o-transcribe-diarize"
-    # Streamed answer hints, Debrief and screenshot analysis.
+    # Streamed answer hints, Debrief and screenshot summaries.
     coaching: str = "gpt-5.4-mini"
+    # Solve screen: reading a coding or system-design problem from a screenshot and writing a correct solution.
+    screen: str = "gpt-5.4-mini"
     # Spoken practice interviewer: speech-to-speech Realtime model (default) or full-duplex GPT-Live.
     realtime_voice_agent: str = "gpt-realtime-2.1"
     live: str = "gpt-live-1"
