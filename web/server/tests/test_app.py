@@ -133,3 +133,16 @@ async def test_admin_dashboard_is_for_admins_only(site):
     assert messages["wishes"][0]["email"] == "boss@example.com" and messages["waitlist"][0]["email"] == "fan@example.com"
     assert (await (await site.get("/api/admin/usage")).json())["days"] == []
     assert (await (await site.get("/api/me")).json())["user"]["admin"] is True
+
+
+async def test_traffic_counters_and_admin_report(site):
+    browser = {"User-Agent": "Mozilla/5.0 Safari"}
+    for kind, source in (("view", "xiaohongshu"), ("view", "xiaohongshu"), ("download", "xiaohongshu"), ("view", ""), ("bogus", "x")):
+        assert (await post(site, "/api/track", {"kind": kind, "page": "/", "source": source, "lang": "zh"}, **browser)).status == 200
+    await post(site, "/api/track", {"kind": "view", "page": "/", "source": "x"}, **{"User-Agent": "Googlebot"})  # bots are not counted
+    await post(site, "/api/signup", {"email": "boss2@example.com", "password": "long-enough-1"})
+    from irc_web.app import Store
+    Store(site.server.app["db_path"]).db.execute("update users set is_admin = 1")
+    report = await (await site.get("/api/admin/traffic")).json()
+    assert report["totals"]["views"] == 3 and report["totals"]["downloads"] == 1 and report["totals"]["signups"] == 1
+    assert report["sources"][0] == ["xiaohongshu", 2, 1, 0] and ["direct", 1, 0, 0] in report["sources"]

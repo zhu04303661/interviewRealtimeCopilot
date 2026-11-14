@@ -2,7 +2,10 @@
 document.documentElement.classList.add('js');  // enables scroll reveal; content stays visible without JS
 const LANGS = { en: 'English', zh: '中文' };
 let lang = localStorage.getItem('lang') || (navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en');
-const urlLang = new URLSearchParams(location.search).get('lang');  // ?lang=en|zh: share a link in one language
+const fixedLang = document.documentElement.dataset.lang;  // /zh/ pages are Chinese in the HTML itself
+if (fixedLang) { lang = fixedLang; localStorage.setItem('lang', lang); }
+const INTERNAL_LINK = /^\/(?!zh\/|(?:login|account|admin)\.html)((?:[\w\-/]*\.html|[\w\-/]*\/)?(?:[#?].*)?)$/;
+const urlLang = fixedLang ? null : new URLSearchParams(location.search).get('lang');  // ?lang=en|zh: share a link in one language
 if (urlLang in LANGS) { lang = urlLang; localStorage.setItem('lang', lang); }
 const tr = (key, vars = {}) => Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, v), (window.I18N[lang] || {})[key] ?? window.I18N.en[key] ?? key);
 
@@ -22,6 +25,21 @@ const api = async (path, body) => {
 };
 const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
 
+/** Anonymous counters for the admin dashboard: page views, download clicks and sign-ups by source.
+ *  The source is ?utm_source=… or the referring site, remembered for this browser so a later sign-up is attributed. */
+function source() {
+  const utm = new URLSearchParams(location.search).get('utm_source');
+  let ref = '';
+  try { const host = new URL(document.referrer).hostname; if (host && host !== location.hostname) ref = host.replace(/^www\./, ''); } catch { /* no referrer */ }
+  const found = utm || ref;
+  if (found) localStorage.setItem('src', found);
+  return localStorage.getItem('src') || '';
+}
+function track(kind) {
+  fetch('/api/track', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, page: location.pathname, source: source(), lang }) }).catch(() => {});
+}
+
 function chrome() {
   const page = document.body.dataset.page;
   const link = (href, key, name) => `<a href="${href}" class="${page === name ? 'active' : ''}" data-i18n="${key}"></a>`;
@@ -34,7 +52,15 @@ function chrome() {
   document.body.append(el(`<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>
     <a href="/use-cases.html" data-i18n="nav.scenarios"></a><a href="/pricing.html" data-i18n="nav.pricing"></a><a href="/download.html" data-i18n="nav.download"></a>
     <a href="/docs/" data-i18n="nav.docs"></a><a href="/#wishlist" data-i18n="foot.wishlist"></a><a href="/privacy.html" data-i18n="foot.privacy"></a><a href="mailto:${window.SUPPORT_EMAIL}"><span data-i18n="foot.support"></span> · ${window.SUPPORT_EMAIL}</a><a href="/terms.html" data-i18n="foot.terms"></a><span>© ${new Date().getFullYear()}</span></div></footer>`));
-  document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; localStorage.setItem('lang', lang); applyLanguage(); }));
+  // Public pages have a Chinese copy under /zh/: switching language moves between the two URLs.
+  const hasCopy = !['login', 'account', 'admin', '404'].includes(page);
+  document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => {
+    localStorage.setItem('lang', b.dataset.lang);
+    if (hasCopy && b.dataset.lang === 'zh' && !fixedLang) { location.href = '/zh' + location.pathname + location.hash; return; }
+    if (fixedLang && b.dataset.lang === 'en') { location.href = location.pathname.replace(/^\/zh/, '') + '?lang=en' + location.hash; return; }
+    lang = b.dataset.lang; applyLanguage();
+  }));
+  if (fixedLang === 'zh') document.querySelectorAll('header a, footer a').forEach((a) => { const m = a.getAttribute('href').match(INTERNAL_LINK); if (m) a.setAttribute('href', '/zh/' + m[1]); });
   api('/api/me').then(({ user }) => {
     if (user) document.getElementById('account-slot').innerHTML = (user.admin ? `<a class="btn" href="/admin.html" data-i18n="nav.admin">${tr('nav.admin')}</a> ` : '')
       + `<a class="btn" href="/account.html">${user.email.split('@')[0]} · ${user.plan === 'free' ? 'Free' : 'Pro'}</a>`;
@@ -102,12 +128,12 @@ const pages = {
     const root = document.getElementById('admin');
     const get = (p) => fetch(p).then(async (r) => { if (!r.ok) throw Object.assign(new Error(), { status: r.status }); return r.json(); });
     let data;
-    try { data = await Promise.all(['/api/admin/overview', '/api/admin/usage', '/api/admin/messages', '/api/admin/users'].map(get)); }
+    try { data = await Promise.all(['/api/admin/overview', '/api/admin/usage', '/api/admin/messages', '/api/admin/users', '/api/admin/traffic'].map(get)); }
     catch (e) {
       if (e.status === 401) { location.href = '/login.html?next=/admin.html'; return; }
       root.innerHTML = `<div class="notice warn">${tr('ad.denied')}</div>`; return;
     }
-    let [o, u, m, users] = data, query = '';
+    let [o, u, m, users, tf] = data, query = '';
     const card = (label, value, sub) => `<div class="card stat-card"><span class="muted small">${label}</span><b>${value}</b><span class="faint small">${sub}</span></div>`;
     const table = (head, rows) => rows.length ? `<div class="doc-table"><table><thead><tr>${head.map((h) => `<th>${tr(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>` : `<p class="muted">${tr('ad.none')}</p>`;
     const render = () => {
@@ -119,6 +145,11 @@ const pages = {
         ${card(tr('ad.month'), usd(o.usage.month_used_usd), tr('ad.of', { total: o.usage.month_allowance_usd.toFixed(2), req: o.usage.month_requests }))}
         ${card(tr('ad.remaining'), usd(o.usage.month_remaining_usd), tr('ad.credit', { credit: o.usage.credit_usd.toFixed(2), min: o.usage.audio_minutes_month }))}
         ${card(tr('ad.alltime'), usd(o.usage.all_time_used_usd), tr('ad.alltimereq', { req: o.usage.all_time_requests }))}</div>
+        <h2>${tr('ad.traffic')}</h2><div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        ${card(tr('ad.t.views'), tf.totals.views, '')}${card(tr('ad.t.downloads'), tf.totals.downloads, tf.totals.views ? (tf.totals.downloads / tf.totals.views * 100).toFixed(1) + '%' : '')}
+        ${card(tr('ad.t.signups'), tf.totals.signups, tf.totals.views ? (tf.totals.signups / tf.totals.views * 100).toFixed(1) + '%' : '')}${card(tr('ad.subs'), tf.totals.subscribers, '')}</div>
+        ${table(['ad.t.source', 'ad.t.views', 'ad.t.downloads', 'ad.t.signups'], tf.sources.map((r) => `<tr><td>${esc(r[0])}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`))}
+        ${table(['ad.t.page', 'ad.t.views'], tf.pages.map((r) => `<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`))}
         <h2>${tr('ad.daily')}</h2>${u.days.length ? `<div class="bars">${u.days.map((d) => `<div title="${d.day}: ${usd(d.usd)} · ${d.requests} · ${d.users}"><i style="height:${Math.max(3, d.usd / max * 100)}%"></i><span>${d.day.slice(5)}</span></div>`).join('')}</div>` : `<p class="muted">${tr('ad.none')}</p>`}
         ${u.models.length ? `<h2>${tr('ad.models')}</h2>` + table(['ad.c.model', 'ad.c.req', 'ad.month'], u.models.map((x) => `<tr><td>${esc(x.model)}</td><td>${x.requests}</td><td>${usd(x.usd)}</td></tr>`)) : ''}
         <h2>${tr('ad.userlist')} (${users.users.length})</h2><input class="input" id="admin-q" placeholder="${tr('ad.search')}" value="${esc(query)}" style="max-width:320px;margin-bottom:12px">
@@ -175,6 +206,7 @@ const pages = {
       e.preventDefault();
       try {
         await api(mode === 'signup' ? '/api/signup' : '/api/login', { email: e.target.email.value, password: e.target.password.value });
+        if (mode === 'signup') track('signup');
         location.href = params.get('next')?.startsWith('/') ? params.get('next') : '/account.html';
       } catch (error) { document.getElementById('error').textContent = error.message; }
     });
@@ -282,6 +314,8 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('form[data-waitlist]').forEach(bindWaitlist);
   pages[document.body.dataset.page]?.();
   docs();
+  if (!['admin', 'account'].includes(document.body.dataset.page)) track('view');
+  document.addEventListener('click', (event) => { if (event.target.closest?.('a[href^="/downloads/"]')) track('download'); });
   document.querySelectorAll('.wish-form').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const button = form.querySelector('button');

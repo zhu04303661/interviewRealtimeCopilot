@@ -10,11 +10,48 @@ language switcher in site.js swaps them; nothing is mixed on screen.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 STATIC = Path(__file__).parent / "static"
 SUPPORT_EMAIL = "linkyourfuture2026@outlook.com"
 STRINGS: dict[str, dict[str, str]] = {"en": {}, "zh": {}}
+SITE = "https://copilot.xichiuk.com"
+PAGES: list[str] = []  # every page written, as a path under static/ (for the /zh/ copies and hreflang)
+PRIVATE = {"login.html", "account.html", "admin.html", "404.html"}  # no /zh/ copy, not in the sitemap
+ZH_DESCRIPTION = "AI 面试助手：实时听懂面试官、中英同步翻译、自动识别问题，并基于你自己的简历给出回答提示；支持截屏解答编程题、语音模拟面试和面试复盘。"
+INTERNAL = re.compile(r'href="/(?!(?:login|account|admin)\.html)((?:[\w\-/]*\.html|[\w\-/]*/)?(?:[#?][^"]*)?)"')
+
+
+def url_of(rel: str) -> str:
+    return rel[:-len("index.html")] if rel.endswith("index.html") else rel
+
+
+def write_chinese_copies() -> None:
+    """/zh/<page>: the same page with the Chinese text in the HTML itself, so search engines that do not run
+    JavaScript index it. Both versions point at each other with hreflang."""
+    inner = re.compile(r'(<(\w+) data-i18n="([^"]+)"[^>]*>)(.*?)(</\2>)', re.S)
+    for rel in PAGES:
+        source = STATIC / rel
+        html = source.read_text()
+        alternates = "" if rel in PRIVATE else (f'<link rel="alternate" hreflang="en" href="{SITE}/{url_of(rel)}"><link rel="alternate" hreflang="zh-CN" href="{SITE}/zh/{url_of(rel)}">'
+                                                f'<link rel="alternate" hreflang="x-default" href="{SITE}/{url_of(rel)}">')
+        source.write_text(html.replace("<!--ALT-->", alternates))
+        if rel in PRIVATE:
+            continue
+        zh = inner.sub(lambda m: m.group(1) + STRINGS["zh"].get(m.group(3), m.group(4)) + m.group(5), html)
+        zh = re.sub(r'data-i18n-placeholder="([^"]+)" placeholder="[^"]*"', lambda m: f'data-i18n-placeholder="{m.group(1)}" placeholder="{STRINGS["zh"].get(m.group(1), "")}"', zh)
+        zh = zh.replace('<html lang="en">', '<html lang="zh-CN" data-lang="zh">', 1).replace("<!--ALT-->", alternates)
+        zh = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{ZH_DESCRIPTION}">', zh, count=1)
+        zh = re.sub(r'<meta property="og:description" content="[^"]*">', f'<meta property="og:description" content="{ZH_DESCRIPTION}">', zh, count=1)
+        zh_title = STRINGS["zh"]["title." + re.search(r'data-page="([^"]+)"', zh).group(1)]
+        zh = re.sub(r'<meta property="og:title" content="[^"]*">', f'<meta property="og:title" content="{zh_title}">', zh, count=1)
+        zh = re.sub(r'<link rel="canonical" href="[^"]*">', f'<link rel="canonical" href="{SITE}/zh/{url_of(rel)}">', zh, count=1)
+        zh = re.sub(r'<meta property="og:url" content="[^"]*">', f'<meta property="og:url" content="{SITE}/zh/{url_of(rel)}">', zh, count=1)
+        zh = INTERNAL.sub(lambda m: f'href="/zh/{m.group(1)}"', zh)
+        target = STATIC / "zh" / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(zh)
 
 
 def t(key: str, en: str, zh: str, tag: str = "span", cls: str = "") -> str:
@@ -35,10 +72,12 @@ def page(name: str, title: tuple[str, str], body: str, out: str | None = None) -
             f'<script type="application/ld+json">{LD}</script>'
             f'<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">'
             f'<link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#06070b">'
-            f'<meta property="og:image" content="https://copilot.xichiuk.com/icon-512.png">'
+            f'<meta property="og:image" content="https://copilot.xichiuk.com/share.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
+            f'<meta name="twitter:card" content="summary_large_image"><!--ALT-->'
             f'<link rel="stylesheet" href="/site.css"><script src="/i18n.js" defer></script><script src="/site.js" defer></script></head><body data-page="{name}">'
             '<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9d85ff"/><stop offset=".5" stop-color="#5b8cff"/><stop offset="1" stop-color="#3fe0ff"/></linearGradient></defs></svg>'
             '<div class="bg-grid"></div><div class="aurora"><i></i><i></i><i></i></div><canvas id="stars"></canvas><div class="spot"></div>')
+    PAGES.append(out or f"{name}.html")
     target = STATIC / (out or f"{name}.html")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(head + body + "</body></html>\n")
@@ -292,7 +331,9 @@ def build() -> None:
     page("admin", ("Admin — Interview Realtime Copilot", "管理后台 — Interview Realtime Copilot"), f'''
 <div class="wrap" style="padding:60px 28px 80px"><span class="eyebrow">{t("ad.eyebrow", "Admin", "管理后台")}</span><h1 style="font-size:42px">{t("ad.h1", "Dashboard", "运营数据")}</h1>
 <div id="admin"><p class="muted" data-i18n="acc.loading">Loading…</p></div></div>''')
-    for key, en, zh in [("ad.users", "Registered users", "注册用户"), ("ad.new", "+{d7} this week · +{d30} this month", "本周 +{d7} · 本月 +{d30}"),
+    for key, en, zh in [("ad.traffic", "Traffic and conversion (30 days)", "流量与转化（近 30 天）"), ("ad.t.views", "Page views", "页面浏览"),
+                        ("ad.t.downloads", "Download clicks", "下载点击"), ("ad.t.signups", "Sign-ups", "注册"), ("ad.t.source", "Source", "来源渠道"), ("ad.t.page", "Page", "页面"),
+                        ("ad.users", "Registered users", "注册用户"), ("ad.new", "+{d7} this week · +{d30} this month", "本周 +{d7} · 本月 +{d30}"),
                         ("ad.active", "Active (30 days)", "活跃用户（30 天）"), ("ad.devices", "{n} signed-in devices", "{n} 台已登录设备"),
                         ("ad.subs", "Pro subscriptions", "Pro 订阅"), ("ad.subsplit", "{m} monthly · {y} yearly · {f} free", "月付 {m} · 年付 {y} · 免费 {f}"),
                         ("ad.month", "AI usage this month", "本月 AI 用量"), ("ad.of", "of ${total} total allowance · {req} requests", "总额度 ${total} · {req} 次请求"),
@@ -343,7 +384,8 @@ def build() -> None:
                                                                        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}]}) + "\n")
     (STATIC / "robots.txt").write_text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /account.html\nDisallow: /admin.html\nSitemap: https://copilot.xichiuk.com/sitemap.xml\n")
     docs = build_docs()
-    urls = "".join(f"<url><loc>https://copilot.xichiuk.com/{p}</loc></url>" for p in ("", "use-cases.html", "demo.html", "pricing.html", "download.html", "privacy.html", *docs))
+    public = [url_of(p) for p in PAGES if p not in PRIVATE]
+    urls = "".join(f"<url><loc>{SITE}/{prefix}{p}</loc></url>" for p in public for prefix in ("", "zh/"))
     (STATIC / "sitemap.xml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')
     (STATIC / "llms.txt").write_text("""# Interview Realtime Copilot
 > AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro $29/month or $199/year.
@@ -357,7 +399,9 @@ def build() -> None:
 """.replace("{SUPPORT_EMAIL}", SUPPORT_EMAIL))
     (STATIC / "i18n.js").write_text(f"// Generated by web/build_site.py — edit the strings there.\nwindow.SUPPORT_EMAIL = {json.dumps(SUPPORT_EMAIL)};\nwindow.I18N = "
                                     + json.dumps(STRINGS, ensure_ascii=False, indent=0) + ";\n")
-    print(f"{len(STRINGS['en'])} strings")
+    write_chinese_copies()
+    (STATIC / "urls.txt").write_text("".join(f"{SITE}/{prefix}{p}\n" for p in public for prefix in ("", "zh/")))  # for search-engine submission
+    print(f"{len(STRINGS['en'])} strings, {len(PAGES)} pages")
 
 
 if __name__ == "__main__":

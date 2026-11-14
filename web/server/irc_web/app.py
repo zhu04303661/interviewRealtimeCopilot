@@ -10,6 +10,7 @@ subscriptions in SQLite:
     POST /api/checkout    {plan: "monthly"|"yearly"} Stripe Checkout URL
     POST /api/portal                                Stripe billing portal URL
     POST /api/waitlist    {email, topic}            notify-me sign-ups
+    POST /api/track       {kind, page, source, lang}  anonymous visit counters (no cookies, no IP stored)
     POST /api/wish        {text, email?}            feature wishlist (stored; read in the admin dashboard)
     POST /api/stripe/webhook                        subscription updates from Stripe
     GET  /api/admin/overview|users|messages|usage   admin dashboard data (signed-in admin accounts only)
@@ -62,6 +63,8 @@ create table if not exists users (id integer primary key, email text unique not 
 create table if not exists sessions (token text primary key, user_id integer not null, expires_at integer not null);
 create table if not exists waitlist (email text not null, topic text not null, created_at integer not null, primary key (email, topic));
 create table if not exists wishes (id integer primary key, email text, text text not null, page text, created_at integer not null);
+create table if not exists events (ts integer not null, kind text not null, page text not null, source text not null, lang text not null);
+create index if not exists events_ts on events (ts);
 create table if not exists stripe_events (id text primary key, received_at integer not null);
 """
 
@@ -296,6 +299,18 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         store.db.execute("insert or ignore into waitlist values (?, ?, ?)", (email, topic, int(time.time())))
         return web.json_response({"ok": True})
 
+    async def track(request: web.Request) -> web.Response:
+        """Counts a page view, a download click or a sign-up with its source (utm_source or referring site)."""
+        agent = request.headers.get("User-Agent", "").lower()
+        if any(word in agent for word in ("bot", "spider", "crawl", "headless", "curl", "python")) or limited(request, f"track:{request.remote}", 200):
+            return web.json_response({"ok": True})
+        body = await request.json()
+        kind = str(body.get("kind", ""))
+        if kind in ("view", "download", "signup"):
+            store.db.execute("insert into events values (?, ?, ?, ?, ?)", (int(time.time()), kind, str(body.get("page", ""))[:120],
+                             (str(body.get("source", "")).strip().lower() or "direct")[:60], str(body.get("lang", ""))[:5]))
+        return web.json_response({"ok": True})
+
     async def wish(request: web.Request) -> web.Response:
         if limited(request, f"wish:{request.remote}", 10, 3600):
             return fail(429, "Too many attempts. Try again later.")
@@ -411,6 +426,22 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         return web.json_response({"days": [{"day": d, "requests": n, "usd": c / 1e6, "users": u} for d, n, c, u in days],
                                   "models": [{"model": m, "requests": n, "usd": c / 1e6} for m, n, c in models]})
 
+    @admin_only
+    async def admin_traffic(request: web.Request) -> web.Response:
+        since = int(time.time()) - 30 * 86400
+        rows = lambda sql: [list(r) for r in store.db.execute(sql, (since,))]
+        totals = dict(store.db.execute("select kind, count(*) from events where ts > ? group by kind", (since,)).fetchall())
+        return web.json_response({
+            "totals": {"views": totals.get("view", 0), "downloads": totals.get("download", 0), "signups_tracked": totals.get("signup", 0),
+                       "signups": scalar("select count(*) from users where created_at > ?", since),
+                       "subscribers": scalar("select count(*) from users where status in ('active', 'trialing')")},
+            "days": rows("select strftime('%Y-%m-%d', ts, 'unixepoch') d, sum(kind = 'view'), sum(kind = 'download'), sum(kind = 'signup') "
+                         "from events where ts > ? group by d order by d"),
+            "sources": rows("select source, sum(kind = 'view'), sum(kind = 'download'), sum(kind = 'signup') from events where ts > ? "
+                            "group by source order by 2 desc limit 30"),
+            "pages": rows("select page, count(*) from events where ts > ? and kind = 'view' group by page order by 2 desc limit 20"),
+        })
+
     app = web.Application(middlewares=[guard], client_max_size=64 * 1024 * 1024)  # transcription uploads
     app["db_path"] = db_path or os.environ.get("IRC_WEB_DB", "irc-web.sqlite3")
     relay.setup(app, billing, origin, openai_upstream or os.environ.get("IRC_OPENAI_UPSTREAM", "https://api.openai.com"), device_user)
@@ -420,6 +451,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         web.post("/api/signup", signup), web.post("/api/login", login), web.post("/api/logout", logout),
         web.get("/api/me", me), web.post("/api/checkout", checkout), web.post("/api/portal", portal),
         web.post("/api/waitlist", waitlist), web.post("/api/wish", wish),
+        web.post("/api/track", track), web.get("/api/admin/traffic", admin_traffic),
         web.get("/api/admin/overview", admin_overview), web.get("/api/admin/users", admin_users),
         web.get("/api/admin/messages", admin_messages), web.get("/api/admin/usage", admin_usage), web.post("/api/stripe/webhook", webhook),
         web.get("/", page), web.get("/{name:.+}", page),
