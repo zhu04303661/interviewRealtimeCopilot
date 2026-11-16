@@ -1,4 +1,4 @@
-"""Server administration (run on the server as the service user, with /etc/irc-web.env loaded):
+"""Server administration (run on the server as the service user, with /etc/irc-web.env loaded; README.md has a wrapper):
 
     python -m irc_web.admin set-openai-key          # reads the key from stdin (not echoed); stored encrypted
     python -m irc_web.admin grant EMAIL USD [REASON] # add credit to an account
