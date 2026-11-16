@@ -42,3 +42,5 @@
   by our AI engine and trusted AI processing partners. Code, comments and logs may name OpenAI.
 - Coding-round evaluation (real OpenAI, generated problem images, returned code is executed): `cd engine && uv run python evals/coding_screen.py`;
   C++ check: `cd engine/evals && uv run --project .. python coding_screen_cpp.py`.
+- China mirror (Shenzhen, nginx): `sh web/deploy/deploy-mirror.sh` (settings in web/deploy/mirror.env, SSH by key). It serves web/static and the
+  installer and proxies /api and /auth to the main site; deploy.sh reads the same file so the main site accepts the mirror origin.

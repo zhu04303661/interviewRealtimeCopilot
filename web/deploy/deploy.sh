@@ -1,14 +1,16 @@
 #!/bin/sh
 # Deploy the website to the server (idempotent). Run from the repository root:
 #   sh web/deploy/deploy.sh ubuntu@host ~/.ssh/key.pem copilot.example.com
+# With a mirror site in front (see deploy-mirror.sh): MIRROR_ORIGIN=https://copilot.example.cn MIRROR_IP=1.2.3.4 sh web/deploy/deploy.sh …
 # Leaves other Caddy sites untouched; adds /etc/caddy/sites/irc-web.conf for the domain.
 set -eu
 target=$1; key=$2; host=$3
+[ -n "${MIRROR_ORIGIN:-}" ] || { [ -f web/deploy/mirror.env ] && . web/deploy/mirror.env; }
 ssh_() { ssh -i "$key" -o BatchMode=yes "$target" "$@"; }
 rsync -az --delete -e "ssh -i $key -o BatchMode=yes" --exclude '.venv' --exclude '__pycache__' --exclude '*.sqlite3' --exclude 'tests' \
   web/server web/static "$target:/tmp/irc-web-upload/"
 scp -q -i "$key" web/deploy/irc-web.service "$target:/tmp/irc-web-upload/"
-ssh_ "HOST=$host sh -s" <<'REMOTE'
+ssh_ "HOST=$host MIRROR_ORIGIN=${MIRROR_ORIGIN:-} MIRROR_IP=${MIRROR_IP:-} sh -s" <<'REMOTE'
 set -eu
 sudo id ircweb >/dev/null 2>&1 || sudo useradd --system --home /var/lib/irc-web --shell /usr/sbin/nologin ircweb
 sudo mkdir -p /opt/irc-web /var/lib/irc-web
@@ -31,8 +33,16 @@ sudo cp /tmp/irc-web-upload/irc-web.service /etc/systemd/system/irc-web.service
 sudo systemctl daemon-reload
 sudo systemctl enable -q irc-web
 sudo systemctl restart irc-web
+if [ -n "$MIRROR_ORIGIN" ]; then  # accept the mirror's pages as same-site
+  sudo sed -i '/^IRC_WEB_MIRRORS=/d' /etc/irc-web.env && printf 'IRC_WEB_MIRRORS=%s\n' "$MIRROR_ORIGIN" | sudo tee -a /etc/irc-web.env >/dev/null
+  sudo systemctl restart irc-web
+fi
 site=/etc/caddy/sites/irc-web.conf
-new=$(printf '%s {\n\tencode gzip\n\treverse_proxy 127.0.0.1:8090\n}\n' "$HOST")
+if [ -n "$MIRROR_IP" ]; then  # trust the mirror's X-Forwarded-For so rate limits see its visitors, not the mirror
+  new=$(printf '%s {\n\tencode gzip\n\treverse_proxy 127.0.0.1:8090 {\n\t\ttrusted_proxies %s\n\t}\n}\n' "$HOST" "$MIRROR_IP")
+else
+  new=$(printf '%s {\n\tencode gzip\n\treverse_proxy 127.0.0.1:8090\n}\n' "$HOST")
+fi
 if [ "$(sudo cat $site 2>/dev/null)" != "$new" ]; then
   printf '%s\n' "$new" | sudo tee $site >/dev/null
   sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null

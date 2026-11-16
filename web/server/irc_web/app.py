@@ -23,7 +23,8 @@ Desktop app (Authorization: Bearer <device token>; see billing.py and relay.py):
     POST /api/v1/auth/web-link {next}               one-time link that signs the browser in
     *    /api/v1/openai/v1/...                      metered OpenAI relay
 
-Configuration (environment): IRC_WEB_DB, IRC_WEB_ORIGIN (public https origin),
+Configuration (environment): IRC_WEB_DB, IRC_WEB_ORIGIN (public https origin), IRC_WEB_MIRRORS (comma-separated
+origins of mirror sites that serve the pages themselves and proxy /api here, e.g. the China entry),
 STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, IRC_WEB_SECRET (encrypts the stored OpenAI key),
 IRC_OPENAI_UPSTREAM, IRC_FREE_ALLOWANCE_USD, IRC_PRO_ALLOWANCE_USD. Without Stripe keys, checkout
 answers 503 and everything else works.
@@ -124,6 +125,18 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
     store = Store(db_path or os.environ.get("IRC_WEB_DB", "irc-web.sqlite3"))
     billing = billing or Billing(store.db)
     origin = os.environ.get("IRC_WEB_ORIGIN", "http://localhost:8090").rstrip("/")
+    origins = {origin, *(o.strip().rstrip("/") for o in os.environ.get("IRC_WEB_MIRRORS", "").split(",") if o.strip())}
+
+    def site(request: web.Request) -> str:
+        """The site the visitor is on (ours or a mirror), for links that bring them back after Stripe."""
+        seen = request.headers.get("Origin", "").rstrip("/")
+        return seen if seen in origins else origin
+
+    def client(request: web.Request) -> str:
+        """The visitor's address for rate limits. Behind our own proxy (loopback peer) it is the first X-Forwarded-For
+        entry, which the proxy sets itself (and extends only for trusted mirror proxies)."""
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        return forwarded.split(",")[0].strip() if forwarded and request.remote in ("127.0.0.1", "::1") else str(request.remote)
     stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
     webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
     attempts: dict[str, list[float]] = {}
@@ -136,7 +149,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         # State-changing requests must come from our own pages (or be Stripe's signed webhook).
         # (The app's /api/v1 calls carry a Bearer token and no cookies, so they are not subject to this check.)
         if (request.method == "POST" and request.path != "/api/stripe/webhook" and not request.path.startswith("/api/v1/")
-                and request.headers.get("Origin", "").rstrip("/") != origin):
+                and request.headers.get("Origin", "").rstrip("/") not in origins):
             return fail(403, "Cross-site request refused.")
         response = await handler(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -166,7 +179,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         return email, password
 
     async def signup(request: web.Request) -> web.Response:
-        if limited(request, f"signup:{request.remote}", 5):
+        if limited(request, f"signup:{client(request)}", 5):
             return fail(429, "Too many attempts. Try again later.")
         email, password = await credentials(request)
         if not EMAIL.match(email):
@@ -183,7 +196,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
 
     async def login(request: web.Request) -> web.Response:
         email, password = await credentials(request)
-        if limited(request, f"login:{email}") or limited(request, f"login-ip:{request.remote}", 30):
+        if limited(request, f"login:{email}") or limited(request, f"login-ip:{client(request)}", 30):
             return fail(429, "Too many attempts. Try again later.")
         user = store.user_by_email(email)
         if not user or not check_password(password, user["password"]):
@@ -267,7 +280,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         key = next(k for k, v in PLANS.items() if v is plan)
         form = {
             "mode": "subscription", "client_reference_id": str(user["id"]), "customer_email": user["email"],
-            "success_url": f"{origin}/account.html?checkout=success", "cancel_url": f"{origin}/pricing.html?checkout=cancelled",
+            "success_url": f"{site(request)}/account.html?checkout=success", "cancel_url": f"{site(request)}/pricing.html?checkout=cancelled",
             "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": CURRENCY,
             "line_items[0][price_data][unit_amount]": str(plan["amount"]),
             "line_items[0][price_data][recurring][interval]": plan["interval"],
@@ -288,11 +301,11 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
             return fail(404, "No subscription to manage.")
         if not stripe_key:
             return fail(503, "Payments are not configured yet.")
-        session = await stripe("/v1/billing_portal/sessions", {"customer": user["stripe_customer"], "return_url": f"{origin}/account.html"})
+        session = await stripe("/v1/billing_portal/sessions", {"customer": user["stripe_customer"], "return_url": f"{site(request)}/account.html"})
         return web.json_response({"url": session["url"]})
 
     async def waitlist(request: web.Request) -> web.Response:
-        if limited(request, f"waitlist:{request.remote}", 10):
+        if limited(request, f"waitlist:{client(request)}", 10):
             return fail(429, "Too many attempts. Try again later.")
         body = await request.json()
         email = str(body.get("email", "")).strip().lower()
@@ -305,7 +318,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
     async def track(request: web.Request) -> web.Response:
         """Counts a page view, a download click or a sign-up with its source (utm_source or referring site)."""
         agent = request.headers.get("User-Agent", "").lower()
-        if any(word in agent for word in ("bot", "spider", "crawl", "headless", "curl", "python")) or limited(request, f"track:{request.remote}", 200):
+        if any(word in agent for word in ("bot", "spider", "crawl", "headless", "curl", "python")) or limited(request, f"track:{client(request)}", 200):
             return web.json_response({"ok": True})
         body = await request.json()
         kind = str(body.get("kind", ""))
@@ -315,7 +328,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         return web.json_response({"ok": True})
 
     async def wish(request: web.Request) -> web.Response:
-        if limited(request, f"wish:{request.remote}", 10, 3600):
+        if limited(request, f"wish:{client(request)}", 10, 3600):
             return fail(429, "Too many attempts. Try again later.")
         body = await request.json()
         text = str(body.get("text", "")).strip()

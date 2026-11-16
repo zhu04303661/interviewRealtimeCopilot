@@ -146,3 +146,29 @@ async def test_traffic_counters_and_admin_report(site):
     report = await (await site.get("/api/admin/traffic")).json()
     assert report["totals"]["views"] == 3 and report["totals"]["downloads"] == 1 and report["totals"]["signups"] == 1
     assert report["sources"][0] == ["xiaohongshu", 2, 1, 0] and ["direct", 1, 0, 0] in report["sources"]
+
+
+async def test_mirror_site_origin_and_forwarded_client(aiohttp_client, tmp_path, monkeypatch):
+    mirror = "https://copilot.example.cn"
+    calls = []
+
+    async def stripe_fake(request):
+        calls.append(dict(await request.post()))
+        return web.json_response({"url": "https://checkout.stripe.test/s/1"})
+
+    stripe = web.Application()
+    stripe.router.add_post("/v1/checkout/sessions", stripe_fake)
+    stripe_client = await aiohttp_client(stripe)
+    monkeypatch.setenv("IRC_WEB_ORIGIN", ORIGIN)
+    monkeypatch.setenv("IRC_WEB_MIRRORS", mirror + "/")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_x")
+    site = await aiohttp_client(build_app(db_path=str(tmp_path / "db.sqlite3"), stripe_api=str(stripe_client.make_url("")).rstrip("/")))
+    signup = lambda n, **h: site.post("/api/signup", json={"email": f"m{n}@example.com", "password": "long-enough-1"}, headers={"Origin": mirror, **h})
+    assert (await signup(0)).status == 200  # a mirror origin is accepted
+    await site.post("/api/checkout", json={"plan": "monthly"}, headers={"Origin": mirror})
+    assert calls[-1]["success_url"].startswith(mirror) and calls[-1]["cancel_url"].startswith(mirror)  # back to the site they came from
+    # Sign-up limit is per visitor (first X-Forwarded-For entry), not per proxy.
+    for n in range(1, 6):
+        assert (await signup(n, **{"X-Forwarded-For": "203.0.113.7, 8.8.8.8"})).status == 200
+    assert (await signup(6, **{"X-Forwarded-For": "203.0.113.7, 8.8.8.8"})).status == 429
+    assert (await signup(7, **{"X-Forwarded-For": "203.0.113.99, 8.8.8.8"})).status == 200
