@@ -8,7 +8,27 @@ set -eu
 . web/deploy/mirror.env
 ssh_() { ssh -o BatchMode=yes "$MIRROR_SSH" "$@"; }
 ssh_ "sudo mkdir -p /var/www/irc-web/downloads && sudo chown -R \$(id -un) /var/www/irc-web"
-rsync -az --delete --exclude 'downloads/' -e "ssh -o BatchMode=yes" web/static/ "$MIRROR_SSH:/var/www/irc-web/"
+# The mirror is the home of the Chinese pages for Chinese search engines (Baidu indexes filed, in-country sites):
+# its /zh/ pages name themselves as canonical, and it has its own sitemap of them. English pages still point at the main site.
+stage=$(mktemp -d)
+cp -R web/static/. "$stage/"
+MAIN="https://$MAIN_HOST" MIRROR="$MIRROR_ORIGIN" python3 - "$stage" <<'PY'
+import os, re, sys
+from pathlib import Path
+root, main, mirror = Path(sys.argv[1]), os.environ["MAIN"], os.environ["MIRROR"]
+for page in (root / "zh").rglob("*.html"):
+    html = page.read_text().replace(main, mirror)
+    html = re.sub(r'(hreflang="(?:en|x-default)" href=")' + re.escape(mirror), r"\g<1>" + main, html)  # the English version lives on the main site
+    page.write_text(html)
+urls = [u.replace(main, mirror) for u in (root / "urls.txt").read_text().split() if "/zh/" in u]
+today = re.search(r"<lastmod>([^<]+)", (root / "sitemap.xml").read_text()).group(1)
+(root / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                                  + "".join(f"<url><loc>{u}</loc><lastmod>{today}</lastmod></url>" for u in urls) + "</urlset>\n")
+(root / "urls.txt").write_text("\n".join(urls) + "\n")
+(root / "robots.txt").write_text((root / "robots.txt").read_text().replace(f"Sitemap: {main}/", f"Sitemap: {mirror}/"))
+PY
+rsync -az --delete --exclude 'downloads/' -e "ssh -o BatchMode=yes" "$stage/" "$MIRROR_SSH:/var/www/irc-web/"
+rm -rf "$stage"
 ssh_ "DOMAIN=$MIRROR_DOMAIN MAIN=$MAIN_HOST IP=$MIRROR_IP sh -s" <<'REMOTE'
 set -eu
 conf=/etc/nginx/sites-available/irc-web-mirror
