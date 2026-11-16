@@ -46,7 +46,7 @@ function chrome() {
   document.body.prepend(el(`<header class="nav"><div class="wrap">
     <a class="brand" href="/"><span class="logo">IR</span>Interview Realtime Copilot</a>
     <nav class="links">${link('/use-cases.html', 'nav.scenarios', 'use-cases')}${link('/demo.html', 'nav.demo', 'demo')}${link('/pricing.html', 'nav.pricing', 'pricing')}${link('/download.html', 'nav.download', 'download')}<a href="/docs/" class="${page.startsWith('docs-') ? 'active' : ''}" data-i18n="nav.docs"></a></nav>
-    <span class="spacer"></span><span class="lang">${Object.entries(LANGS).map(([k, v]) => `<button data-lang="${k}">${v}</button>`).join('')}</span>
+    <span class="spacer"></span><button class="menu-btn" aria-label="Menu" aria-expanded="false"><i></i><i></i><i></i></button><span class="lang">${Object.entries(LANGS).map(([k, v]) => `<button data-lang="${k}">${v}</button>`).join('')}</span>
     <span id="account-slot"><a class="btn" href="/login.html" data-i18n="nav.signin"></a></span>
     <a class="btn primary" href="/download.html" data-i18n="nav.start"></a></div></header>`));
   document.body.append(el(`<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>
@@ -54,6 +54,8 @@ function chrome() {
     <a href="/docs/" data-i18n="nav.docs"></a><a href="/#wishlist" data-i18n="foot.wishlist"></a><a href="/privacy.html" data-i18n="foot.privacy"></a><a href="mailto:${window.SUPPORT_EMAIL}"><span data-i18n="foot.support"></span> · ${window.SUPPORT_EMAIL}</a><a href="/terms.html" data-i18n="foot.terms"></a><span>© ${new Date().getFullYear()}</span></div></footer>`));
   // Public pages have a Chinese copy under /zh/: switching language moves between the two URLs.
   const hasCopy = !['login', 'account', 'admin', '404'].includes(page);
+  const header = document.querySelector('header.nav'), menu = header.querySelector('.menu-btn');
+  menu.addEventListener('click', () => menu.setAttribute('aria-expanded', String(header.classList.toggle('open'))));
   document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => {
     localStorage.setItem('lang', b.dataset.lang);
     if (hasCopy && b.dataset.lang === 'zh' && !fixedLang) { location.href = '/zh' + location.pathname + location.hash; return; }
@@ -240,6 +242,8 @@ const pages = {
 function docs() {
   const search = document.querySelector('.docs-search');
   if (!search) return;
+  // Desktop shows every group; phones start with only the current group open (the list is long).
+  if (matchMedia('(min-width: 961px)').matches) document.querySelectorAll('.docs-nav details[data-desktop-open]').forEach((d) => { d.open = true; });
   search.addEventListener('input', () => {
     const q = search.value.trim().toLowerCase();
     document.querySelectorAll('.docs-nav details').forEach((group) => {

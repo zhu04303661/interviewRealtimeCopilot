@@ -157,7 +157,7 @@ def build_docs() -> list[str]:
         for g2key, g2en, g2zh, pages in DOCS:
             links = "".join(f'<a href="/docs/{"" if p["slug"] == "index" else p["slug"] + ".html"}" class="{"on" if p["slug"] == slug else ""}">'
                             + t(f"doc.{p['slug']}.title", *p["title"]) + "</a>" for p in pages)
-            nav.append(f'<details {"open" if g2key == gkey or True else ""}><summary>{t(f"docg.{g2key}", g2en, g2zh)}</summary>{links}</details>')
+            nav.append(f'<details {"open" if g2key == gkey else "data-desktop-open"}><summary>{t(f"docg.{g2key}", g2en, g2zh)}</summary>{links}</details>')
         html, toc, h = [], [], 0
         for i, block in enumerate(doc["blocks"]):
             kind, key = block[0], f"{k}.b{i}"

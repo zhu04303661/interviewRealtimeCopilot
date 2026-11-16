@@ -277,3 +277,47 @@ textarea.input { height: auto; padding: 12px 16px; resize: vertical; font: 15px/
 .bars i { width: 100%; background: var(--grad); border-radius: 6px 6px 2px 2px; } .bars span { font: 10px var(--mono); color: var(--faint); }
 @media (max-width: 960px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
 #admin h2 { font-size: 22px; margin: 40px 0 14px; letter-spacing: -.01em; }
+
+/* ── phones and small tablets (kept last so it wins over the wide-screen rules above) ── */
+.menu-btn { display: none; }
+@media (max-width: 960px) {
+  .wrap { max-width: 100%; padding: 0 20px; }
+  header.nav .wrap { flex-wrap: wrap; gap: 10px 12px; height: auto; min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+  .brand { min-width: 0; flex: 1 1 0; font-size: 15px; } .brand .logo { flex: none; }
+  header .brand { overflow: hidden; text-overflow: ellipsis; display: flex; } 
+  header.nav .spacer { display: none; }
+  .lang button { padding: 5px 9px; }
+  .menu-btn { display: grid; gap: 4px; align-content: center; width: 40px; height: 40px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--panel); cursor: pointer; order: 3; }
+  .menu-btn i { display: block; height: 2px; border-radius: 2px; background: var(--text); }
+  header.nav .lang { order: 2; }
+  header.nav nav.links, header.nav #account-slot, header.nav .wrap > .btn.primary { display: none; order: 4; flex: 1 0 100%; }
+  header.nav.open nav.links { display: grid; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); }
+  header.nav.open nav.links a { padding: 12px 4px; font-size: 16px; color: var(--text); }
+  header.nav.open #account-slot { display: flex; gap: 10px; } header.nav.open #account-slot .btn { flex: 1; }
+  header.nav.open .wrap > .btn.primary { display: flex; margin-bottom: 8px; }
+  section { padding: 64px 0; } .hero { padding: 40px 0 48px; }
+  .hero-grid, .split, .plans, .timeline { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  h2 { font-size: clamp(26px, 7vw, 36px); } .lead { font-size: 17px; }
+  .pill { font-size: 12.5px; } .cta .btn { flex: 1 1 auto; } .trust { gap: 8px 18px; font-size: 13px; }
+  .scene { height: auto; display: grid; gap: 12px; }
+  .scene .meeting { position: relative; inset: auto; height: 190px; }
+  .scene .meeting .tiles { grid-template-rows: none; grid-template-columns: 1fr 1fr; } .scene .controls { display: none; }
+  .scene .avatar { width: 46px; height: 46px; font-size: 14px; }
+  .scene .mock { position: relative; width: 100%; max-width: none; margin: 0; }
+  .scene .mock-body { height: 380px; }
+  .stage::before { inset: 0; }
+  .phases { justify-content: flex-start; } .phases span { font-size: 11px; padding: 5px 9px; }
+  .stats { grid-template-columns: 1fr 1fr; } .stats div { padding: 18px; } .stats b { font-size: 24px; }
+  .bento { grid-template-columns: minmax(0, 1fr); gap: 14px; } .tile, .tile.wide, .tile.full { grid-column: auto; padding: 24px; }
+  .glass, .plan, .card { padding: 24px; } .final { padding: 44px 22px; border-radius: 22px; }
+  .price { font-size: 42px; } .plans { margin-top: 34px; }
+  .auth { margin: 40px auto; padding: 26px; }
+  .docs { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-top: 20px; }
+  .docs-nav { position: static; max-height: none; border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .docs-nav details:not([open]) a { display: none; } .docs-toc { display: none; }
+  .docs-main h1 { font-size: 30px; } .docs-main h2 { font-size: 22px; } .doc-cards, .pager { grid-template-columns: minmax(0, 1fr); }
+  .stat-grid { grid-template-columns: 1fr 1fr !important; } .stat-card b { font-size: 24px; }
+  footer .wrap { gap: 12px 18px; } footer .spacer { flex-basis: 100%; height: 0; }
+  .spot, #stars { display: none; }
+}
+@media (max-width: 420px) { .hero h1 { font-size: 34px; } html[lang="zh-CN"] .hero h1 > span { white-space: normal; } .stat-grid { grid-template-columns: 1fr !important; } }
