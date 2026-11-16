@@ -183,7 +183,8 @@ const pages = {
     const render = () => {
       if (latest) {
         status.textContent = tr('dl.version', { v: latest.version, mb: latest.size_mb, date: latest.date });
-        slot.innerHTML = `<a class="btn primary lg" href="/downloads/${latest.file}">${tr('cta.download')}</a>`;
+        // latest.url (object storage / CDN) when published there, else the copy on this server.
+        slot.innerHTML = `<a class="btn primary lg" data-download href="${latest.url || `/downloads/${latest.file}`}">${tr('cta.download')}</a>`;
       } else {
         status.textContent = tr('dl.preparing');
         if (!slot.firstChild) slot.append(waitlistForm('macos'));
@@ -315,7 +316,7 @@ window.addEventListener('DOMContentLoaded', () => {
   pages[document.body.dataset.page]?.();
   docs();
   if (!['admin', 'account'].includes(document.body.dataset.page)) track('view');
-  document.addEventListener('click', (event) => { if (event.target.closest?.('a[href^="/downloads/"]')) track('download'); });
+  document.addEventListener('click', (event) => { if (event.target.closest?.('a[data-download], a[href^="/downloads/"]')) track('download'); });
   document.querySelectorAll('.wish-form').forEach((form) => form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const button = form.querySelector('button');

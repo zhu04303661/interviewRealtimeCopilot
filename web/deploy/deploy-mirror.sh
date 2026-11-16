@@ -1,7 +1,7 @@
 #!/bin/sh
 # Deploy the mirror site (settings in web/deploy/mirror.env). Run from the repository root:
 #   sh web/deploy/deploy-mirror.sh
-# nginx on the mirror serves web/static and the installer from apps/desktop/dist-mac, and proxies /api and /auth to the
+# nginx on the mirror serves web/static and the installer (see publish-installer.sh), and proxies /api and /auth to the
 # main site. Adds one nginx site (irc-web-mirror); other sites on that server are not touched. The certificate is
 # requested with certbot once the domain's DNS points at the server; until then the site answers on HTTP only.
 set -eu
@@ -9,9 +9,6 @@ set -eu
 ssh_() { ssh -o BatchMode=yes "$MIRROR_SSH" "$@"; }
 ssh_ "sudo mkdir -p /var/www/irc-web/downloads && sudo chown -R \$(id -un) /var/www/irc-web"
 rsync -az --delete --exclude 'downloads/' -e "ssh -o BatchMode=yes" web/static/ "$MIRROR_SSH:/var/www/irc-web/"
-if ls apps/desktop/dist-mac/*.dmg >/dev/null 2>&1; then
-  rsync -az --delete -e "ssh -o BatchMode=yes" apps/desktop/dist-mac/*.dmg apps/desktop/dist-mac/latest.json "$MIRROR_SSH:/var/www/irc-web/downloads/"
-fi
 ssh_ "DOMAIN=$MIRROR_DOMAIN MAIN=$MAIN_HOST IP=$MIRROR_IP sh -s" <<'REMOTE'
 set -eu
 conf=/etc/nginx/sites-available/irc-web-mirror
