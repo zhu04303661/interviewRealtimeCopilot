@@ -11,6 +11,7 @@ ssh_ "sudo mkdir -p /var/www/irc-web/downloads && sudo chown -R \$(id -un) /var/
 # The mirror is the home of the Chinese pages for Chinese search engines (Baidu indexes filed, in-country sites):
 # its /zh/ pages name themselves as canonical, and it has its own sitemap of them. English pages still point at the main site.
 stage=$(mktemp -d)
+chmod 755 "$stage"  # rsync copies this directory's mode onto the web root; mktemp's 700 would lock nginx out
 cp -R web/static/. "$stage/"
 MAIN="https://$MAIN_HOST" MIRROR="$MIRROR_ORIGIN" python3 - "$stage" <<'PY'
 import os, re, sys
@@ -29,6 +30,8 @@ today = re.search(r"<lastmod>([^<]+)", (root / "sitemap.xml").read_text()).group
 PY
 rsync -az --delete --exclude 'downloads/' -e "ssh -o BatchMode=yes" "$stage/" "$MIRROR_SSH:/var/www/irc-web/"
 rm -rf "$stage"
+code=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$MIRROR_ORIGIN/zh/" || true)
+[ "$code" = 200 ] || { echo "MIRROR CHECK FAILED: $MIRROR_ORIGIN/zh/ answered $code"; exit 1; }
 ssh_ "DOMAIN=$MIRROR_DOMAIN MAIN=$MAIN_HOST IP=$MIRROR_IP sh -s" <<'REMOTE'
 set -eu
 conf=/etc/nginx/sites-available/irc-web-mirror
