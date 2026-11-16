@@ -1,0 +1,394 @@
+# Interview Realtime Copilot
+
+> Interview Realtime Copilot is an AI interview assistant for Mac: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.
+
+Website: https://copilot.xichiuk.com/ · Download: https://copilot.xichiuk.com/download.html · Support: linkyourfuture2026@outlook.com · Updated 2026-11-16
+
+## Frequently asked questions
+
+### What is Interview Realtime Copilot?
+
+Interview Realtime Copilot is an AI interview assistant for Mac. During a live interview it transcribes the interviewer, translates between English and Chinese, recognises each finished question and shows a short answer built from your own resume and notes. It also runs spoken mock interviews and writes a debrief after every session.
+
+### How does it help if my English is not fluent?
+
+Every sentence the interviewer says appears on screen with a Chinese translation as it is spoken, and each answer hint is written in natural English you can say directly, with a Chinese version beside it.
+
+### Can it help with coding interview questions?
+
+Yes. Press ⌥S and it reads the coding problem on your screen and returns a complete solution in your chosen language, with the approach to say out loud, time and space complexity, and edge cases. In our own evaluation its code passed the tests for ten of ten problems, from easy to hard.
+
+### Can the interviewer see it?
+
+The cockpit window is excluded from screen sharing and screen recordings by default, so it is not included when you share your screen in a meeting app.
+
+### Where is my data stored?
+
+Your resume, notes, transcripts, debriefs and recordings are stored on your own Mac. Audio and the text needed to answer are processed by our AI engine only during a session you start.
+
+### How much does it cost?
+
+There is a free plan with a monthly AI allowance, enough for about two practice sessions. Pro costs £25 a month or £169 a year and includes 20 times the free allowance. Local tax is added at checkout.
+
+### Which computers does it run on?
+
+Macs with Apple Silicon (M1 to M4) running macOS 14.2 or later. A Windows version is planned.
+
+## Use cases
+
+- **Video interviews on Zoom, Teams or Meet**: The copilot hears the meeting and your microphone separately, recognises each question once the interviewer finishes, and streams a one-minute answer built from your resume — while you keep eye contact.
+- **Interviewing in your second language**: Every interviewer line is translated as it is spoken (English ↔ Chinese), and hints come in both languages, so you understand precisely and answer fluently.
+- **Technical and coding rounds**: Press ⌥S — or let auto-capture do it — and the copilot reads the coding problem, diagram or error on your screen and explains a solution with its trade-offs.
+- **Rehearsing your prepared Q&A**: Upload your preparation document and every prepared question is extracted. A spoken AI interviewer asks them in order, at random or improvises, follows up once, and never repeats itself.
+- **Getting stuck mid-answer**: Already talking? Expand answer continues from what you just said with the most valuable facts you have not mentioned yet, in under a minute.
+- **Improving after every interview**: Each session ends with a debrief: every question reviewed, what was missing, a stronger spoken version — and the recording to replay.
+
+## Pricing
+
+Free plan with a monthly AI allowance; Pro is £25 a month or £169 a year with 20 times the allowance. Cancel anytime; local tax added at checkout.
+
+# Getting started
+
+## Help Center
+
+https://copilot.xichiuk.com/docs/
+
+What Interview Realtime Copilot does, the loop it runs on, and how to find your way around this guide.
+
+Interview Realtime Copilot is a Mac app that helps you through real job interviews. It listens to the interviewer, translates as they speak, recognises each question and shows a short answer built from your own resume and notes. It also rehearses with you before the interview and reviews every session afterwards.
+
+New here? Install the app, sign in with your website account, create a goal and add your resume — then start a practice session. The realtime AI engine is ready as soon as you sign in; every plan includes a monthly allowance.
+
+### The loop: Prepare, Practise, Perform, Review
+
+Everything in the app follows the same four steps for each job you apply for. Go round the loop once per interview.
+
+- **1. Prepare**: Create a goal (role and company) and add your resume and preparation notes.
+- **2. Practise**: A spoken AI interviewer asks your prepared questions and follows up.
+- **3. Perform**: Go Live in your real interview; the cockpit listens, translates and hints.
+- **4. Review**: Read the debrief and replay the recording, then prepare better next time.
+
+### Words you will see a lot
+
+| Term | Meaning |
+|---|---|
+| Goal | One role at one company. Practice, live sessions and debriefs belong to a goal. |
+| Knowledge sources | The resume and documents a session may use to answer. |
+| Cockpit | The floating window you see during a session, hidden from screen sharing. |
+| Hint | Three or four speakable bullets in English and Chinese. |
+| Debrief | The review written after each session. |
+| AI allowance | The monthly AI usage included in your plan. |
+
+### Common questions
+
+- Which Macs are supported? Apple Silicon (M1–M4) with macOS 14.2 or later.
+- Does the interviewer see it? No — the cockpit is excluded from screen sharing and recordings.
+- Need help? Email linkyourfuture2026@outlook.com.
+
+## Install and sign in
+
+https://copilot.xichiuk.com/docs/install.html
+
+Download the app, open it the first time, and sign in with your website account.
+
+1. Download the DMG from the Download page and open it.
+2. Drag Interview Realtime Copilot into Applications.
+3. Open it. Preview builds are not yet notarised by Apple, so macOS blocks the first launch: open System Settings → Privacy & Security and click “Open Anyway”.
+4. Sign in with your email and password, or choose “Create an account”. It is the same account as on the website.
+
+Downloading from mainland China can be slow because the server is in the UK. Using a faster network or proxy helps.
+
+### Your workspace
+
+Goals, documents, transcripts, debriefs and recordings are stored on your Mac, in a workspace that belongs to your account. Signing out keeps them; signing in again opens them.
+
+## Set up permissions
+
+https://copilot.xichiuk.com/docs/permissions.html
+
+The microphone hears you; System Audio Recording hears the interviewer in your meeting app.
+
+| Permission | Needed for | Where |
+|---|---|---|
+| Microphone | Practice and Live — your answers | Asked the first time you start a session |
+| System Audio Recording | Live — the interviewer's voice | System Settings → Privacy & Security → Screen & System Audio Recording |
+| Screen Recording | Solve screen and auto-capture | Same panel as above |
+
+Settings → Privacy & Stealth shows the state of each permission with a button to grant it. Preflight, the check before every session, lets you test the microphone level.
+
+After changing a permission in System Settings, quit and reopen the app so macOS applies it.
+
+## Plans and AI allowance
+
+https://copilot.xichiuk.com/docs/plans.html
+
+Every plan includes a monthly allowance of the realtime AI engine — nothing to set up.
+
+| Plan | Price | AI allowance per month |
+|---|---|---|
+| Free | £0 | About 2 practice sessions |
+| Pro monthly | £25 / month | 20× the free allowance |
+| Pro yearly | £169 / year | 20× the free allowance |
+
+Prices exclude tax; your local VAT or sales tax is added at checkout.
+
+- The allowance resets on the 1st of each month (UTC). Settings → Account shows what you have used and what is left.
+- Spoken practice uses the most (realtime voice); live hints and translation use less; debriefs cost a few cents.
+- When the allowance is used up, the cockpit says so; subscribe to Pro for a larger monthly allowance.
+
+### Subscribe or manage billing
+
+In Settings → Account click Subscribe (or Manage billing). The website opens already signed in; payment is handled by Stripe. Cancel anytime — Pro stays active until the end of the paid period.
+
+## Your first interview, end to end
+
+https://copilot.xichiuk.com/docs/first-interview.html
+
+From an empty app to a debrief in about fifteen minutes.
+
+1. Create a goal: role, company and (ideally) the job description.
+2. Add your resume and preparation notes on the goal's Prep tab. Wait until they show Ready.
+3. Click Practice. In Preflight choose the practice mode and sources, test the microphone, and start.
+4. Answer out loud. Use Suggest answer when you are stuck, or Expand answer to continue what you said.
+5. Click End. The debrief appears in History within a minute.
+6. On interview day, open your meeting app, click Go Live and keep the cockpit beside the call.
+
+# Goals and materials
+
+## Goals
+
+https://copilot.xichiuk.com/docs/goals.html
+
+A goal is one role at one company; everything else hangs off it.
+
+Create a goal from the sidebar. Add the job description so hints and practice questions focus on what the role needs. The goal page has three tabs: Overview, Prep (documents) and Sessions.
+
+## Resume and preparation notes
+
+https://copilot.xichiuk.com/docs/materials.html
+
+What to upload, what happens to it, and how prepared questions are found.
+
+- Formats: PDF, Word (.docx), Markdown and plain text, up to 500 MB per file.
+- Each document is read once and kept as text on your Mac, so large PDFs are only processed the first time.
+- Every prepared question in your notes (Q&A, headings ending in “?”, numbered questions) becomes a practice question.
+
+Hints only use facts from your materials. If something is not in them, the copilot suggests how to answer honestly rather than inventing experience.
+
+### Knowledge sources
+
+Preflight lets you choose which documents a session may use. The choice is remembered per goal.
+
+# Practice interviews
+
+## Spoken practice
+
+https://copilot.xichiuk.com/docs/practice.html
+
+A spoken AI interviewer asks your prepared questions, waits for you to finish and follows up.
+
+### Practice modes
+
+| Mode | What happens |
+|---|---|
+| In order | Prepared questions in the order of your notes. |
+| Random | Prepared questions shuffled; none repeated. |
+| AI improvises | New questions based on the role and your answers. |
+
+- The question panel shows progress (asked / total). Click any question to jump to it.
+- The interviewer waits about 2.5 seconds of silence before replying, so pauses while you think are fine.
+- Each question gets at most one follow-up, then the interview moves on.
+
+### Help while answering
+
+- Suggest answer — under an interviewer line: a bilingual hint for that question.
+- Expand answer — under your own line: continues what you said with the facts you have not mentioned yet.
+
+# Live interview
+
+## Go Live
+
+https://copilot.xichiuk.com/docs/go-live.html
+
+Start a live session for a real interview on Zoom, Teams, Meet or any call app.
+
+1. Join the call in your meeting app.
+2. Click Go Live on the goal. In Preflight choose the knowledge sources, answer language and playbook.
+3. Start. The cockpit opens and both meters (Mic and Computer) should move when people speak.
+
+### What you see
+
+- Interviewer lines appear as they speak, with the translation underneath.
+- Pauses inside a question do not split it; a finished question becomes a question card.
+- A hint streams in: three or four bullets in English and Chinese, from your materials.
+- If a question is cut off mid-sentence, a hint still appears after a short pause.
+
+The copilot hears everything your Mac plays. Close music and videos during the interview so they are not transcribed.
+
+## The cockpit and stealth
+
+https://copilot.xichiuk.com/docs/cockpit.html
+
+Keep the cockpit readable for you and invisible to everyone else.
+
+- Hide from screen sharing is on by default: the cockpit does not appear in shared screens or recordings. Turning it off shows a warning.
+- Appearance: opacity 70–100% (default 80%), background and text colours, with a live preview.
+- Move and resize it with the keyboard so you never reach for the mouse during a call.
+
+## Keyboard shortcuts
+
+https://copilot.xichiuk.com/docs/shortcuts.html
+
+Default shortcuts; change any of them in Settings → Shortcuts.
+
+| Action | Shortcut |
+|---|---|
+| Show or hide the results panel | ⌥ C |
+| Solve screen | ⌥ S |
+| Show or hide the cockpit | ⌥ A |
+| Move the cockpit | ⌥ ↑ ↓ ← → |
+| Wider / narrower | ⌥ =  /  ⌥ − |
+
+## Coding, system design and screen help
+
+https://copilot.xichiuk.com/docs/solve-screen.html
+
+Let the copilot read the problem on your screen and explain a solution.
+
+- Press ⌥S (or Solve screen in the cockpit) to capture the screen once. The copilot reads the coding problem, diagram or error and writes a solution with its complexity and edge cases.
+- Auto-capture (Settings → Privacy & Stealth) does this by itself when the interviewer asks a coding or system-design question.
+- Defaults → Coding language sets the language solutions are written in.
+
+Screen capture needs the Screen Recording permission. Only one screenshot is taken per request; nothing is recorded continuously.
+
+# History and debriefs
+
+## Debriefs and recordings
+
+https://copilot.xichiuk.com/docs/debriefs.html
+
+Every session is recorded on your Mac and reviewed question by question.
+
+- History lists your sessions; open one to read its debrief and play the recording.
+- The debrief reviews every question (up to 40 per session): what was missing and a stronger spoken version, using only what you actually said.
+- The recording mixes your microphone, the computer audio and the practice interviewer's voice. It is saved when you click End.
+
+No debrief? A session needs some of your own speech to review. If the microphone was muted or denied, there is nothing to assess.
+
+# Account, privacy and settings
+
+## Privacy and your data
+
+https://copilot.xichiuk.com/docs/privacy.html
+
+What stays on your Mac and what is sent for processing.
+
+- On your Mac: goals, documents, extracted questions, transcripts, debriefs and recordings.
+- Processed during a session you start: audio and the text needed to answer (the question and relevant passages of your materials), by our AI engine on our servers and trusted AI processing partners.
+- Our server keeps your email, a password hash, your plan and usage amounts. Payments are processed by Stripe.
+
+## Settings reference
+
+https://copilot.xichiuk.com/docs/settings.html
+
+The six sections of Settings.
+
+| Section | What it controls |
+|---|---|
+| General | Launch at login, version. |
+| Appearance | Cockpit opacity and colours, with preview. |
+| Defaults | Answer language, coding language, playbook. |
+| Privacy & Stealth | Hide from screen sharing, permissions, auto-capture, AI memory. |
+| Shortcuts | Nine shortcuts, click to rebind, reset. |
+| Account | Plan and allowance, subscribe, sign out, support. |
+
+# Interview guides
+
+## How to get through an English interview when English is not your first language
+
+https://copilot.xichiuk.com/docs/english-interview.html
+
+A practical method for understanding every question and answering clearly — with and without an AI interview assistant.
+
+### Why English interviews go wrong
+
+- You miss part of the question — an accent, a fast speaker or an unfamiliar term — and answer something else.
+- You know the answer in your own language but lose time translating it in your head.
+- Nerves make both problems worse.
+
+### Five things that work
+
+1. Write your ten most likely answers in English beforehand, in short spoken sentences, and say them out loud.
+2. Learn the English names of your own work: systems, metrics, tools. These are the words you cannot paraphrase.
+3. Answer in a fixed shape: the direct answer first, then how it works, then one number or result.
+4. If you did not catch a question, say “Let me make sure I understood — you are asking about …?” It is normal and buys time.
+5. Rehearse with a spoken mock interviewer, not silently. Speaking is a different skill from reading.
+
+### How an AI interview assistant helps
+
+Interview Realtime Copilot shows every interviewer sentence with a Chinese translation as it is spoken, turns a finished question into a card, and gives you a short answer in natural English built from your own resume. Before the interview, its spoken practice asks your prepared questions out loud so the real one feels familiar.
+
+Use the hints as a prompt for your own words. Reading a script aloud sounds unnatural; glancing at three bullets does not.
+
+## What is an AI interview assistant, and how do you choose one?
+
+https://copilot.xichiuk.com/docs/ai-interview-assistant.html
+
+What these tools do during a live interview, what to check before trusting one, and where they do not help.
+
+An AI interview assistant — some people call it an interview copilot, 面试神器 or 面试外挂 — is an app that listens to your interview, recognises the question and suggests an answer while you are still on the call.
+
+### What to check
+
+| Question | Why it matters |
+|---|---|
+| Does it answer from your own resume and notes? | Generic answers are easy to spot; invented experience fails follow-up questions. |
+| How fast is the first hint? | More than a few seconds and the silence is noticeable. |
+| Does it understand questions with pauses? | Real interviewers think aloud; a tool that splits one question into three gives three wrong answers. |
+| Is it hidden from screen sharing? | Otherwise the interviewer sees the window. |
+| Can you rehearse with it? | The first time you use it should not be the real interview. |
+| Where is your data kept? | Your resume and recordings are personal; local storage is safer. |
+
+### Where it does not help
+
+- It cannot give you experience you do not have — and a good tool will not pretend to.
+- Check the rules of each interview and use it within them.
+
+Interview Realtime Copilot is built around these points: answers from your own materials, question detection that survives pauses, English–Chinese translation, spoken practice, and local storage.
+
+## Interview tomorrow and no time to prepare: a two-hour plan
+
+https://copilot.xichiuk.com/docs/last-minute-prep.html
+
+What to do, in order, when the interview is close and preparation time is short.
+
+1. 20 minutes — read the job description and underline the five skills it repeats. Those are your questions.
+2. 30 minutes — for each skill, write one real example from your work: the situation, what you did, the result with a number.
+3. 20 minutes — prepare the three certain questions: tell me about yourself, why this company, why are you leaving.
+4. 40 minutes — say the answers out loud against a mock interviewer and fix the ones that ramble.
+5. 10 minutes — check your microphone, camera and meeting link; sleep.
+
+### Doing it faster with the copilot
+
+Upload your resume, the job description and whatever notes you have. Interview Realtime Copilot extracts the questions, a spoken AI interviewer asks them, and during the real interview each hint is drawn from those same files — so the two hours you do have go into rehearsing rather than writing.
+
+# Troubleshooting and FAQ
+
+## Troubleshooting
+
+https://copilot.xichiuk.com/docs/troubleshooting.html
+
+Fixes for the problems people meet most often.
+
+| Problem | What to do |
+|---|---|
+| The Computer meter does not move in Live | Allow System Audio Recording for the app, quit and reopen it, and check the meeting's sound plays through this Mac. |
+| The Mic meter does not move | Allow the microphone in System Settings → Privacy & Security → Microphone; check the input device in macOS Sound settings. |
+| “Your monthly AI allowance is used up” | Subscribe in Settings → Account, or wait for next month's allowance. |
+| macOS says the app cannot be opened | System Settings → Privacy & Security → Open Anyway (preview builds are not notarised yet). |
+| Cannot reach the account service | Check your internet connection or proxy; the app keeps you signed in and retries. |
+| A continuous question is split into pieces | Usually a very long pause; the copilot still answers the combined question. Tell us if it keeps happening. |
+
+### Contact support
+
+Email linkyourfuture2026@outlook.com with what you did, what you expected and what happened. In the app, the Help button (?) opens a new email for you.

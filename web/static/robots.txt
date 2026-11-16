@@ -1,6 +1,26 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /auth/
 Disallow: /account.html
 Disallow: /admin.html
+Disallow: /login.html
+
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Bytespider
+User-agent: Baiduspider
+Allow: /
+Disallow: /api/
+Disallow: /auth/
+Disallow: /account.html
+Disallow: /admin.html
+Disallow: /login.html
+
 Sitemap: https://copilot.xichiuk.com/sitemap.xml

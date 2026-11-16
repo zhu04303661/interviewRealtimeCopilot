@@ -9,6 +9,7 @@ language switcher in site.js swaps them; nothing is mixed on screen.
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 from pathlib import Path
@@ -17,9 +18,9 @@ STATIC = Path(__file__).parent / "static"
 SUPPORT_EMAIL = "linkyourfuture2026@outlook.com"
 STRINGS: dict[str, dict[str, str]] = {"en": {}, "zh": {}}
 SITE = "https://copilot.xichiuk.com"
+APP_VERSION = json.loads((Path(__file__).parent.parent / "apps/desktop/package.json").read_text())["version"]
 PAGES: list[str] = []  # every page written, as a path under static/ (for the /zh/ copies and hreflang)
 PRIVATE = {"login.html", "account.html", "admin.html", "404.html"}  # no /zh/ copy, not in the sitemap
-ZH_DESCRIPTION = "AI 面试助手：实时听懂面试官、中英同步翻译、自动识别问题，并基于你自己的简历给出回答提示；支持截屏解答编程题、语音模拟面试和面试复盘。"
 INTERNAL = re.compile(r'href="/(?!(?:login|account|admin)\.html)((?:[\w\-/]*\.html|[\w\-/]*/)?(?:[#?][^"]*)?)"')
 
 
@@ -42,10 +43,15 @@ def write_chinese_copies() -> None:
         zh = inner.sub(lambda m: m.group(1) + STRINGS["zh"].get(m.group(3), m.group(4)) + m.group(5), html)
         zh = re.sub(r'data-i18n-placeholder="([^"]+)" placeholder="[^"]*"', lambda m: f'data-i18n-placeholder="{m.group(1)}" placeholder="{STRINGS["zh"].get(m.group(1), "")}"', zh)
         zh = zh.replace('<html lang="en">', '<html lang="zh-CN" data-lang="zh">', 1).replace("<!--ALT-->", alternates)
-        zh = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{ZH_DESCRIPTION}">', zh, count=1)
-        zh = re.sub(r'<meta property="og:description" content="[^"]*">', f'<meta property="og:description" content="{ZH_DESCRIPTION}">', zh, count=1)
+        zh_desc = STRINGS["zh"][f"desc.{rel}"].replace("&", "&amp;").replace('"', "&quot;")
+        zh = re.sub(r'<meta name="description" content="[^"]*">', lambda m: f'<meta name="description" content="{zh_desc}">', zh, count=1)
+        zh = re.sub(r'<meta property="og:description" content="[^"]*">', lambda m: f'<meta property="og:description" content="{zh_desc}">', zh, count=1)
+        zh = re.sub(r'<meta name="keywords" content="[^"]*">', f'<meta name="keywords" content="{KEYWORDS["zh"]}">', zh, count=1)
+        zh = zh.replace('<meta property="og:locale" content="en_GB"><meta property="og:locale:alternate" content="zh_CN">',
+                        '<meta property="og:locale" content="zh_CN"><meta property="og:locale:alternate" content="en_GB">', 1)
+        zh = re.sub(r'<script type="application/ld\+json">.*?</script>', lambda m: f'<script type="application/ld+json">{ld_script(rel, "zh")}</script>', zh, count=1, flags=re.S)
         zh_title = STRINGS["zh"]["title." + re.search(r'data-page="([^"]+)"', zh).group(1)]
-        zh = re.sub(r'<meta property="og:title" content="[^"]*">', f'<meta property="og:title" content="{zh_title}">', zh, count=1)
+        zh = re.sub(r'<meta property="og:title" content="[^"]*">', lambda m: f'<meta property="og:title" content="{zh_title}">', zh, count=1)
         zh = re.sub(r'<link rel="canonical" href="[^"]*">', f'<link rel="canonical" href="{SITE}/zh/{url_of(rel)}">', zh, count=1)
         zh = re.sub(r'<meta property="og:url" content="[^"]*">', f'<meta property="og:url" content="{SITE}/zh/{url_of(rel)}">', zh, count=1)
         zh = INTERNAL.sub(lambda m: f'href="/zh/{m.group(1)}"', zh)
@@ -54,22 +60,130 @@ def write_chinese_copies() -> None:
         target.write_text(zh)
 
 
+TODAY = datetime.date.today().isoformat()
+LDS: dict[str, object] = {}  # page path -> function(lang) returning its JSON-LD nodes
+KEYWORDS = {"en": "AI interview assistant, interview copilot, real-time interview help, interview answer generator, coding interview AI, mock interview, interview translation",
+            "zh": "AI面试助手, 实时面试辅助, 面试神器, 面试外挂, 英文面试, 跨语言面试, 面试翻译, 编程面试, 面试题答案, 模拟面试"}
+# One description per page (search-result snippet); Help Center pages use their lead instead.
+DESCRIPTIONS = {
+    "index": ("Interview Realtime Copilot is an AI interview assistant for Mac: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.",
+              "Interview Realtime Copilot 是 Mac 上的 AI 面试助手：实时转写并翻译面试官的话、自动识别问题，并基于你自己的简历给出回答提示。提供免费版。"),
+    "use-cases": ("Six interview moments the copilot handles: video interviews, interviewing in a second language, coding rounds, rehearsing prepared answers, getting stuck mid-answer, and debriefs.",
+                  "它解决的六个面试时刻：视频面试、用第二语言面试、技术面与编程题、演练准备好的问答、回答到一半卡住，以及面试后的复盘。"),
+    "demo": ("Watch a live interview question get transcribed, translated, recognised and answered in seconds — the cockpit you see during a real interview.",
+             "看一道面试问题如何在几秒内被转写、翻译、识别并给出回答提示——这就是真实面试中你看到的窗口。"),
+    "pricing": ("Free plan with a monthly AI allowance; Pro is £25 a month or £169 a year with 20 times the allowance. Cancel anytime; local tax added at checkout.",
+                "免费版含每月 AI 额度；Pro 每月 £25 或每年 £169，额度为免费版的 20 倍。随时可取消，结账时加收当地税费。"),
+    "download": ("Download Interview Realtime Copilot for Mac (Apple Silicon, macOS 14.2 or later). Sign in with your website account and start a practice interview in minutes.",
+                 "下载 Interview Realtime Copilot Mac 版（Apple 芯片，macOS 14.2 及以上）。用网站账号登录，几分钟内开始一次语音模拟面试。"),
+    "privacy": ("What Interview Realtime Copilot stores on your Mac, what is processed during a session, and what the website keeps.",
+                "Interview Realtime Copilot 在你的 Mac 上保存什么、会话中处理什么，以及网站保留哪些信息。"),
+    "terms": ("Terms of the Interview Realtime Copilot preview service.", "Interview Realtime Copilot 预览版服务条款。"),
+}
+# Shown on the home page and published as FAQPage data (the two must match). Written as direct, self-contained answers.
+HOME_FAQ = [
+    ("What is Interview Realtime Copilot?", "Interview Realtime Copilot 是什么？",
+     "Interview Realtime Copilot is an AI interview assistant for Mac. During a live interview it transcribes the interviewer, translates between English and Chinese, recognises each finished question and shows a short answer built from your own resume and notes. It also runs spoken mock interviews and writes a debrief after every session.",
+     "Interview Realtime Copilot 是一款 Mac 上的 AI 面试助手。在实时面试中，它转写面试官的话、在中英文之间翻译、识别每个完整的问题，并基于你自己的简历和准备资料给出简短的回答。它还提供语音模拟面试，并在每场会话后生成复盘。"),
+    ("How does it help if my English is not fluent?", "英语不够流利，它能帮上什么？",
+     "Every sentence the interviewer says appears on screen with a Chinese translation as it is spoken, and each answer hint is written in natural English you can say directly, with a Chinese version beside it.",
+     "面试官说的每句话都会实时显示并附上中文翻译；每条回答提示都用可以直接说出口的地道英文写成，旁边附有中文。"),
+    ("Can it help with coding interview questions?", "它能帮忙解答编程面试题吗？",
+     "Yes. Press ⌥S and it reads the coding problem on your screen and returns a complete solution in your chosen language, with the approach to say out loud, time and space complexity, and edge cases. In our own evaluation its code passed the tests for ten of ten problems, from easy to hard.",
+     "可以。按 ⌥S，它会读取屏幕上的编程题，用你选择的编程语言给出完整解法，并附上可以说出口的思路、时间和空间复杂度以及边界情况。在我们自己的评测中，从简单到困难的十道题，它给出的代码全部通过了测试。"),
+    ("Can the interviewer see it?", "面试官能看到它吗？",
+     "The cockpit window is excluded from screen sharing and screen recordings by default, so it is not included when you share your screen in a meeting app.",
+     "面试窗口默认不会出现在屏幕共享和录屏中，所以你在会议软件里共享屏幕时，它不会被包含在画面里。"),
+    ("Where is my data stored?", "我的数据存在哪里？",
+     "Your resume, notes, transcripts, debriefs and recordings are stored on your own Mac. Audio and the text needed to answer are processed by our AI engine only during a session you start.",
+     "简历、资料、字幕、复盘和录音都保存在你自己的 Mac 上。只有在你开始的会话中，音频和回答所需的文字才会交给我们的 AI 引擎处理。"),
+    ("How much does it cost?", "费用是多少？",
+     "There is a free plan with a monthly AI allowance, enough for about two practice sessions. Pro costs £25 a month or £169 a year and includes 20 times the free allowance. Local tax is added at checkout.",
+     "免费版含每月 AI 额度，约可做两次语音练习。Pro 每月 £25 或每年 £169，额度为免费版的 20 倍。结账时加收当地税费。"),
+    ("Which computers does it run on?", "支持哪些电脑？",
+     "Macs with Apple Silicon (M1 to M4) running macOS 14.2 or later. A Windows version is planned.",
+     "搭载 Apple 芯片（M1 至 M4）、运行 macOS 14.2 及以上的 Mac。Windows 版在计划中。"),
+]
+
+
+def base_ld(lang: str) -> list[dict]:
+    return [{"@type": "Organization", "@id": f"{SITE}/#org", "name": "Interview Realtime Copilot", "url": SITE, "logo": f"{SITE}/icon-512.png",
+             "contactPoint": {"@type": "ContactPoint", "contactType": "customer support", "email": SUPPORT_EMAIL, "availableLanguage": ["English", "Chinese"]}},
+            {"@type": "WebSite", "@id": f"{SITE}/#site", "name": "Interview Realtime Copilot", "url": SITE, "inLanguage": ["en", "zh-CN"], "publisher": {"@id": f"{SITE}/#org"}}]
+
+
+def faq_ld(pairs: list[tuple[str, str]]) -> dict:
+    return {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in pairs]}
+
+
+def app_ld(lang: str) -> dict:
+    return {"@type": "SoftwareApplication", "@id": f"{SITE}/#app", "name": "Interview Realtime Copilot", "applicationCategory": "BusinessApplication",
+            "operatingSystem": "macOS 14.2+", "description": DESCRIPTIONS["index"][lang == "zh"], "inLanguage": ["en", "zh-CN"], "softwareVersion": APP_VERSION,
+            "downloadUrl": f"{SITE}/download.html", "image": f"{SITE}/share.png", "publisher": {"@id": f"{SITE}/#org"},
+            "featureList": (["实时转写与中英翻译", "自动识别面试问题", "基于简历的回答提示", "截屏解答编程题", "语音模拟面试", "面试复盘与录音回放"] if lang == "zh" else
+                            ["Live transcription and English-Chinese translation", "Interview question detection", "Answer hints grounded in your resume",
+                             "Coding help from a screenshot", "Spoken mock interviews", "Debriefs with recording playback"]),
+            "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "GBP", "name": "Free"}, {"@type": "Offer", "price": "25", "priceCurrency": "GBP", "name": "Pro monthly"},
+                       {"@type": "Offer", "price": "169", "priceCurrency": "GBP", "name": "Pro yearly"}]}
+
+
+def ld_script(rel: str, lang: str) -> str:
+    nodes = base_ld(lang) + (LDS[rel](lang) if rel in LDS else [])
+    return json.dumps({"@context": "https://schema.org", "@graph": nodes}, ensure_ascii=False).replace("</", "<\\/")
+
+
+def nav_link(key: str, en: str, zh: str, href: str, attrs: str = "") -> str:
+    STRINGS["en"][key], STRINGS["zh"][key] = en, zh
+    return f'<a data-i18n="{key}" href="{href}"{attrs}>{en}</a>'
+
+
+def site_header() -> str:
+    """Header in the HTML itself, so crawlers that do not run JavaScript can follow the navigation (site.js adds the behaviour)."""
+    links = "".join(nav_link(f"nav.{k}", en, zh, href, f' data-nav="{name}"') for k, name, en, zh, href in [
+        ("scenarios", "use-cases", "Use cases", "使用场景", "/use-cases.html"), ("demo", "demo", "Demo", "演示", "/demo.html"),
+        ("pricing", "pricing", "Pricing", "价格", "/pricing.html"), ("download", "download", "Download", "下载", "/download.html"), ("docs", "docs", "Docs", "使用手册", "/docs/")])
+    return ('<header class="nav"><div class="wrap"><a class="brand" href="/"><span class="logo">IR</span>Interview Realtime Copilot</a>'
+            f'<nav class="links">{links}</nav><span class="spacer"></span><button class="menu-btn" aria-label="Menu" aria-expanded="false"><i></i><i></i><i></i></button>'
+            '<span class="lang"><button data-lang="en">English</button><button data-lang="zh">中文</button></span>'
+            f'<span id="account-slot">{nav_link("nav.signin", "Sign in", "登录", "/login.html", " class=" + chr(34) + "btn" + chr(34))}</span>'
+            + nav_link("nav.start", "Get started", "开始使用", "/download.html", ' class="btn primary"') + "</div></header>")
+
+
+def site_footer() -> str:
+    links = "".join(nav_link(k, en, zh, href) for k, en, zh, href in [
+        ("nav.scenarios", "Use cases", "使用场景", "/use-cases.html"), ("nav.demo", "Demo", "演示", "/demo.html"), ("nav.pricing", "Pricing", "价格", "/pricing.html"),
+        ("nav.download", "Download", "下载", "/download.html"), ("nav.docs", "Docs", "使用手册", "/docs/"),
+        ("foot.guide.english", "English interview guide", "英文面试指南", "/docs/english-interview.html"),
+        ("foot.guide.assistant", "Choosing an AI interview assistant", "如何选择 AI 面试助手", "/docs/ai-interview-assistant.html"),
+        ("foot.guide.prep", "Last-minute interview prep", "面试前两小时准备", "/docs/last-minute-prep.html"),
+        ("foot.wishlist", "Wishlist", "许愿单", "/#wishlist"), ("foot.privacy", "Privacy", "隐私", "/privacy.html"), ("foot.terms", "Terms", "条款", "/terms.html")])
+    return ('<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>' + links
+            + f'<a href="mailto:{SUPPORT_EMAIL}">{t("foot.support", "Support", "联系客服")} · {SUPPORT_EMAIL}</a><span>© {TODAY[:4]}</span></div></footer>')
+
+
 def t(key: str, en: str, zh: str, tag: str = "span", cls: str = "") -> str:
     STRINGS["en"][key], STRINGS["zh"][key] = en, zh
     return f'<{tag} data-i18n="{key}"{f" class={chr(34)}{cls}{chr(34)}" if cls else ""}>{en}</{tag}>'
 
 
-def page(name: str, title: tuple[str, str], body: str, out: str | None = None) -> None:
+def page(name: str, title: tuple[str, str], body: str, out: str | None = None, desc: tuple[str, str] | None = None, ld=None) -> None:
     key = f"title.{name}"
     STRINGS["en"][key], STRINGS["zh"][key] = title
+    rel = out or f"{name}.html"
+    desc = desc or DESCRIPTIONS.get(name) or DESCRIPTIONS["index"]
+    STRINGS["en"][f"desc.{rel}"], STRINGS["zh"][f"desc.{rel}"] = desc
+    if ld:
+        LDS[rel] = ld
+    robots = '<meta name="robots" content="noindex, nofollow">' if rel in PRIVATE else '<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">'
+    escape = lambda text: text.replace("&", "&amp;").replace('"', "&quot;")  # noqa: E731
     head = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            f'<title data-i18n="{key}">{title[0]}</title><meta name="description" content="Real-time interview copilot: live transcript, '
-            f'question detection, answer hints grounded in your own resume, spoken practice and debriefs.">'
-            f'<meta name="keywords" content="AI interview assistant, interview copilot, real-time interview help, interview answer generator, coding interview AI, AI面试助手, 实时面试辅助, 面试外挂, 面试神器, 英文面试, 跨语言面试, 面试翻译, 编程面试代码, 面试题答案, 模拟面试">'
-            f'<meta property="og:title" content="{title[0]}"><meta property="og:type" content="website"><meta property="og:url" content="https://copilot.xichiuk.com/{"" if name == "index" else name + ".html"}">'
-            f'<meta property="og:description" content="Real-time AI interview assistant: live translation, question detection, answers from your resume, coding help from your screen.">'
+            f'<title data-i18n="{key}">{title[0]}</title><meta name="description" content="{escape(desc[0])}">{robots}'
+            f'<meta name="keywords" content="{KEYWORDS["en"]}">'
+            f'<meta property="og:site_name" content="Interview Realtime Copilot"><meta property="og:locale" content="en_GB"><meta property="og:locale:alternate" content="zh_CN">'
+            f'<meta property="og:title" content="{escape(title[0])}"><meta property="og:type" content="website"><meta property="og:url" content="{SITE}/{url_of(rel)}">'
+            f'<meta property="og:description" content="{escape(desc[0])}">'
             f'<link rel="canonical" href="https://copilot.xichiuk.com/{out or ("" if name == "index" else name + ".html")}">'
-            f'<script type="application/ld+json">{LD}</script>'
+            f'<script type="application/ld+json">{ld_script(rel, "en")}</script>'
             f'<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">'
             f'<link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#06070b">'
             f'<meta property="og:image" content="https://copilot.xichiuk.com/share.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
@@ -80,21 +194,8 @@ def page(name: str, title: tuple[str, str], body: str, out: str | None = None) -
     PAGES.append(out or f"{name}.html")
     target = STATIC / (out or f"{name}.html")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(head + body + "</body></html>\n")
+    target.write_text(head + site_header() + body + site_footer() + "</body></html>\n")
 
-
-LD = json.dumps({"@context": "https://schema.org", "@graph": [
-    {"@type": "SoftwareApplication", "name": "Interview Realtime Copilot", "applicationCategory": "BusinessApplication", "operatingSystem": "macOS 14.2+",
-     "description": "AI interview assistant (AI面试助手) that listens to live interviews, translates English and Chinese in real time, detects each question and suggests answers from your own resume; solves coding questions from your screen; spoken mock interviews and debriefs.",
-     "publisher": {"@type": "Organization", "name": "Interview Realtime Copilot", "url": "https://copilot.xichiuk.com",
-                   "contactPoint": {"@type": "ContactPoint", "contactType": "customer support", "email": SUPPORT_EMAIL, "availableLanguage": ["English", "Chinese"]}},
-     "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "GBP", "name": "Free"}, {"@type": "Offer", "price": "25", "priceCurrency": "GBP", "name": "Pro monthly"},
-                {"@type": "Offer", "price": "169", "priceCurrency": "GBP", "name": "Pro yearly"}]},
-    {"@type": "FAQPage", "mainEntity": [
-        {"@type": "Question", "name": "What is an AI interview assistant (面试外挂 / AI面试助手)?", "acceptedAnswer": {"@type": "Answer", "text": "A desktop app that listens to your live interview, recognises each question and shows a short answer drawn from your own resume and notes, with English–Chinese translation."}},
-        {"@type": "Question", "name": "Can it help if my English is not fluent?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every interviewer line is translated into Chinese as it is spoken, and hints give natural English you can say directly."}},
-        {"@type": "Question", "name": "Does it help with coding interviews?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It reads the coding problem on your screen and writes a working solution with complexity and edge cases, hidden from screen sharing."}},
-        {"@type": "Question", "name": "I have no time to prepare. Can it still help?", "acceptedAnswer": {"@type": "Answer", "text": "Upload your resume, notes or the job description; prepared questions are extracted for spoken practice and live hints come from the same files."}}]}]}, ensure_ascii=False)
 
 COCKPIT = ('<div class="stage"><div class="scene" data-scene>'
            # The meeting the candidate is in (what the interviewer and candidate see on the call).
@@ -189,10 +290,19 @@ def build_docs() -> list[str]:
         pager = (pager_link(prev_, "", "docs.prev", "Previous") if prev_ else "<span></span>") + (pager_link(next_, "next", "docs.next", "Next") if next_ else "")
         body = (f'<div class="docs wrap"><aside class="docs-nav">{"".join(nav)}</aside><main class="docs-main">'
                 f'<div class="eyebrow">{t(f"docg.{gkey}", gen, gzh)}</div><h1>{t(k + ".title", *doc["title"])}</h1>{t(k + ".lead", *doc["lead"], "p", "lead")}'
-                + "".join(html) + f'<div class="pager">{pager}</div></main>'
+                + "".join(html) + f'<p class="faint small updated">{t("docs.updated", "Last updated", "最后更新")} <time datetime="{TODAY}">{TODAY}</time></p><div class="pager">{pager}</div></main>'
                 f'<nav class="docs-toc">{("<b class=" + chr(34) + "faint small" + chr(34) + " data-i18n=" + chr(34) + "docs.toc" + chr(34) + ">On this page</b>" + "".join(toc)) if toc else ""}</nav></div>')
         out = "docs/index.html" if slug == "index" else f"docs/{slug}.html"
-        page(f"docs-{slug}", (f"{doc['title'][0]} — Interview Realtime Copilot Help", f"{doc['title'][1]} — Interview Realtime Copilot 帮助中心"), body, out)
+        def doc_ld(lang, doc=doc, out=out, guide=gkey == "guides"):
+            z = lang == "zh"
+            url = f"{SITE}/{'zh/' if z else ''}{url_of(out)}"
+            crumbs = [("首页" if z else "Home", f"{SITE}/{'zh/' if z else ''}"), ("帮助中心" if z else "Help Center", f"{SITE}/{'zh/' if z else ''}docs/"), (doc["title"][z], url)]
+            return [{"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n, "item": u} for i, (n, u) in enumerate(crumbs)]},
+                    {"@type": "Article" if guide else "TechArticle", "headline": doc["title"][z], "description": doc["lead"][z], "inLanguage": "zh-CN" if z else "en",
+                     "url": url, "mainEntityOfPage": url, "dateModified": TODAY, "datePublished": "2026-11-13", "image": f"{SITE}/share.png",
+                     "author": {"@id": f"{SITE}/#org"}, "publisher": {"@id": f"{SITE}/#org"}, "about": {"@id": f"{SITE}/#app"}}]
+        suffix = ("Interview Realtime Copilot", "Interview Realtime Copilot") if gkey == "guides" else ("Interview Realtime Copilot Help", "Interview Realtime Copilot 帮助中心")
+        page(f"docs-{slug}", (f"{doc['title'][0]} — {suffix[0]}", f"{doc['title'][1]} — {suffix[1]}"), body, out, desc=doc["lead"], ld=doc_ld)
         urls.append(out.replace("index.html", ""))
     for key, en, zh in [("docs.search", "Search the guide", "搜索手册"), ("docs.prev", "Previous", "上一篇"), ("docs.next", "Next", "下一篇"),
                         ("docs.toc", "On this page", "本页内容"), ("nav.docs", "Docs", "使用手册")]:
@@ -200,8 +310,83 @@ def build_docs() -> list[str]:
     return urls
 
 
+def write_llms() -> None:
+    """llms.txt (index) and llms-full.txt / llms-full-zh.txt (the whole product and Help Center as Markdown) for AI search engines."""
+    from docs_content import DOCS
+
+    def block_md(block, z: int) -> str:
+        kind = block[0]
+        pick = lambda v: v[z] if isinstance(v, tuple) else v  # noqa: E731
+        if kind == "h2":
+            return f"### {block[1 + z]}"
+        if kind in ("p", "note"):
+            return block[1 + z]
+        if kind in ("ul", "steps"):
+            return "\n".join(f"{f'{i + 1}.' if kind == 'steps' else '-'} {item[z]}" for i, item in enumerate(block[1]))
+        if kind == "cards":
+            return "\n".join(f"- **{c[z]}**: {c[2 + z]}" for c in block[1])
+        if kind == "table":
+            head = "| " + " | ".join(pick(h) for h in block[1]) + " |"
+            return "\n".join([head, "|" + "---|" * len(block[1])] + ["| " + " | ".join(pick(c) for c in row) + " |" for row in block[2]])
+        return ""
+
+    doc_url = lambda d, prefix="": f"{SITE}/{prefix}docs/{'' if d['slug'] == 'index' else d['slug'] + '.html'}"  # noqa: E731
+    for z, name in ((0, "llms-full.txt"), (1, "llms-full-zh.txt")):
+        prefix = "zh/" if z else ""
+        out = [f"# Interview Realtime Copilot\n\n> {DESCRIPTIONS['index'][z]}\n",
+               f"{'网站' if z else 'Website'}: {SITE}/{prefix} · {'下载' if z else 'Download'}: {SITE}/{prefix}download.html · {'客服' if z else 'Support'}: {SUPPORT_EMAIL} · "
+               f"{'更新于' if z else 'Updated'} {TODAY}\n", f"## {'常见问题' if z else 'Frequently asked questions'}\n"]
+        out += [f"### {q[z]}\n\n{q[2 + z]}\n" for q in HOME_FAQ]
+        out.append(f"## {'使用场景' if z else 'Use cases'}\n\n" + "\n".join(f"- **{sc[2 + z]}**: {sc[4 + z]}" for sc in SCENARIOS) + "\n")
+        out.append(f"## {'价格' if z else 'Pricing'}\n\n{DESCRIPTIONS['pricing'][z]}\n")
+        for _gkey, gen, gzh, pages in DOCS:
+            out.append(f"# {(gen, gzh)[z]}\n")
+            for doc in pages:
+                out.append(f"## {doc['title'][z]}\n\n{doc_url(doc, prefix)}\n\n{doc['lead'][z]}\n")
+                out += [block_md(b, z) + "\n" for b in doc["blocks"]]
+        (STATIC / name).write_text("\n".join(out))
+    guides = "\n".join(f"- [{d['title'][0]}]({doc_url(d)}): {d['lead'][0]}" for g in DOCS if g[0] == "guides" for d in g[3])
+    help_pages = "\n".join(f"- [{d['title'][0]}]({doc_url(d)}): {d['lead'][0]}" for g in DOCS if g[0] != "guides" for d in g[3])
+    (STATIC / "llms.txt").write_text(f"""# Interview Realtime Copilot
+
+> {DESCRIPTIONS['index'][0]}
+
+Key facts:
+- Category: AI interview assistant / interview copilot (中文：AI 面试助手、实时面试辅助).
+- Platform: macOS 14.2 or later on Apple Silicon. Windows is planned.
+- Live interviews: transcribes the interviewer, translates English and Chinese, detects each finished question, hints a short answer from the user's own resume and notes.
+- Coding rounds: reads the problem from a screenshot and returns runnable code with complexity and edge cases.
+- Practice: a spoken AI interviewer asks the questions extracted from the user's preparation notes.
+- After each session: a question-by-question debrief and the recording.
+- Privacy: documents, transcripts and recordings stay on the user's Mac; the window is excluded from screen sharing.
+- Pricing: free plan; Pro £25/month or £169/year plus local tax.
+- Site languages: English ({SITE}/) and Chinese ({SITE}/zh/).
+- Support: {SUPPORT_EMAIL}
+
+## Product
+- [Home]({SITE}/): overview, the problems it solves, frequently asked questions
+- [Use cases]({SITE}/use-cases.html): {DESCRIPTIONS['use-cases'][0]}
+- [Demo]({SITE}/demo.html): {DESCRIPTIONS['demo'][0]}
+- [Pricing]({SITE}/pricing.html): {DESCRIPTIONS['pricing'][0]}
+- [Download]({SITE}/download.html): {DESCRIPTIONS['download'][0]}
+
+## Guides
+{guides}
+
+## Help Center
+{help_pages}
+
+## Full text
+- [Everything in one file, English]({SITE}/llms-full.txt)
+- [Everything in one file, Chinese]({SITE}/llms-full-zh.txt)
+""")
+
+
 def build() -> None:
-    page("index", ("Interview Realtime Copilot — your private co-pilot for live interviews", "Interview Realtime Copilot — 你的私人面试副驾"), f'''
+    home_faq = "".join(f'<details{" open" if i == 0 else ""}><summary>{t(f"hfaq.{i}q", q_en, q_zh)}</summary>{t(f"hfaq.{i}a", a_en, a_zh, "p")}</details>'
+                       for i, (q_en, q_zh, a_en, a_zh) in enumerate(HOME_FAQ))
+    page("index", ("Interview Realtime Copilot — AI interview assistant for live interviews", "Interview Realtime Copilot — 实时 AI 面试助手"),
+         ld=lambda lang: [app_ld(lang), faq_ld([(q[lang == "zh"], q[2 + (lang == "zh")]) for q in HOME_FAQ])], body=f'''
 <section class="hero"><div class="wrap hero-grid"><div>
 <span class="pill"><b>{t("hero.new", "NEW", "新")}</b>{t("hero.pill", "Spoken practice with your own prepared questions", "用你自己的准备题做语音模拟面试")}</span>
 <h1>{t("hero.h1a", "Answer every interview question", "每一道面试题，")}<br><span class="grad-text">{t("hero.h1b", "with calm confidence.", "都能从容作答。")}</span></h1>
@@ -239,6 +424,8 @@ def build() -> None:
 <li>{t("priv.3", "The cockpit is excluded from screen sharing and recordings.", "面试窗口不会出现在共享屏幕和录屏中。")}</li></ul></div>
 <div class="glass reveal">{t("priv.card.t", "Answers only from what is true", "只说真实的经历", "h3")}{t("priv.card.p", "Hints use facts from your resume and notes. When something is not in your materials, the copilot tells you how to answer honestly instead of inventing experience.", "回答提示只引用你简历和资料中的事实。资料里没有的内容，它会建议你如何如实回答，而不是编造经历。", "p", "muted")}</div></div></section>
 
+<section id="faq"><div class="wrap"><h2 class="center reveal">{t("hfaq.h2", "Frequently asked questions", "常见问题")}</h2><div class="faq">{home_faq}</div></div></section>
+
 <section id="wishlist"><div class="wrap split"><div class="reveal"><span class="eyebrow">{t("wish.eyebrow", "Wishlist", "许愿单")}</span>
 <h2>{t("wish.h2", "Tell us what to build next.", "告诉我们下一步做什么。")}</h2>
 {t("wish.lead", "A feature you need, an interview type we should support, something that annoyed you — every wish is read by the team.", "需要的功能、希望支持的面试类型、用着不顺手的地方——每一条心愿团队都会认真阅读。", "p", "lead")}</div>
@@ -269,7 +456,8 @@ def build() -> None:
 <div class="cta"><a class="btn primary lg" href="/download.html">{t("cta.try", "Try it yourself", "亲自试用")}</a></div></div>{COCKPIT}</div></section>''')
 
     plan_cta = lambda plan, en, zh: f'<button class="btn primary" data-plan="{plan}">{t(f"plan.{plan}.cta", en, zh)}</button>'  # noqa: E731
-    page("pricing", ("Pricing — Interview Realtime Copilot", "价格 — Interview Realtime Copilot"), f'''
+    page("pricing", ("Pricing — Interview Realtime Copilot", "价格 — Interview Realtime Copilot"),
+         ld=lambda lang: [faq_ld([(STRINGS[lang][f"faq.{n}q"], STRINGS[lang][f"faq.{n}a"]) for n in (1, 2, 3, 4)])], body=f'''
 <section class="hero"><div class="wrap center"><span class="eyebrow">{t("pr.eyebrow", "Pricing", "价格")}</span>
 <h1>{t("pr.h1a", "Simple plans.", "简单的方案，")}<br><span class="grad-text">{t("pr.h1b", "Cancel anytime.", "随时可取消。")}</span></h1>
 {t("pr.lead", "Our realtime AI engine is included as a monthly allowance — nothing to set up, no surprise bills.", "每月包含实时 AI 引擎使用额度——无需任何配置，没有意外账单。", "p", "lead")}<div id="checkout-note"></div>
@@ -382,21 +570,18 @@ def build() -> None:
     (STATIC / "site.webmanifest").write_text(json.dumps({"name": "Interview Realtime Copilot", "short_name": "IR Copilot", "theme_color": "#06070b",
         "background_color": "#06070b", "display": "standalone", "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
                                                                        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}]}) + "\n")
-    (STATIC / "robots.txt").write_text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /account.html\nDisallow: /admin.html\nSitemap: https://copilot.xichiuk.com/sitemap.xml\n")
+    rules = "Allow: /\nDisallow: /api/\nDisallow: /auth/\nDisallow: /account.html\nDisallow: /admin.html\nDisallow: /login.html\n"
+    # AI search and answer engines are welcome (named explicitly so the intent is unambiguous); llms.txt gives them a summary.
+    bots = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Applebot-Extended", "Bytespider", "Baiduspider"]
+    (STATIC / "robots.txt").write_text(f"User-agent: *\n{rules}\n" + "".join(f"User-agent: {bot}\n" for bot in bots) + f"{rules}\nSitemap: {SITE}/sitemap.xml\n")
     docs = build_docs()
     public = [url_of(p) for p in PAGES if p not in PRIVATE]
-    urls = "".join(f"<url><loc>{SITE}/{prefix}{p}</loc></url>" for p in public for prefix in ("", "zh/"))
-    (STATIC / "sitemap.xml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n')
-    (STATIC / "llms.txt").write_text("""# Interview Realtime Copilot
-> AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro £25/month or £169/year (plus local tax).
-
-- [Use cases](https://copilot.xichiuk.com/use-cases.html): cross-language interviews, expert answers, last-minute preparation, coding questions from the screen
-- [Demo](https://copilot.xichiuk.com/demo.html)
-- [Pricing](https://copilot.xichiuk.com/pricing.html)
-- [Download](https://copilot.xichiuk.com/download.html)
-- [Help Center](https://copilot.xichiuk.com/docs/): install, permissions, plans, practice, live interview, shortcuts, debriefs, troubleshooting
-- Support: {SUPPORT_EMAIL}
-""".replace("{SUPPORT_EMAIL}", SUPPORT_EMAIL))
+    alternates = lambda p: (f'<xhtml:link rel="alternate" hreflang="en" href="{SITE}/{p}"/><xhtml:link rel="alternate" hreflang="zh-CN" href="{SITE}/zh/{p}"/>'  # noqa: E731
+                            f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE}/{p}"/>')
+    urls = "".join(f"<url><loc>{SITE}/{prefix}{p}</loc><lastmod>{TODAY}</lastmod>{alternates(p)}</url>" for p in public for prefix in ("", "zh/"))
+    (STATIC / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+                                        f'xmlns:xhtml="http://www.w3.org/1999/xhtml">{urls}</urlset>\n')
+    write_llms()
     (STATIC / "i18n.js").write_text(f"// Generated by web/build_site.py — edit the strings there.\nwindow.SUPPORT_EMAIL = {json.dumps(SUPPORT_EMAIL)};\nwindow.I18N = "
                                     + json.dumps(STRINGS, ensure_ascii=False, indent=0) + ";\n")
     write_chinese_copies()

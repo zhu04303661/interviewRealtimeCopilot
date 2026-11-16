@@ -1,9 +1,49 @@
 # Interview Realtime Copilot
-> AI interview assistant (AI面试助手, 实时面试辅助) for macOS. Listens to live video interviews (Zoom, Teams, Meet), translates English and Chinese in real time, detects each question and suggests a one-minute answer from the user's own resume and notes. Solves coding interview questions from the screen, runs spoken mock interviews from prepared Q&A, and writes a debrief with the recording after each session. Local-first; hidden from screen sharing. Free plan; Pro £25/month or £169/year (plus local tax).
 
-- [Use cases](https://copilot.xichiuk.com/use-cases.html): cross-language interviews, expert answers, last-minute preparation, coding questions from the screen
-- [Demo](https://copilot.xichiuk.com/demo.html)
-- [Pricing](https://copilot.xichiuk.com/pricing.html)
-- [Download](https://copilot.xichiuk.com/download.html)
-- [Help Center](https://copilot.xichiuk.com/docs/): install, permissions, plans, practice, live interview, shortcuts, debriefs, troubleshooting
+> Interview Realtime Copilot is an AI interview assistant for Mac: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.
+
+Key facts:
+- Category: AI interview assistant / interview copilot (中文：AI 面试助手、实时面试辅助).
+- Platform: macOS 14.2 or later on Apple Silicon. Windows is planned.
+- Live interviews: transcribes the interviewer, translates English and Chinese, detects each finished question, hints a short answer from the user's own resume and notes.
+- Coding rounds: reads the problem from a screenshot and returns runnable code with complexity and edge cases.
+- Practice: a spoken AI interviewer asks the questions extracted from the user's preparation notes.
+- After each session: a question-by-question debrief and the recording.
+- Privacy: documents, transcripts and recordings stay on the user's Mac; the window is excluded from screen sharing.
+- Pricing: free plan; Pro £25/month or £169/year plus local tax.
+- Site languages: English (https://copilot.xichiuk.com/) and Chinese (https://copilot.xichiuk.com/zh/).
 - Support: linkyourfuture2026@outlook.com
+
+## Product
+- [Home](https://copilot.xichiuk.com/): overview, the problems it solves, frequently asked questions
+- [Use cases](https://copilot.xichiuk.com/use-cases.html): Six interview moments the copilot handles: video interviews, interviewing in a second language, coding rounds, rehearsing prepared answers, getting stuck mid-answer, and debriefs.
+- [Demo](https://copilot.xichiuk.com/demo.html): Watch a live interview question get transcribed, translated, recognised and answered in seconds — the cockpit you see during a real interview.
+- [Pricing](https://copilot.xichiuk.com/pricing.html): Free plan with a monthly AI allowance; Pro is £25 a month or £169 a year with 20 times the allowance. Cancel anytime; local tax added at checkout.
+- [Download](https://copilot.xichiuk.com/download.html): Download Interview Realtime Copilot for Mac (Apple Silicon, macOS 14.2 or later). Sign in with your website account and start a practice interview in minutes.
+
+## Guides
+- [How to get through an English interview when English is not your first language](https://copilot.xichiuk.com/docs/english-interview.html): A practical method for understanding every question and answering clearly — with and without an AI interview assistant.
+- [What is an AI interview assistant, and how do you choose one?](https://copilot.xichiuk.com/docs/ai-interview-assistant.html): What these tools do during a live interview, what to check before trusting one, and where they do not help.
+- [Interview tomorrow and no time to prepare: a two-hour plan](https://copilot.xichiuk.com/docs/last-minute-prep.html): What to do, in order, when the interview is close and preparation time is short.
+
+## Help Center
+- [Help Center](https://copilot.xichiuk.com/docs/): What Interview Realtime Copilot does, the loop it runs on, and how to find your way around this guide.
+- [Install and sign in](https://copilot.xichiuk.com/docs/install.html): Download the app, open it the first time, and sign in with your website account.
+- [Set up permissions](https://copilot.xichiuk.com/docs/permissions.html): The microphone hears you; System Audio Recording hears the interviewer in your meeting app.
+- [Plans and AI allowance](https://copilot.xichiuk.com/docs/plans.html): Every plan includes a monthly allowance of the realtime AI engine — nothing to set up.
+- [Your first interview, end to end](https://copilot.xichiuk.com/docs/first-interview.html): From an empty app to a debrief in about fifteen minutes.
+- [Goals](https://copilot.xichiuk.com/docs/goals.html): A goal is one role at one company; everything else hangs off it.
+- [Resume and preparation notes](https://copilot.xichiuk.com/docs/materials.html): What to upload, what happens to it, and how prepared questions are found.
+- [Spoken practice](https://copilot.xichiuk.com/docs/practice.html): A spoken AI interviewer asks your prepared questions, waits for you to finish and follows up.
+- [Go Live](https://copilot.xichiuk.com/docs/go-live.html): Start a live session for a real interview on Zoom, Teams, Meet or any call app.
+- [The cockpit and stealth](https://copilot.xichiuk.com/docs/cockpit.html): Keep the cockpit readable for you and invisible to everyone else.
+- [Keyboard shortcuts](https://copilot.xichiuk.com/docs/shortcuts.html): Default shortcuts; change any of them in Settings → Shortcuts.
+- [Coding, system design and screen help](https://copilot.xichiuk.com/docs/solve-screen.html): Let the copilot read the problem on your screen and explain a solution.
+- [Debriefs and recordings](https://copilot.xichiuk.com/docs/debriefs.html): Every session is recorded on your Mac and reviewed question by question.
+- [Privacy and your data](https://copilot.xichiuk.com/docs/privacy.html): What stays on your Mac and what is sent for processing.
+- [Settings reference](https://copilot.xichiuk.com/docs/settings.html): The six sections of Settings.
+- [Troubleshooting](https://copilot.xichiuk.com/docs/troubleshooting.html): Fixes for the problems people meet most often.
+
+## Full text
+- [Everything in one file, English](https://copilot.xichiuk.com/llms-full.txt)
+- [Everything in one file, Chinese](https://copilot.xichiuk.com/llms-full-zh.txt)
