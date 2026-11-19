@@ -112,6 +112,32 @@ async def test_wishlist_validation(site):
 
 
 
+async def test_interview_posts_review_board_and_pages(site):
+    story = {"company": "ExampleCo", "role": "SDE II", "round": "technical", "lang": "en", "outcome": "waiting",
+             "text": "Two rounds over video. First a 45-minute coding question on interval merging, then a behavioral round with a lot of 'tell me about a time' follow-ups."}
+    assert (await post(site, "/api/interviews", {**story, "text": "too short"})).status == 422
+    assert (await post(site, "/api/interviews", {**story, "round": "bogus"})).status == 422
+    assert (await post(site, "/api/interviews", story)).status == 200
+    assert (await (await site.get("/api/interviews")).json())["posts"] == []  # nothing is public before moderation
+    assert (await site.get("/interviews/1")).status == 404
+    await post(site, "/api/signup", {"email": "mod@example.com", "password": "long-enough-1"})
+    assert (await post(site, "/api/admin/interview", {"id": 1, "approved": True})).status == 403
+    from irc_web.app import Store
+    Store(site.server.app["db_path"]).db.execute("update users set is_admin = 1")
+    assert (await post(site, "/api/admin/interview", {"id": 1, "approved": True})).status == 200
+    posts = (await (await site.get("/api/interviews")).json())["posts"]
+    assert [p["id"] for p in posts] == [1] and posts[0]["company"] == "ExampleCo"
+    assert "text" not in posts[0]  # the list leaks only a snippet
+    found = (await (await site.get("/api/interviews?q=exampl")).json())["posts"]
+    assert [p["id"] for p in found] == [1] and (await (await site.get("/api/interviews?q=nomatch")).json())["posts"] == []
+    for path in ("/interviews/1", "/zh/interviews/1"):
+        html = await (await site.get(path)).text()
+        assert "ExampleCo" in html and "interval merging" in html and f"{path}" in html and "{{" not in html
+    assert (await site.get("/interview-post.html")).status == 404  # the template itself is not a page
+    assert (await post(site, "/api/admin/interview", {"id": 1, "remove": True})).status == 200
+    assert (await site.get("/interviews/1")).status == 404
+
+
 async def test_admin_dashboard_is_for_admins_only(site):
     assert (await site.get("/api/admin/overview")).status == 401
     await post(site, "/api/signup", {"email": "member@example.com", "password": "long-enough-1"})
@@ -172,3 +198,13 @@ async def test_mirror_site_origin_and_forwarded_client(aiohttp_client, tmp_path,
         assert (await signup(n, **{"X-Forwarded-For": "203.0.113.7, 8.8.8.8"})).status == 200
     assert (await signup(6, **{"X-Forwarded-For": "203.0.113.7, 8.8.8.8"})).status == 429
     assert (await signup(7, **{"X-Forwarded-For": "203.0.113.99, 8.8.8.8"})).status == 200
+    # Pages served through a mirror proxy (X-Forwarded-Host) keep the mirror's canonical URL.
+    await site.post("/api/interviews", json={"company": "MirrorCo", "role": "PM", "round": "hr", "lang": "zh", "outcome": "",
+                                             "text": "A friendly thirty-minute HR screen about expectations and salary range."},
+                    headers={"Origin": mirror})
+    from irc_web.app import Store
+    Store(site.server.app["db_path"]).db.execute("update interview_posts set approved = 1")
+    html = await (await site.get("/zh/interviews/1", headers={"X-Forwarded-Host": "copilot.example.cn"})).text()
+    assert f'canonical" href="{mirror}/zh/interviews/1"' in html
+    html = await (await site.get("/interviews/1", headers={"X-Forwarded-Host": "untrusted.example"})).text()
+    assert f'canonical" href="{ORIGIN}/interviews/1"' in html  # an untrusted forwarded host is ignored

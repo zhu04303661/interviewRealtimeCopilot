@@ -21,6 +21,7 @@ SITE = "https://copilot.xichiuk.com"
 APP_VERSION = json.loads((Path(__file__).parent.parent / "apps/desktop/package.json").read_text())["version"]
 PAGES: list[str] = []  # every page written, as a path under static/ (for the /zh/ copies and hreflang)
 PRIVATE = {"login.html", "account.html", "admin.html", "404.html"}  # no /zh/ copy, not in the sitemap
+TEMPLATES = {"interview-post.html"}  # zh copy exists (server fills it per post) but the template URL itself is not a page
 INTERNAL = re.compile(r'href="/(?!(?:login|account|admin)\.html)((?:[\w\-/]*\.html|[\w\-/]*/)?(?:[#?][^"]*)?)"')
 
 
@@ -78,6 +79,8 @@ DESCRIPTIONS = {
                  "下载 Interview Realtime Copilot macOS 版（Apple 芯片，14.2 及以上）或 Windows 版（64 位）。用网站账号登录，几分钟内开始一次语音模拟面试。"),
     "compare": ("How Interview Realtime Copilot compares with other AI interview assistants — Linkjob, Final Round AI, Interview Coder and Cluely — on price, platforms, languages and privacy.",
                 "Interview Realtime Copilot 与 Linkjob、Final Round AI、Interview Coder、Cluely 等 AI 面试助手在价格、平台、语言和隐私上的对比。"),
+    "interviews": ("Interview stories shared by candidates — what companies actually asked, in English and Chinese. Share yours.",
+                   "求职者分享的面试经历——公司实际问了什么。中英双语，欢迎分享你的面经。"),
     "privacy": ("What Interview Realtime Copilot stores on your Mac, what is processed during a session, and what the website keeps.",
                 "Interview Realtime Copilot 在你的 Mac 上保存什么、会话中处理什么，以及网站保留哪些信息。"),
     "terms": ("Terms of the Interview Realtime Copilot preview service.", "Interview Realtime Copilot 预览版服务条款。"),
@@ -161,6 +164,7 @@ def site_footer() -> str:
         ("foot.guide.assistant", "Choosing an AI interview assistant", "如何选择 AI 面试助手", "/docs/ai-interview-assistant.html"),
         ("foot.guide.behavioral", "STAR answers for behavioral questions", "行为面试 STAR 法则", "/docs/behavioral-questions.html"),
         ("foot.guide.prep", "Last-minute interview prep", "面试前两小时准备", "/docs/last-minute-prep.html"),
+        ("foot.board", "Interview stories", "面经分享", "/interviews.html"),
         ("foot.wishlist", "Wishlist", "许愿单", "/#wishlist"), ("foot.privacy", "Privacy", "隐私", "/privacy.html"), ("foot.terms", "Terms", "条款", "/terms.html")])
     return ('<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>' + links
             + f'<a href="mailto:{SUPPORT_EMAIL}">{t("foot.support", "Support", "联系客服")} · {SUPPORT_EMAIL}</a><span>© {TODAY[:4]}</span></div></footer>')
@@ -527,6 +531,48 @@ def build() -> None:
     t("dl.thanks", "Thanks — we will email you.", "已登记，我们会邮件通知你。")
     t("dl.version", "Version {v} · {mb} MB · {date}", "版本 {v} · {mb} MB · {date}")
 
+    sel = lambda name, key, options: f'<select class="input" name="{name}">' + "".join(  # noqa: E731
+        f'<option value="{v}"{"" if i else " selected"}>{t(f"{key}.{v}" if v else key, en, zh)}</option>' for i, (v, en, zh) in enumerate(options))
+    page("interviews", ("Interview stories — Interview Realtime Copilot", "面经分享 — Interview Realtime Copilot"), f'''
+<section class="hero"><div class="wrap center"><span class="eyebrow">{t("ip.eyebrow", "Interview stories", "面经")}</span>
+<h1>{t("ip.h1a", "What they actually ask,", "他们到底问了什么，")}<br><span class="grad-text">{t("ip.h1b", "told by candidates.", "由亲历者来讲。")}</span></h1>
+{t("ip.lead", "Real interview experiences shared by candidates: the company, the round, the questions and how it went. Every story is reviewed before it appears.", "求职者分享的真实面试经历：公司、轮次、被问到的题和过程。每条面经都经审核后展示。", "p", "lead")}</div></section>
+<section style="padding-top:0"><div class="wrap"><input class="input" id="post-q" type="search" data-i18n-placeholder="ip.search" placeholder="Search company or role" style="max-width:420px;margin-bottom:20px;display:block">
+<div id="posts"><p class="muted">{t("wl.loading", "Loading…", "加载中…")}</p></div>
+<div class="card" style="margin-top:30px"><h3 style="margin-top:0">{t("ip.share", "Share your interview story", "分享你的面经")}</h3>
+<form id="interview-form"><div class="fields2"><label class="field">{t("ip.company", "Company", "公司")}<input class="input" name="company" required maxlength="100" placeholder="e.g. Google"></label>
+<label class="field">{t("ip.role", "Role", "职位")}<input class="input" name="role" required maxlength="100" placeholder="e.g. SDE II"></label>
+<label class="field">{t("ip.round", "Round", "轮次")}{sel("round", "ip.r", [("", "Choose…", "请选择"), ("hr", "HR screen", "HR 初筛"), ("oa", "Online assessment", "在线笔试 / OA"), ("technical", "Technical", "技术面"), ("system-design", "System design", "系统设计"), ("behavioral", "Behavioral", "行为面试"), ("manager", "Hiring manager", "主管面"), ("onsite", "Onsite / final", "终面 / 现场面"), ("other", "Other", "其他")])}</label>
+<label class="field">{t("ip.lang", "Interview language", "面试语言")}{sel("lang", "ip.l", [("en", "English", "English"), ("zh", "中文", "中文"), ("other", "Other", "其他")])}</label>
+<label class="field">{t("ip.outcome", "Outcome (optional)", "结果（选填）")}{sel("outcome", "ip.o", [("", "Prefer not to say", "不透露"), ("offer", "Offer", "拿到 offer"), ("rejected", "Rejected", "未通过"), ("waiting", "Waiting", "等待结果"), ("declined", "Declined", "婉拒 offer")])}</label></div>
+<label class="field">{t("ip.text", "What they asked and how it went", "被问到的题、过程和感受")}<textarea class="input" name="text" rows="6" required minlength="30" maxlength="5000" data-i18n-placeholder="ip.textph"></textarea></label>
+<label class="field">{t("ip.email", "Email (optional, never shown)", "邮箱（选填，不会公开）")}<input class="input" name="email" type="email" placeholder="you@example.com"></label>
+<button class="btn primary">{t("ip.send", "Share my story", "发布面经")}</button><p class="error"></p></form>
+{t("ip.note", "Posts are reviewed before they appear; emails and names are never published. Please leave out anything confidential.", "面经经审核后展示；邮箱和姓名不会公开。请不要包含任何保密内容。", "p", "faint small")}</div></div></section>''')
+    # The template for /interviews/<id> pages (one indexable page per post — the "Google 面经" search landings).
+    # {{…}} placeholders are filled by the server per post; excluded from the sitemap via TEMPLATES.
+    page("interview-post", ("{{TITLE}}", "{{TITLE}}"), '''
+<div class="wrap" style="max-width:820px;padding:70px 28px">
+<nav><a data-i18n="post.back" class="mail small" href="/interviews.html">← Interview stories</a></nav>
+<h1 style="font-size:36px;margin:16px 0 8px">{{ROLE}} · {{COMPANY}}</h1>
+<div class="faint small">{{META}}</div>
+<div class="card" style="margin-top:26px"><div style="white-space:pre-wrap;line-height:1.8">{{BODY}}</div></div>
+<div class="callout"><a data-i18n="post.share" class="mail" href="/interviews.html">Had this interview? Share your story.</a></div></div>''',
+         out="interview-post.html")
+    t("post.back", "← All interview stories", "← 全部面经")
+    t("post.share", "Had this interview? Share your story.", "你也面过这家？分享你的面经。")
+    t("ip.search", "Search company or role", "搜索公司或职位")
+    t("ip.empty", "No stories yet — yours could be the first.", "还没有面经——你的可以是第一篇。")
+    t("ip.thanks", "Thank you — your story was sent for review and will appear on the board once approved.", "谢谢——面经已提交审核，通过后会出现在列表里。")
+    t("ip.error", "Could not load the stories right now. Please refresh in a moment.", "暂时加载不出来，请稍后刷新。")
+    t("ad.posts", "Interview posts", "面经")
+    t("ad.c.company", "Company", "公司"); t("ad.c.role", "Role", "职位"); t("ad.c.round", "Round", "轮次"); t("ad.c.board", "Board", "上墙")
+    t("ad.show", "Show", "展示"); t("ad.hide", "Hide", "下架"); t("ad.remove", "Remove", "删除")
+    t("ad.removeSure", "Delete this post permanently?", "确认永久删除这条面经？")
+    t("ad.read", "Read", "查看全文")
+    t("ip.textph", "e.g. First round: a 45-minute video call. Two questions — a sliding-window medium and a graph question. Interviewer was friendly; the graph follow-up was about scaling to millions of nodes…",
+      "例如：第一轮 45 分钟视频面，两道题——一道滑动窗口中等题和一道图论题。面试官很友善，图论题的追问是数据量到百万级怎么做……")
+
     page("login", ("Sign in — Interview Realtime Copilot", "登录 — Interview Realtime Copilot"), f'''
 <div class="wrap"><div class="auth"><h2 id="title" style="margin-top:0" data-i18n="auth.signin">Sign in</h2>
 <form id="auth"><label class="field">{t("auth.email", "Email", "邮箱")}<input class="input" name="email" type="email" autocomplete="email" required></label>
@@ -589,7 +635,7 @@ def build() -> None:
         t(key, en, zh)
     # Shared chrome and the cockpit demo script.
     for key, en, zh in [("wish.placeholder", "e.g. Support Windows · live captions for Teams · a system-design whiteboard…", "例如：支持 Windows · Teams 实时字幕 · 系统设计白板……"),
-                        ("wish.thanks", "Thank you — your wish is on its way to the team.", "谢谢！你的心愿已送达团队。"), ("foot.wishlist", "Wishlist", "许愿单"),
+                        ("wish.thanks", "Thank you — your wish is in. We read every one.", "谢谢！心愿已收到，每一条我们都会看。"), ("foot.wishlist", "Wishlist", "许愿单"),
                         ("nav.scenarios", "Use cases", "使用场景"), ("nav.demo", "Demo", "演示"), ("nav.pricing", "Pricing", "价格"), ("nav.download", "Download", "下载"),
                         ("nav.signin", "Sign in", "登录"), ("nav.start", "Get started", "开始使用"), ("foot.privacy", "Privacy", "隐私"), ("foot.support", "Support", "联系客服"), ("foot.terms", "Terms", "条款"),
                         ("mock.interviewer", "Interviewer", "面试官"), ("mock.question", "Question", "问题"),
@@ -610,7 +656,7 @@ def build() -> None:
     bots = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Applebot-Extended", "Bytespider", "Baiduspider"]
     (STATIC / "robots.txt").write_text(f"User-agent: *\n{rules}\n" + "".join(f"User-agent: {bot}\n" for bot in bots) + f"{rules}\nSitemap: {SITE}/sitemap.xml\n")
     docs = build_docs()
-    public = [url_of(p) for p in PAGES if p not in PRIVATE]
+    public = [url_of(p) for p in PAGES if p not in PRIVATE and p not in TEMPLATES]
     alternates = lambda p: (f'<xhtml:link rel="alternate" hreflang="en" href="{SITE}/{p}"/><xhtml:link rel="alternate" hreflang="zh-CN" href="{SITE}/zh/{p}"/>'  # noqa: E731
                             f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE}/{p}"/>')
     urls = "".join(f"<url><loc>{SITE}/{prefix}{p}</loc><lastmod>{TODAY}</lastmod>{alternates(p)}</url>" for p in public for prefix in ("", "zh/"))

@@ -48,7 +48,8 @@ $1
     gzip_types text/css application/javascript application/json image/svg+xml text/plain application/xml;
     client_max_body_size 64m;
     location /.well-known/acme-challenge/ { root /var/www/irc-web; }
-    # Accounts, subscriptions, counters: one database, on the main site.
+    # Accounts, subscriptions, counters: one database, on the main site. Interview-story pages (/interviews/<id>)
+    # are rendered by the web app, so they proxy too — /interviews.html itself stays a local static page.
     location ~ ^/(api|auth)/ {
         proxy_pass https://$MAIN;
         proxy_ssl_server_name on;
@@ -58,6 +59,13 @@ $1
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection \$http_connection;
         proxy_read_timeout 300s;
+    }
+    location ~ ^/(zh/)?interviews/ {
+        proxy_pass https://$MAIN;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $MAIN;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-For \$remote_addr;
     }
     location /downloads/ { add_header Cache-Control "no-cache"; }
     location / { try_files \$uri \$uri/index.html =404; }

@@ -151,10 +151,22 @@ const pages = {
           <td>${x.plan}${x.status !== 'none' ? ` <span class="faint">${esc(x.status)}</span>` : ''}</td><td>${day(x.created_at)}</td>
           <td>${usd(x.used_usd)} / ${usd(x.allowance_usd)}</td><td>${usd(x.balance_usd)}</td><td>${x.requests}</td><td>${day(x.last_active)}</td></tr>`))}
         <h2>${tr('ad.wishes')} (${m.wishes.length})</h2>${table(['ad.c.when', 'ad.c.email', 'ad.c.text'], m.wishes.map((w) => `<tr><td>${day(w.created_at)}</td><td>${w.email ? `<a class="mail" href="mailto:${esc(w.email)}">${esc(w.email)}</a>` : tr('ad.anon')}</td><td style="white-space:pre-wrap">${esc(w.text)}</td></tr>`))}
+        <h2>${tr('ad.posts')} (${m.posts.length})</h2>${table(['ad.c.when', 'ad.c.company', 'ad.c.role', 'ad.c.round', 'ad.c.email', 'ad.c.board'], m.posts.map((p) => `<tr><td>${day(p.created_at)}</td><td>${esc(p.company)}</td><td>${esc(p.role)}</td><td>${esc(p.round)}</td>
+          <td>${p.email ? `<a class="mail" href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : tr('ad.anon')}</td>
+          <td style="white-space:nowrap"><button class="btn" data-post-act="${p.approved ? 'hide' : 'show'}" data-id="${p.id}">${tr(p.approved ? 'ad.hide' : 'ad.show')}</button> <button class="btn" data-post-act="remove" data-id="${p.id}">${tr('ad.remove')}</button>
+          <details style="margin-top:6px"><summary class="faint small">${tr('ad.read')}</summary><div class="small" style="white-space:pre-wrap">${esc(p.text)}</div></details></td></tr>`))}
         <h2>${tr('ad.waitlist')} (${m.waitlist.length})</h2>${table(['ad.c.when', 'ad.c.email', 'ad.c.topic'], m.waitlist.map((w) => `<tr><td>${day(w.created_at)}</td><td><a class="mail" href="mailto:${esc(w.email)}">${esc(w.email)}</a></td><td>${esc(w.topic)}</td></tr>`))}`;
       const q = document.getElementById('admin-q');
       q.addEventListener('change', async () => { query = q.value; users = await get(`/api/admin/users?q=${encodeURIComponent(query)}`); render(); });
     };
+    root.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-post-act]');
+      if (!button) return;
+      const act = button.dataset.postAct, id = Number(button.dataset.id);
+      if (act === 'remove' && !confirm(tr('ad.removeSure'))) return;
+      await api('/api/admin/interview', act === 'remove' ? { id, remove: true } : { id, approved: act === 'show' });
+      m = await get('/api/admin/messages'); render();
+    });
     render(); window.addEventListener('language', render);
   },
   pricing() {
@@ -210,6 +222,33 @@ const pages = {
         if (mode === 'signup') track('signup');
         location.href = params.get('next')?.startsWith('/') ? params.get('next') : '/account.html';
       } catch (error) { document.getElementById('error').textContent = error.message; }
+    });
+  },
+  async interviews() {
+    const root = document.getElementById('posts'), q = document.getElementById('post-q');
+    const prefix = fixedLang === 'zh' ? '/zh' : '';
+    const bits = (p) => [day(p.created_at).slice(0, 12), tr('ip.r.' + p.round), { en: 'English', zh: '中文' }[p.lang] || p.lang,
+                         p.outcome ? tr('ip.o.' + p.outcome) : ''].filter(Boolean).join(' · ');
+    const load = async () => {
+      try {
+        const { posts } = await api('/api/interviews' + (q.value.trim() ? `?q=${encodeURIComponent(q.value.trim())}` : ''));
+        root.innerHTML = posts.length ? posts.map((p) => `<a class="post-row card" href="${prefix}/interviews/${p.id}">
+          <b>${esc(p.role)} · ${esc(p.company)}</b><div class="faint small">${bits(p)}</div><p class="post-snip">${esc(p.snippet)}…</p></a>`).join('')
+          : `<div class="notice">${tr('ip.empty')}</div>`;
+      } catch { root.innerHTML = `<div class="notice warn">${tr('ip.error')}</div>`; }
+    };
+    let timer;
+    q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 300); });
+    load();
+    document.getElementById('interview-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.target, button = form.querySelector('button');
+      button.disabled = true;
+      try {
+        await api('/api/interviews', { company: form.company.value, role: form.role.value, round: form.round.value, lang: form.lang.value,
+                                       outcome: form.outcome.value, text: form.text.value, email: form.email.value });
+        form.innerHTML = `<div class="notice">${tr('ip.thanks')}</div>`;
+      } catch (error) { form.querySelector('.error').textContent = error.message; button.disabled = false; }
     });
   },
   async account() {
