@@ -31,6 +31,10 @@
   Electron win32 and a python-build-standalone CPython 3.12 for Windows, installs Windows wheels with `uv pip --python-platform`,
   sets the .exe icon with resedit. Needs uv, curl, tar, makensis. Publish both platforms with
   `sh web/deploy/publish-installer.sh <main> <key.pem> [mac|win]`; the download page reads `latest.json` / `latest-win.json`.
+  On this Mac `brew install makensis` builds the world from source (macOS 14 gets no bottles) and the electron-builder-binaries
+  makensis crashes — run `package-win.mjs --dir`, rsync `dist-win/{win-unpacked,installer.nsi}` + `assets/icon.ico` to a Linux
+  host with `apt install nsis`, sed the nsi's build-machine prefix to the remote dir, run `makensis -V2` there, scp the exe back
+  (the Shenzhen server has nsis installed and keeps a copy in ~/nsis-build).
 - Windows runtime: computer audio is Electron's loopback via getDisplayMedia (no helper); the engine watches stdin from a
   thread there (no loop signal handlers) and runs with PYTHONUTF8=1; the Windows app data is `%APPDATA%\Interview Realtime Copilot`.
 - Website: `python3 web/build_site.py` (all text, EN+ZH) → `web/static`; tests `cd web/server && uv run pytest -q`;
