@@ -88,6 +88,13 @@ export class Cloud {
     rmSync(this.providerFile, { force: true });
   }
 
+  /** Shares an interview story (面经) to the site's review queue; the account email is attached server-side. */
+  async shareStory(body: Record<string, unknown>): Promise<void> {
+    const saved = this.saved();
+    if (!saved?.token) throw new Error('Sign in to your account first.');
+    await this.call('POST', '/api/v1/interviews', body, saved.token);
+  }
+
   /** Opens the website signed in (one-time link), e.g. /pricing.html to subscribe. */
   async open(next: string): Promise<void> {
     const saved = this.saved();

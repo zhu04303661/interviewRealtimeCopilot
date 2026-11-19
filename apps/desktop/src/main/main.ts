@@ -211,7 +211,13 @@ function registerIpc(): void {
     return { ...current, wsUrl: url.toString(), jwt: signedIn?.value?.token ?? '', testSystemAudio };
   });
   ipcMain.handle('session:end', async () => {
-    if (current) await engine.request('POST', `/api/v3/sessions/${current.sessionId}/end`, {}).catch(() => undefined);
+    if (current) {
+      const ended = current;
+      await engine.request('POST', `/api/v3/sessions/${ended.sessionId}/end`, {}).catch(() => undefined);
+      // Back to the debrief page — live sessions get the interview-story share card there.
+      mainWindow?.webContents.send('session:ended', ended.sessionId, ended.topology);
+      mainWindow?.show();
+    }
     current = null;
     cockpit?.close();
   });
@@ -240,6 +246,8 @@ function registerIpc(): void {
     cloud.authenticate(mode === 'register' ? 'register' : 'login', String(email ?? ''), String(password ?? '')));
   ipcMain.handle('cloud:sign-out', () => cloud.signOut());
   ipcMain.handle('cloud:open', (_event, next: unknown) => cloud.open(typeof next === 'string' && next.startsWith('/') ? next : '/account.html'));
+  ipcMain.handle('cloud:share-story', (_event, body: unknown) =>
+    body && typeof body === 'object' ? cloud.shareStory(body as Record<string, unknown>) : Promise.reject(new Error('Expected a story.')));
   // OpenAI API key entered in Settings: stored only on this computer (owner-only file; on Windows the per-user
   // %APPDATA% folder's ACL does the same), read by the engine on every call.
   ipcMain.handle('apikey:status', () => {

@@ -353,28 +353,51 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
     ROUNDS = {"hr", "oa", "technical", "system-design", "behavioral", "manager", "onsite", "other"}
     OUTCOMES = {"offer", "rejected", "waiting", "declined", ""}
 
+    def story_fields(body: dict) -> dict | str:
+        """Normalize and validate a story submission; the fields dict or an error message."""
+        fields = {"company": str(body.get("company", "")).strip()[:100], "role": str(body.get("role", "")).strip()[:100],
+                  "round": str(body.get("round", "")), "lang": str(body.get("lang", "")), "outcome": str(body.get("outcome", "")),
+                  "email": str(body.get("email", "")).strip().lower()[:200], "text": str(body.get("text", "")).strip()}
+        if not fields["company"] or not fields["role"]:
+            return "Company and role are required."
+        if fields["round"] not in ROUNDS or fields["lang"] not in ("en", "zh", "other"):
+            return "Pick the interview stage and language."
+        if fields["outcome"] not in OUTCOMES:
+            return "Pick a valid outcome."
+        if not 30 <= len(fields["text"]) <= 5000:
+            return "Describe the interview in 30 to 5000 characters."
+        if fields["email"] and not EMAIL.match(fields["email"]):
+            return "Enter a valid email address, or leave it empty."
+        fields["outcome"], fields["email"] = fields["outcome"] or None, fields["email"] or None
+        return fields
+
+    def save_story(fields: dict) -> web.Response:
+        store.db.execute("insert into interview_posts (company, role, round, lang, outcome, text, email, approved, created_at) "
+                         "values (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+                         (fields["company"], fields["role"], fields["round"], fields["lang"], fields["outcome"], fields["text"],
+                          fields["email"], int(time.time())))
+        return web.json_response({"ok": True})
+
     async def interview_submit(request: web.Request) -> web.Response:
         """Interview-experience posts (面经). Anonymous is fine; nothing is public until an admin approves it."""
         if limited(request, f"post:{client(request)}", 5, 3600):
             return fail(429, "Too many attempts. Try again later.")
-        body = await request.json()
-        company, role = str(body.get("company", "")).strip()[:100], str(body.get("role", "")).strip()[:100]
-        round_, lang = str(body.get("round", "")), str(body.get("lang", ""))
-        outcome, email = str(body.get("outcome", "")), str(body.get("email", "")).strip().lower()[:200]
-        text = str(body.get("text", "")).strip()
-        if not company or not role:
-            return fail(422, "Company and role are required.")
-        if round_ not in ROUNDS or lang not in ("en", "zh", "other"):
-            return fail(422, "Pick the interview stage and language.")
-        if outcome not in OUTCOMES:
-            return fail(422, "Pick a valid outcome.")
-        if not 30 <= len(text) <= 5000:
-            return fail(422, "Describe the interview in 30 to 5000 characters.")
-        if email and not EMAIL.match(email):
-            return fail(422, "Enter a valid email address, or leave it empty.")
-        store.db.execute("insert into interview_posts (company, role, round, lang, outcome, text, email, approved, created_at) "
-                         "values (?, ?, ?, ?, ?, ?, ?, 0, ?)", (company, role, round_, lang, outcome or None, text, email or None, int(time.time())))
-        return web.json_response({"ok": True})
+        fields = story_fields(await request.json())
+        return save_story(fields) if isinstance(fields, dict) else fail(422, fields)
+
+    async def device_interview(request: web.Request) -> web.Response:
+        """The desktop app shares a story here after a live interview: same review flow, but the
+        Bearer token identifies the account (its email is attached for moderation, never shown)."""
+        user = device_user(request)
+        if not user:
+            return fail(401, "Sign in first.")
+        if limited(request, f"post:u{user['id']}", 5, 3600):
+            return fail(429, "Too many attempts. Try again later.")
+        fields = story_fields(await request.json())
+        if isinstance(fields, str):
+            return fail(422, fields)
+        fields["email"] = user["email"]
+        return save_story(fields)
 
     async def interview_list(request: web.Request) -> web.Response:
         """The public board: approved posts only, newest first; ?q= filters company/role. Snippets, not full text."""
@@ -568,6 +591,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
     app.add_routes([
         web.post("/api/v1/auth/{action:register|login}", device_auth), web.post("/api/v1/auth/logout", device_logout),
         web.get("/api/v1/me", device_me), web.post("/api/v1/auth/web-link", web_link), web.get("/auth/link", redeem_link),
+        web.post("/api/v1/interviews", device_interview),
         web.post("/api/signup", signup), web.post("/api/login", login), web.post("/api/logout", logout),
         web.get("/api/me", me), web.post("/api/checkout", checkout), web.post("/api/portal", portal),
         web.post("/api/waitlist", waitlist), web.post("/api/wish", wish),

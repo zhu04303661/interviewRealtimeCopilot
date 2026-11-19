@@ -27,6 +27,7 @@ from ..accounts import AccountService
 from ..config import Settings
 from ..errors import ApiError, fail
 from ..openai import OpenAI, ProviderError
+from ..realtime import coach
 from ..realtime.engine import RealtimeEngine
 from ..screen import analyze_screen
 from .documents import DocumentService
@@ -505,6 +506,12 @@ class WorkspaceApi:
             return raw(self._report(workspace.username, state, session))
         if action == "transcript" and method == "GET":
             return raw({"segments": state["transcripts"].get(session_id, [])})
+        if action == "story" and method == "POST":
+            return raw({"draft": await self._story(workspace, session)})
+        if action == "shared" and method == "POST":
+            session["story_shared"] = True
+            workspace.changed()
+            return raw()
         if action == "recordings" and method == "GET" and not recording_id:
             return raw({"recordings": [r for r in state["recordings"].values() if r["session_id"] == session_id and r.get("completed_at")]})
         if action == "recordings" and method == "POST":
@@ -528,6 +535,27 @@ class WorkspaceApi:
                 workspace.changed()
                 return raw()
         fail(405, "This session operation is unavailable.")
+
+    async def _story(self, workspace: Workspace, session: dict) -> dict:
+        """Draft an anonymous interview-experience post (面经) from a finished live session's transcript.
+        The app shows it in an editable form; the user reviews it before anything is submitted."""
+        if not session.get("ended_at") or session.get("topology") == "mock":
+            fail(422, "Stories are for finished live interviews, not practice sessions.")
+        if session.get("story_shared"):
+            fail(409, "This interview was already shared.")
+        segments = workspace.state["transcripts"].get(session["session_id"], [])
+        if sum(1 for s in segments if s.get("role") == "interviewer") < 3:
+            fail(422, "This interview is too short to write a story from.")
+        try:
+            text = await self.openai.respond(coach.story_request(self.settings.models.coaching, session, segments), timeout=120)
+            draft = json.loads(text)
+        except ProviderError as error:
+            fail(422, str(error))
+        except ValueError:
+            fail(502, "Could not draft the story right now. Try again in a moment.")
+        if not coach.matches_schema(draft, coach.STORY_SCHEMA):
+            fail(502, "Could not draft the story right now. Try again in a moment.")
+        return {"company": session.get("company") or "", "role": session.get("role") or "", **draft}
 
     # ── uploaded blobs ──────────────────────────────────────────────────────
 

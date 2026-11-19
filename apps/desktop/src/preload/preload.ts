@@ -11,6 +11,7 @@ const api = {
     ipcRenderer.invoke('session:start', request),
   currentSession: () => ipcRenderer.invoke('session:current'),
   endSession: () => ipcRenderer.invoke('session:end'),
+  onSessionEnded: (listener: (sessionId: string, topology: string) => void) => { ipcRenderer.on('session:ended', (_event, id, topology) => listener(id, topology)); },
   permissions: () => ipcRenderer.invoke('permissions:status'),
   requestMicrophone: () => ipcRenderer.invoke('permissions:request-microphone'),
   openScreenSettings: () => ipcRenderer.invoke('permissions:open-screen-settings'),
@@ -25,6 +26,8 @@ const api = {
   cloudAuth: (mode: 'register' | 'login', email: string, password: string) => ipcRenderer.invoke('cloud:auth', mode, email, password),
   cloudSignOut: () => ipcRenderer.invoke('cloud:sign-out'),
   cloudOpen: (next: string) => ipcRenderer.invoke('cloud:open', next),
+  shareStory: (body: { company: string; role: string; round: string; lang: string; outcome: string; text: string }) =>
+    ipcRenderer.invoke('cloud:share-story', body),
   contactSupport: () => ipcRenderer.invoke('support:email'),
   setApiKey: (key: string) => ipcRenderer.invoke('apikey:set', key),
   defaultSettings: () => ipcRenderer.invoke('settings:defaults'),

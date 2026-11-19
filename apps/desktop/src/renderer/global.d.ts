@@ -24,7 +24,9 @@ interface Window {
     cloudStatus(): Promise<{ signedIn: boolean; email?: string; user?: CloudUser; offline?: boolean; local?: LocalCredentials }>;
     cloudAuth(mode: 'register' | 'login', email: string, password: string): Promise<{ user: CloudUser; local: LocalCredentials }>;
     cloudSignOut(): Promise<void>;
+    onSessionEnded(listener: (sessionId: string, topology: string) => void): void;
     cloudOpen(next: string): Promise<void>;
+    shareStory(body: { company: string; role: string; round: string; lang: string; outcome: string; text: string }): Promise<void>;
     contactSupport(): Promise<void>;
     defaultSettings(): Promise<DeviceSettings>;
     setSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;

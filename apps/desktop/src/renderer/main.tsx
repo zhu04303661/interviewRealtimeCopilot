@@ -9,7 +9,7 @@ const OWNER = 'main';
 type Goal = { goal_id: string; role: string; company: string; job_description?: string; company_detail?: string; created_at: string };
 type Doc = { document_id: string; filename: string; kind: 'resume' | 'material'; status: string; text_chars?: number; byte_size?: number; created_at?: string; failure_reason?: string };
 type SessionRow = { session_id: string; goal_id: string; role: string; company: string; topology: string; created_at: string;
-  duration_seconds: number | null; status: string; headline?: string; failure_reason?: string | null };
+  duration_seconds: number | null; status: string; headline?: string; failure_reason?: string | null; story_shared?: boolean };
 type Route = { page: 'goals' } | { page: 'goal'; goalId: string } | { page: 'library' } | { page: 'history'; sessionId?: string } | { page: 'settings' };
 
 async function auth(path: string, body?: Record<string, unknown>) {
@@ -303,6 +303,82 @@ function LibraryPage({ docs, refresh }: { docs: Doc[]; refresh: () => void }) {
   );
 }
 
+/** After a live interview: offer to share an anonymous 面经 on the site's story board — drafted from the
+ *  transcript by the engine, reviewed by the user, then submitted for moderation. Nothing posts unreviewed. */
+function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) {
+  type Story = { company: string; role: string; round: string; lang: string; outcome: string; text: string };
+  const [story, setStory] = useState<Story>({ company: row.company, role: row.role, round: 'technical', lang: 'zh', outcome: '', text: '' });
+  const [phase, setPhase] = useState<'ask' | 'drafting' | 'edit' | 'sending' | 'done' | 'closed'>('ask');
+  const [error, setError] = useState('');
+  if (row.topology === 'mock' || row.story_shared || phase === 'closed') return null;
+  const set = (patch: Partial<Story>) => setStory((s) => ({ ...s, ...patch }));
+  const ROUNDS: [string, string][] = [['hr', 'HR 初筛 · HR screen'], ['oa', '在线笔试 / OA'], ['technical', '技术面 · Technical'],
+    ['system-design', '系统设计 · System design'], ['behavioral', '行为面试 · Behavioral'], ['manager', '主管面 · Hiring manager'],
+    ['onsite', '终面 / 现场面 · Onsite'], ['other', '其他 · Other']];
+  const draft = async () => {
+    setPhase('drafting'); setError('');
+    try {
+      const r = await window.copilot.request('POST', `/api/v3/sessions/${sessionId}/story`) as { draft: Story };
+      setStory((s) => ({ ...s, ...r.draft }));
+      setPhase('edit');
+    } catch (e) { setError((e as Error).message); setPhase('ask'); }
+  };
+  const submit = async () => {
+    setPhase('sending'); setError('');
+    try {
+      await window.copilot.shareStory(story);
+      void window.copilot.request('POST', `/api/v3/sessions/${sessionId}/shared`).catch(() => undefined);
+      setPhase('done');
+    } catch (e) { setError((e as Error).message); setPhase('edit'); }
+  };
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <div className="card-head"><h3>Share your story · 分享面经</h3></div>
+      <div className="card-body">
+        {phase === 'done'
+          ? <p>Sent for review — thank you! Once approved it appears anonymously on the story board. · 已提交审核，谢谢！通过后会匿名展示在面经墙。
+            {' '}<button className="link small" onClick={() => window.copilot.cloudOpen('/interviews.html')}>View the board · 看面经墙</button></p>
+          : phase === 'edit' || phase === 'sending' ? (
+            <div>
+              <div className="row" style={{ gap: 12 }}>
+                <label className="field" style={{ flex: 1 }}><span>Company · 公司</span><input className="input" value={story.company} onChange={(e) => set({ company: e.target.value })} /></label>
+                <label className="field" style={{ flex: 1 }}><span>Role · 职位</span><input className="input" value={story.role} onChange={(e) => set({ role: e.target.value })} /></label>
+              </div>
+              <div className="row" style={{ gap: 12 }}>
+                <label className="field" style={{ flex: 1 }}><span>Round · 轮次</span><select className="select" value={story.round} onChange={(e) => set({ round: e.target.value })}>
+                  {ROUNDS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></label>
+                <label className="field" style={{ flex: 1 }}><span>Language · 语言</span><select className="select" value={story.lang} onChange={(e) => set({ lang: e.target.value })}>
+                  <option value="zh">中文</option><option value="en">English</option><option value="other">其他 · Other</option></select></label>
+                <label className="field" style={{ flex: 1 }}><span>Outcome · 结果（可选）</span><select className="select" value={story.outcome} onChange={(e) => set({ outcome: e.target.value })}>
+                  <option value="">不透露 · Prefer not to say</option><option value="offer">拿到 offer · Offer</option><option value="rejected">未通过 · Rejected</option>
+                  <option value="waiting">等待结果 · Waiting</option><option value="declined">婉拒 · Declined</option></select></label>
+              </div>
+              <label className="field"><span>Your story · 面经正文（可编辑）</span>
+                <textarea className="textarea" style={{ minHeight: 160 }} value={story.text} onChange={(e) => set({ text: e.target.value })} /></label>
+              <p className="muted small">Reviewed before it appears; your name and email are never shown. · 审核通过后展示，姓名和邮箱不会公开。</p>
+              {error && <p className="error small">{error}</p>}
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <button className="btn ghost" onClick={() => setPhase('ask')}>Back · 返回</button>
+                <button className="btn primary" disabled={phase === 'sending' || story.text.trim().length < 30 || !story.company.trim() || !story.role.trim()} onClick={submit}>
+                  {phase === 'sending' ? 'Sending… · 提交中' : 'Submit for review · 提交审核'}</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="muted">Help other candidates prepare: we can draft an anonymous story from this interview's transcript for you to review.
+                Nothing is shared until you approve it. · 帮其他求职者准备：可以基于这次面试的转写稿起草一条匿名面经，你确认后才会提交。</p>
+              {error && <p className="error small">{error}</p>}
+              <div className="row">
+                <button className="btn primary" disabled={phase === 'drafting'} onClick={draft}>{phase === 'drafting' ? 'Drafting… · 起草中' : 'Draft my story · 起草面经'}</button>
+                <button className="btn ghost" onClick={() => setPhase('closed')}>No thanks · 不了</button>
+              </div>
+            </div>
+          )}
+      </div>
+    </div>
+  );
+}
+
 function HistoryPage({ sessions, sessionId, open }: { sessions: SessionRow[]; sessionId?: string; open: (id?: string) => void }) {
   const [report, setReport] = useState<any>(null);
   const [audio, setAudio] = useState<string | null>(null);
@@ -332,6 +408,7 @@ function HistoryPage({ sessions, sessionId, open }: { sessions: SessionRow[]; se
           <div className="row"><b>Recording · 录音</b><span className="spacer" />
             {audio ? <audio controls src={audio} style={{ width: 420 }} /> : <span className="muted small">No recording for this session. · 这个会话没有录音。</span>}</div>
         </div>
+        <ShareStory row={row} sessionId={sessionId} />
         {report && (
           <div className="two-col" style={{ marginTop: 24 }}>
             <div className="stack">
@@ -737,6 +814,9 @@ function Shell({ username, role, signOut }: { username: string; role: string; si
     return () => clearTimeout(timer);
   }, [docs, sessions, refresh]);
   useEffect(() => { const onFocus = () => void refresh(); window.addEventListener('focus', onFocus); return () => window.removeEventListener('focus', onFocus); }, [refresh]);
+  useEffect(() => {  // a live interview just ended: land on its debrief, where the story-share card prompts them
+    window.copilot.onSessionEnded((id, topology) => { if (topology !== 'mock') void refresh().then(() => setRoute({ page: 'history', sessionId: id })); });
+  }, [refresh]);
 
   const goal = route.page === 'goal' ? goals.find((g) => g.goal_id === route.goalId) : undefined;
   const liveGoal = goal ?? goals[0];

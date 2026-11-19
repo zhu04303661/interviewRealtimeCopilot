@@ -94,6 +94,7 @@ def report_of(session: dict[str, Any], transcript: list | None, preparing: bool)
         "end_reason": session.get("end_reason"),
         "duration_seconds": duration,
         "question_count": session.get("question_count"),
+        "story_shared": bool(session.get("story_shared")),
         "headline": ((report or {}).get("overall") or {}).get("headline"),
         "status": "ready" if report else "preparing" if preparing else "unprepared",
         "report": report,

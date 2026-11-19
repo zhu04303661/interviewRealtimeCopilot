@@ -138,6 +138,23 @@ async def test_interview_posts_review_board_and_pages(site):
     assert (await site.get("/interviews/1")).status == 404
 
 
+async def test_device_interview_post(site):
+    """The desktop app submits with its Bearer token (no Origin); the account email is attached."""
+    story = {"company": "DeviceCo", "role": "SRE", "round": "hr", "lang": "en", "outcome": "",
+             "text": "A thirty-minute screen about on-call expectations and team structure.", "email": "spoof@example.com"}
+    assert (await site.post("/api/v1/interviews", json=story)).status == 401  # no token, no story
+    auth = await site.post("/api/v1/auth/register", json={"email": "dev@example.com", "password": "long-enough-1"})
+    token = (await auth.json())["token"]
+    bearer = {"Authorization": f"Bearer {token}"}  # /api/v1 skips the Origin check by design
+    assert (await site.post("/api/v1/interviews", json=story, headers=bearer)).status == 200
+    assert (await site.post("/api/v1/interviews", json={**story, "round": "bogus"}, headers=bearer)).status == 422
+    await post(site, "/api/signup", {"email": "boss3@example.com", "password": "long-enough-1"})
+    from irc_web.app import Store
+    Store(site.server.app["db_path"]).db.execute("update users set is_admin = 1 where email = 'boss3@example.com'")
+    post_ = (await (await site.get("/api/admin/messages")).json())["posts"][0]
+    assert post_["email"] == "dev@example.com" and post_["company"] == "DeviceCo"  # account email, not the submitted one
+
+
 async def test_admin_dashboard_is_for_admins_only(site):
     assert (await site.get("/api/admin/overview")).status == 401
     await post(site, "/api/signup", {"email": "member@example.com", "password": "long-enough-1"})
