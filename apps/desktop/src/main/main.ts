@@ -21,11 +21,16 @@ if (process.env.IRC_FAKE_AUDIO) {
 }
 
 
-// Packaged: the engine source and a standalone Python live in Contents/Resources (see scripts/package-mac.mjs).
-// (The bundle keeps Electron's executable name, so app.isPackaged is false; detect the bundled engine instead.)
+// Packaged: the engine source and a standalone Python live in the resources folder — Contents/Resources on macOS
+// (scripts/package-mac.mjs), resources\ next to the .exe on Windows (scripts/package-win.mjs).
+// (The macOS bundle keeps Electron's executable name, so app.isPackaged is false; detect the bundled engine instead.)
+const windows = process.platform === 'win32';
 const bundled = existsSync(join(process.resourcesPath, 'engine', 'src', 'frlocal'));
 const engineDir = process.env.IRC_ENGINE_DIR ?? (bundled ? join(process.resourcesPath, 'engine') : resolve(__dirname, '../../../../engine'));
-const bundledPython = bundled ? join(process.resourcesPath, 'python', 'bin', 'python3') : undefined;
+const bundledPython = !bundled ? undefined : windows ? join(process.resourcesPath, 'python', 'python.exe') : join(process.resourcesPath, 'python', 'bin', 'python3');
+/** Windows: the window/taskbar icon (macOS takes it from the bundle). */
+const windowIcon = windows && existsSync(join(process.resourcesPath, 'icon.ico')) ? join(process.resourcesPath, 'icon.ico') : undefined;
+if (windows) app.setAppUserModelId('com.xichiuk.interview-realtime-copilot');  // taskbar grouping and notifications
 const dataDir = process.env.IRC_DATA_DIR ?? join(app.getPath('appData'), 'Interview Realtime Copilot');
 const apiKeyFile = join(dataDir, 'openai.env');
 let cloud: Cloud;
@@ -37,7 +42,8 @@ let settings: SettingsStore;
 let systemAudio: ChildProcess | null = null;
 let testSystemAudioPath = process.env.IRC_TEST_SYSTEM_AUDIO;  // tests only (IRC_E2E=1)
 
-/** macOS: computer audio comes from our Core Audio tap helper (Electron's loopback is Windows-only). */
+/** macOS: computer audio comes from our Core Audio tap helper. Windows uses Electron's loopback through getDisplayMedia
+ *  (see setDisplayMediaRequestHandler below), so startSystemAudio() returns false there. */
 const systemAudioHelper = process.env.IRC_SYSTEM_AUDIO_HELPER ?? join(__dirname, '../../native/bin/irc-system-audio');
 
 function startSystemAudio(): boolean {
@@ -80,7 +86,7 @@ function watch(window: BrowserWindow, name: string): void {
 }
 
 function openMainWindow(): void {
-  mainWindow = new BrowserWindow({ width: 1100, height: 760, title: 'Interview Realtime Copilot', webPreferences: secure });
+  mainWindow = new BrowserWindow({ width: 1100, height: 760, title: 'Interview Realtime Copilot', icon: windowIcon, webPreferences: secure });
   void mainWindow.loadFile(renderer('index.html'));
   watch(mainWindow, 'main');
   mainWindow.on('closed', () => { mainWindow = null; });
@@ -92,6 +98,7 @@ function openCockpit(): void {
   // background opacity, so the meeting behind it shows through.
   cockpit = new BrowserWindow({
     width: 460, height: 760, alwaysOnTop: true, title: 'Copilot', frame: false, transparent: true, hasShadow: true,
+    icon: windowIcon,
     webPreferences: { ...secure, backgroundThrottling: false },
   });
   cockpit.setAlwaysOnTop(true, 'floating');
@@ -107,6 +114,7 @@ function applySettings(value: Settings): void {
     app.setLoginItemSettings({ openAtLogin: value.launchAtLogin });
   }
   cockpit?.setContentProtection(value.stealth);
+  if (windows) cockpit?.setSkipTaskbar(value.stealth);  // a taskbar button would still show in a shared full screen
   registerShortcuts(value);
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', value);
 }
@@ -232,7 +240,8 @@ function registerIpc(): void {
     cloud.authenticate(mode === 'register' ? 'register' : 'login', String(email ?? ''), String(password ?? '')));
   ipcMain.handle('cloud:sign-out', () => cloud.signOut());
   ipcMain.handle('cloud:open', (_event, next: unknown) => cloud.open(typeof next === 'string' && next.startsWith('/') ? next : '/account.html'));
-  // OpenAI API key entered in Settings: stored only on this Mac (owner-only file), read by the engine on every call.
+  // OpenAI API key entered in Settings: stored only on this computer (owner-only file; on Windows the per-user
+  // %APPDATA% folder's ACL does the same), read by the engine on every call.
   ipcMain.handle('apikey:status', () => {
     const own = existsSync(apiKeyFile) && /OPENAI_API_KEY=\S/.test(readFileSync(apiKeyFile, 'utf8'));
     const env = !!process.env.OPENAI_API_KEY || /^\s*(export\s+)?OPENAI_API_KEY\s*=\s*\S/m.test(existsSync(join(homedir(), '.env')) ? readFileSync(join(homedir(), '.env'), 'utf8') : '');
@@ -254,10 +263,18 @@ function registerIpc(): void {
     microphone: systemPreferences.getMediaAccessStatus('microphone'),
     screen: process.platform === 'darwin' ? systemPreferences.getMediaAccessStatus('screen') : 'granted',
   }));
-  ipcMain.handle('permissions:request-microphone', () =>
-    process.platform === 'darwin' ? systemPreferences.askForMediaAccess('microphone') : true);
-  ipcMain.handle('permissions:open-screen-settings', () =>
-    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'));
+  ipcMain.handle('permissions:request-microphone', async () => {
+    if (process.platform === 'darwin') return systemPreferences.askForMediaAccess('microphone');
+    // Windows has no prompt for desktop apps: when access is off, open Settings → Privacy → Microphone.
+    if (windows && systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+      await shell.openExternal('ms-settings:privacy-microphone');
+      return false;
+    }
+    return true;
+  });
+  ipcMain.handle('permissions:open-screen-settings', () => shell.openExternal(windows
+    ? 'ms-settings:privacy-microphone'  // Windows needs no screen-capture permission; the microphone page is the relevant one
+    : 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'));
 }
 
 app.whenReady().then(() => {

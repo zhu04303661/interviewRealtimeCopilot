@@ -171,20 +171,26 @@ const pages = {
     }));
   },
   async download() {
-    const status = document.getElementById('mac-status'), slot = document.getElementById('mac-download');
-    let latest = null;
-    try { const r = await fetch('/downloads/latest.json', { cache: 'no-store' }); if (r.ok) latest = await r.json(); } catch { /* none yet */ }
-    const render = () => {
-      if (latest) {
-        status.textContent = tr('dl.version', { v: latest.version, mb: latest.size_mb, date: latest.date });
-        // latest.url (object storage / CDN) when published there, else the copy on this server.
-        slot.innerHTML = `<a class="btn primary lg" data-download href="${latest.url || `/downloads/${latest.file}`}">${tr('cta.download')}</a>`;
-      } else {
-        status.textContent = tr('dl.preparing');
-        if (!slot.firstChild) slot.append(waitlistForm('macos'));
-      }
-    };
-    render(); window.addEventListener('language', render);
+    // One card per platform; each reads its manifest (written by web/deploy/publish-installer.sh) or offers the waitlist.
+    const platforms = [{ id: 'mac', manifest: 'latest.json', label: 'cta.download', topic: 'macos' },
+      { id: 'win', manifest: 'latest-win.json', label: 'cta.downloadWin', topic: 'windows' }];
+    await Promise.all(platforms.map(async ({ id, manifest, label, topic }) => {
+      const status = document.getElementById(`${id}-status`), slot = document.getElementById(`${id}-download`);
+      if (!status || !slot) return;
+      let latest = null;
+      try { const r = await fetch(`/downloads/${manifest}`, { cache: 'no-store' }); if (r.ok) latest = await r.json(); } catch { /* none yet */ }
+      const render = () => {
+        if (latest) {
+          status.textContent = tr('dl.version', { v: latest.version, mb: latest.size_mb, date: latest.date });
+          // latest.url (object storage / CDN) when published there, else the copy on this server.
+          slot.innerHTML = `<a class="btn primary lg" data-download href="${latest.url || `/downloads/${latest.file}`}">${tr(label)}</a>`;
+        } else {
+          status.textContent = tr('dl.preparing');
+          if (!slot.firstChild) slot.append(waitlistForm(topic));
+        }
+      };
+      render(); window.addEventListener('language', render);
+    }));
   },
   login() {
     const params = new URLSearchParams(location.search);

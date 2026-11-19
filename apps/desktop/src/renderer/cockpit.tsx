@@ -293,7 +293,7 @@ function Cockpit() {
             recorder.addStream(testStream);
             stops.push(await captureLane(testStream, 1, send, onLevel, turns[1]));
           } else if (general && await window.copilot.startSystemAudio()) {
-            // macOS: frames from the Core Audio tap helper, already 16 kHz PCM16.
+            // macOS: frames from the Core Audio tap helper, already 16 kHz PCM16. (Windows: the getDisplayMedia branch below.)
             let sequence = 0;
             window.copilot.onSystemAudio((pcm) => {
               const rms = rmsOf(new Int16Array(pcm.buffer, pcm.byteOffset, pcm.byteLength >> 1));
@@ -310,7 +310,8 @@ function Cockpit() {
           } else if (general) {
             const display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
             display.getVideoTracks().forEach((t) => t.stop());
-            if (!display.getAudioTracks().length) throw new Error('No system audio. Allow Screen & System Audio Recording. · 无系统声音，请授权屏幕与系统录音。');
+            if (!display.getAudioTracks().length) throw new Error(window.copilot.platform === 'darwin' ? 'No system audio. Allow Screen & System Audio Recording. · 无系统声音，请授权屏幕与系统录音。'
+              : 'No computer audio. Check that an output device (speakers or headphones) is enabled. · 无电脑声音，请确认已启用扬声器或耳机。');
             stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send, onLevel, turns[1]));
           }
           dispatch({ type: 'transcription.state', seq: 0, data: { state: 'ok' } });
@@ -446,7 +447,7 @@ function Cockpit() {
         {state.interim && <div className="c-entry"><span className="stamp">Interviewer · 面试官</span><div className="text" style={{ opacity: .7 }}>{state.interim}<span className="typing" /></div></div>}
       </div>
       <footer className="c-footer">
-        <button className="c-btn" onClick={solve} title="⌥S">Solve screen · 截屏解答</button>
+        <button className="c-btn" onClick={solve} title={window.copilot.platform === 'darwin' ? '⌥S' : 'Alt+S'}>Solve screen · 截屏解答</button>
         <span className="spacer" />
         <span className="timer">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</span>
         <button className="c-btn end" disabled={ending} onClick={end}>{ending ? 'Saving… · 保存中…' : 'End · 结束'}</button>

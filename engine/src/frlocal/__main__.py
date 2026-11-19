@@ -19,6 +19,7 @@ import json
 import logging
 import signal
 import sys
+import threading
 from pathlib import Path
 
 from aiohttp import web
@@ -44,20 +45,35 @@ async def serve(accounts: Path, workspace: Path, legacy_workspace: Path | None =
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
-    for name in ("SIGTERM", "SIGINT"):
-        loop.add_signal_handler(getattr(signal, name), stop.set)
-    # Standard input is a pipe from the Electron app; EOF means it is gone.
-    reader = asyncio.StreamReader()
-    await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(reader), sys.stdin)
+    watcher: asyncio.Task[None] | None = None
+    if sys.platform == "win32":
+        # Windows: no loop signal handlers (Electron ends the engine with TerminateProcess), and the
+        # Proactor loop cannot read an inherited anonymous stdin pipe, so a thread waits for EOF.
+        def wait_for_eof() -> None:
+            try:
+                while sys.stdin.buffer.read1(1024):
+                    pass
+            except (OSError, ValueError):
+                pass
+            loop.call_soon_threadsafe(stop.set)
 
-    async def watch_parent() -> None:
-        while await reader.read(1024):
-            pass
-        stop.set()
+        threading.Thread(target=wait_for_eof, name="parent-watch", daemon=True).start()
+    else:
+        for name in ("SIGTERM", "SIGINT"):
+            loop.add_signal_handler(getattr(signal, name), stop.set)
+        # Standard input is a pipe from the Electron app; EOF means it is gone.
+        reader = asyncio.StreamReader()
+        await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(reader), sys.stdin)
 
-    watcher = loop.create_task(watch_parent())
+        async def watch_parent() -> None:
+            while await reader.read(1024):
+                pass
+            stop.set()
+
+        watcher = loop.create_task(watch_parent())
     await stop.wait()
-    watcher.cancel()
+    if watcher:
+        watcher.cancel()
     await runner.cleanup()
 
 

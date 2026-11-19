@@ -6,7 +6,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 export interface EngineOptions {
@@ -32,6 +32,20 @@ export function proxyUrlFromRules(rules: string): string | null {
   const [kind, address] = rule.split(/\s+/);
   const scheme = ({ PROXY: 'http', HTTP: 'http', HTTPS: 'https', SOCKS5: 'socks5', SOCKS: 'socks5' } as Record<string, string>)[kind.toUpperCase()];
   return new URL(`${scheme}://${address}`).href.replace(/\/$/, '');
+}
+
+/** PATH for the engine: where uv is usually installed (development) in front of the inherited PATH. */
+function enginePath(): string {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  const extra = process.platform === 'win32'
+    ? [join(home, '.local', 'bin'), join(home, '.cargo', 'bin')]
+    : [`${home}/.local/bin`, '/opt/homebrew/bin', '/usr/local/bin'];
+  return [...extra, process.env.PATH ?? ''].join(delimiter);  // process.env is case-insensitive on Windows ("Path")
+}
+
+/** process.env without its PATH entry, whatever its case (Windows names it "Path"), so the PATH set after it is the only one. */
+function inheritedEnv(): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toUpperCase() !== 'PATH'));
 }
 
 export class Engine {
@@ -77,11 +91,13 @@ export class Engine {
     const child = spawn(command, args, {
       cwd: engineDir,
       env: {
-        ...process.env, FRLOCAL_TOKEN: this.token, ...(this.proxy ? { FRLOCAL_OPENAI_PROXY: this.proxy } : {}),
+        ...inheritedEnv(), FRLOCAL_TOKEN: this.token, ...(this.proxy ? { FRLOCAL_OPENAI_PROXY: this.proxy } : {}),
         ...(this.options.python ? { PYTHONPATH: join(engineDir, 'src'), PYTHONDONTWRITEBYTECODE: '1', PYTHONNOUSERSITE: '1' } : {}),
-        ...(this.options.envFiles ? { FRLOCAL_ENV_FILE: this.options.envFiles.join(':') } : {}),
-        PATH: `${process.env.HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? ''}`,
+        ...(this.options.envFiles ? { FRLOCAL_ENV_FILE: this.options.envFiles.join(delimiter) } : {}),  // the engine splits on os.pathsep
+        PYTHONUTF8: '1',  // Windows: files, pipes and logs in UTF-8 rather than the ANSI code page
+        PATH: enginePath(),
       },
+      windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],  // the engine exits when stdin closes, i.e. when this app does
     });
     this.child = child;

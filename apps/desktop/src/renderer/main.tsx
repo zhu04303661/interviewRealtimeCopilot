@@ -383,13 +383,16 @@ const SHORTCUT_ROWS: { group: string; hint: string; rows: { ids: (keyof DeviceSe
     { ids: ['shrink'], label: 'Shrink assistant · 变窄', what: 'Make the cockpit narrower' },
   ] },
 ];
-const keyGlyphs = (accelerator: string) => accelerator.split('+').map((k) => ({ Alt: '⌥', Option: '⌥', Shift: '⇧', Control: '⌃', Ctrl: '⌃', Command: '⌘', Cmd: '⌘',
-  CommandOrControl: '⌘', Up: '↑', Down: '↓', Left: '←', Right: '→' } as Record<string, string>)[k] ?? k);
+const isMac = window.copilot.platform === 'darwin';
+const KEY_NAMES: Record<string, string> = isMac
+  ? { Alt: '⌥', Option: '⌥', Shift: '⇧', Control: '⌃', Ctrl: '⌃', Command: '⌘', Cmd: '⌘', CommandOrControl: '⌘', Up: '↑', Down: '↓', Left: '←', Right: '→' }
+  : { Option: 'Alt', Control: 'Ctrl', CommandOrControl: 'Ctrl', Command: 'Win', Cmd: 'Win', Super: 'Win', Up: '↑', Down: '↓', Left: '←', Right: '→' };
+const keyGlyphs = (accelerator: string) => accelerator.split('+').map((k) => KEY_NAMES[k] ?? k);
 /** Turn a keydown into an Electron accelerator; null until a non-modifier key with a modifier is pressed. */
 function accelerator(e: React.KeyboardEvent): string | null {
   const key = { ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', ' ': 'Space' }[e.key] ?? (e.key.length === 1 ? e.key.toUpperCase() : null);
   if (!key || ['Meta', 'Alt', 'Shift', 'Control'].includes(e.key)) return null;
-  const mods = [e.metaKey && 'Command', e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean);
+  const mods = [e.metaKey && (isMac ? 'Command' : 'Super'), e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean);
   const code = e.code.startsWith('Key') ? e.code.slice(3) : e.code.startsWith('Digit') ? e.code.slice(5) : key;  // Option changes e.key on macOS
   return mods.length ? [...mods, { Equal: '=', Minus: '-' }[e.code] ?? code].join('+') : null;
 }
@@ -697,8 +700,8 @@ function Preflight({ goal, docs, initial, onClose, onStarted }: { goal: Goal; do
           <span>{micOk ? 'Hears your answers. · 用于识别你的回答。' : 'Grant microphone access to continue. · 请先授权麦克风。'}</span></div>
           {micOk ? <MicTest /> : <button className="btn sm" onClick={() => window.copilot.requestMicrophone().then(() => window.copilot.permissions().then(setPermissions))}>Grant microphone access · 授权</button>}</div>
         {live && <div className="setting"><div className="icon-tile"><Monitor /></div><div className="what"><b>Computer audio · 电脑声音</b>
-          <span>{systemAudio ? 'Hears the interviewer from the meeting app. macOS asks once for System Audio Recording when the session starts. · 用于听到会议里的面试官，首次开始时 macOS 会询问一次。'
-            : 'Not available on this computer. · 本机不支持。'}</span></div>
+          <span>{!systemAudio ? 'Not available on this computer. · 本机不支持。' : isMac ? 'Hears the interviewer from the meeting app. macOS asks once for System Audio Recording when the session starts. · 用于听到会议里的面试官，首次开始时 macOS 会询问一次。'
+            : 'Hears the interviewer from the meeting app (whatever plays through your speakers or headphones). · 用于听到会议里的面试官（电脑扬声器或耳机里播放的声音）。'}</span></div>
           {systemAudio ? <span className="badge good">Ready · 就绪</span> : <span className="badge bad">Unavailable</span>}</div>}
         <p className="faint small">Microphone and meeting audio start after you press Start. · 按下开始后才开始采集声音。</p>
 

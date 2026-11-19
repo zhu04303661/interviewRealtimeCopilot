@@ -12,7 +12,9 @@
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "start": "npm run build && electron .",
     "app": "npm run build && open -n node_modules/electron/dist/Electron.app --args \"$PWD\"",
-    "build:native": "node scripts/build-native.mjs"
+    "build:native": "node scripts/build-native.mjs",
+    "package:mac": "node scripts/package-mac.mjs",
+    "package:win": "node scripts/package-win.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
@@ -23,6 +25,7 @@
     "lucide-react": "1.66.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "resedit": "3.1.0",
     "typescript": "5.9.3",
     "vite": "8.3.5"
   }

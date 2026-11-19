@@ -485,9 +485,11 @@ def build() -> None:
 <div class="card" style="margin-top:26px">{t("dl.mac", "macOS 14.2 or later · Apple Silicon (M1–M4)", "macOS 14.2 及以上 · Apple 芯片（M1–M4）", "h3")}<p class="muted small" id="mac-status" data-i18n="dl.checking">{"Checking for the current build…"}</p><div id="mac-download"></div>
 {t("dl.key", "Just sign in with your website account — the realtime AI engine is ready, with a monthly allowance on every plan.", "用网站账号登录即可——实时 AI 引擎即刻可用，每个套餐都包含每月额度。", "p", "notice small")}
 {t("dl.gatekeeper", "Preview builds are not yet notarised by Apple: after the first launch, open System Settings → Privacy & Security and click “Open Anyway”.", "测试版尚未经 Apple 公证：首次启动后，打开「系统设置 → 隐私与安全性」，点击「仍要打开」。", "p", "faint small")}</div>
-<div class="card" style="margin-top:16px">{t("dl.win", "Windows — coming soon", "Windows——即将推出", "h3")}{t("dl.win.p", "Leave your email and we will tell you when it is ready.", "留下邮箱，发布时通知你。", "p", "muted small")}
-<form class="inline-form" data-waitlist="windows"><input class="input" name="email" type="email" placeholder="you@example.com" required><button class="btn primary">{t("dl.notify", "Notify me", "通知我")}</button><p class="error"></p></form></div></div>
+<div class="card" style="margin-top:16px">{t("dl.win", "Windows 10 (version 2004 or later) or Windows 11 · 64-bit", "Windows 10（2004 及以上）或 Windows 11 · 64 位", "h3")}<p class="muted small" id="win-status" data-i18n="dl.checking">{"Checking for the current build…"}</p><div id="win-download"></div>
+{t("dl.smartscreen", "Preview builds are not yet code-signed: if Windows shows “Windows protected your PC”, click More info → Run anyway.", "测试版尚未进行代码签名：如果出现「Windows 已保护你的电脑」，点击「更多信息 → 仍要运行」。", "p", "faint small")}</div></div>
 <div class="glass">{t("dl.after", "After installing", "安装之后", "h3")}<ul class="checks"><li>{t("dl.a1", "Allow the microphone when asked.", "按提示允许麦克风。")}</li><li>{t("dl.a2", "For live interviews, allow System Audio Recording so the copilot hears the meeting.", "实时面试需要允许「系统录音」，以便听到会议声音。")}</li><li>{t("dl.a3", "Create a goal, add your resume and notes, and start a practice session.", "创建目标、上传简历和资料，然后开始一次语音练习。")}</li></ul></div></div></section>''')
+    t("cta.downloadWin", "Download for Windows", "下载 Windows 版")
+    t("dl.notify", "Notify me", "通知我")
     t("dl.preparing", "The preview build is being prepared — leave your email to get it first.", "测试版正在准备中——留下邮箱，第一时间获取。")
     t("dl.thanks", "Thanks — we will email you.", "已登记，我们会邮件通知你。")
     t("dl.version", "Version {v} · {mb} MB · {date}", "版本 {v} · {mb} MB · {date}")

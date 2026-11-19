@@ -87,9 +87,17 @@ sh web/deploy/deploy-mirror.sh
 ```zsh
 cd apps/desktop && node scripts/package-mac.mjs && cd ../..   # 生成 dist-mac/*.dmg 和 latest.json
 sh web/deploy/publish-installer.sh ubuntu@ec2-18-134-135-24.eu-west-2.compute.amazonaws.com ~/.ssh/ukssh.pem
+
+cd apps/desktop && node scripts/package-win.mjs && cd ../..   # 生成 dist-win/*-setup.exe 和 latest-win.json
+sh web/deploy/publish-installer.sh ubuntu@ec2-18-134-135-24.eu-west-2.compute.amazonaws.com ~/.ssh/ukssh.pem win
 ```
 
-安装包会传到两台服务器，下载页读取 `latest.json` 显示版本和下载按钮。打包需要 Apple 芯片的 Mac，以及 `uv python install 3.12`。
+安装包会传到两台服务器，下载页读取 `latest.json`（Mac）和 `latest-win.json`（Windows）显示版本和下载按钮；还没发布 Windows 版时，Windows 卡片显示登记邮箱。
+
+- Mac 版：需要 Apple 芯片的 Mac，以及 `uv python install 3.12`。
+- Windows 版：在 Windows、Mac 或 Linux 上都能打包（会下载 Windows 版 Electron 和 Python）。需要 uv、curl、tar 和 NSIS 的 `makensis`
+  （Windows：`winget install NSIS.NSIS`；Mac：`brew install makensis`；Linux：`apt install nsis`）。安装包按用户安装，不需要管理员权限；
+  尚未代码签名，首次运行时 SmartScreen 会提示，点「更多信息 → 仍要运行」。卸载会保留 `%APPDATA%\Interview Realtime Copilot` 里的用户数据。
 
 ### 3. 让搜索引擎知道页面更新了（可选）
 

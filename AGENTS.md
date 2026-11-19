@@ -26,6 +26,13 @@
 - macOS package (Apple Silicon, ad-hoc signed, not notarised): `cd apps/desktop && node scripts/package-mac.mjs` → `dist-mac/*.dmg`
   and `latest.json`. Bundles a uv-managed CPython 3.12 (`uv python install 3.12`) with the engine's locked deps and `engine/src`.
   Publish: copy both files to `/opt/irc-web/static/downloads/` on the web server (deploy.sh keeps that folder).
+- Windows package (x64, per-user NSIS installer, not code-signed): `cd apps/desktop && node scripts/package-win.mjs` → `dist-win/*-setup.exe`
+  and `latest-win.json` (`--dir` stops at `dist-win/win-unpacked`). Runs on Windows or cross-builds from macOS/Linux: downloads
+  Electron win32 and a python-build-standalone CPython 3.12 for Windows, installs Windows wheels with `uv pip --python-platform`,
+  sets the .exe icon with resedit. Needs uv, curl, tar, makensis. Publish both platforms with
+  `sh web/deploy/publish-installer.sh <main> <key.pem> [mac|win]`; the download page reads `latest.json` / `latest-win.json`.
+- Windows runtime: computer audio is Electron's loopback via getDisplayMedia (no helper); the engine watches stdin from a
+  thread there (no loop signal handlers) and runs with PYTHONUTF8=1; the Windows app data is `%APPDATA%\Interview Realtime Copilot`.
 - Website: `python3 web/build_site.py` (all text, EN+ZH) → `web/static`; tests `cd web/server && uv run pytest -q`;
   deploy `sh web/deploy/deploy.sh ubuntu@<host> <key.pem> copilot.xichiuk.com`.
 

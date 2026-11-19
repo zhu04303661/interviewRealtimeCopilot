@@ -2,6 +2,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const api = {
+  /** process.platform ('darwin', 'win32', …), for platform-specific wording and key names. */
+  platform: process.platform as string,
   request: (method: string, path: string, body?: unknown) => ipcRenderer.invoke('engine:request', method, path, body),
   importDocuments: (kind: 'resume' | 'material') => ipcRenderer.invoke('documents:pick-and-import', kind),
   startSession: (request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string;

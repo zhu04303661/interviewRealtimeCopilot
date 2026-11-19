@@ -31,6 +31,7 @@ interface Window {
     onSettings(listener: (value: DeviceSettings) => void): void;
     onCockpitCommand(listener: (command: string) => void): void;
     solveScreen(origin: 'manual' | 'automatic'): Promise<unknown>;
+    platform: string;
     appInfo(): Promise<{ version: string; electron: string; platform: string; systemAudio: boolean }>;
     testSetSystemAudio(path: string): Promise<void>;
     testImportPaths(kind: 'resume' | 'material', paths: string[]): Promise<any[]>;
