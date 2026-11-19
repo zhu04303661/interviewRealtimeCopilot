@@ -154,6 +154,7 @@ const pages = {
         <h2>${tr('ad.posts')} (${m.posts.length})</h2>${table(['ad.c.when', 'ad.c.company', 'ad.c.role', 'ad.c.round', 'ad.c.email', 'ad.c.board'], m.posts.map((p) => `<tr><td>${day(p.created_at)}</td><td>${esc(p.company)}</td><td>${esc(p.role)}</td><td>${esc(p.round)}</td>
           <td>${p.email ? `<a class="mail" href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : tr('ad.anon')}</td>
           <td style="white-space:nowrap"><button class="btn" data-post-act="${p.approved ? 'hide' : 'show'}" data-id="${p.id}">${tr(p.approved ? 'ad.hide' : 'ad.show')}</button> <button class="btn" data-post-act="remove" data-id="${p.id}">${tr('ad.remove')}</button>
+          ${p.audio ? `<a class="mail small" href="/interviews/audio/${p.id}">🎧</a>` : ''}${p.rewarded ? ' <span class="faint small" title="reward credited">+$</span>' : ''}
           <details style="margin-top:6px"><summary class="faint small">${tr('ad.read')}</summary><div class="small" style="white-space:pre-wrap">${esc(p.text)}</div></details></td></tr>`))}
         <h2>${tr('ad.waitlist')} (${m.waitlist.length})</h2>${table(['ad.c.when', 'ad.c.email', 'ad.c.topic'], m.waitlist.map((w) => `<tr><td>${day(w.created_at)}</td><td><a class="mail" href="mailto:${esc(w.email)}">${esc(w.email)}</a></td><td>${esc(w.topic)}</td></tr>`))}`;
       const q = document.getElementById('admin-q');

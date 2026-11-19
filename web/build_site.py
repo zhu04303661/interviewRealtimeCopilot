@@ -554,7 +554,7 @@ def build() -> None:
 <label class="field">{t("ip.text", "What they asked and how it went", "被问到的题、过程和感受")}<textarea class="input" name="text" rows="6" required minlength="30" maxlength="5000" data-i18n-placeholder="ip.textph"></textarea></label>
 <label class="field">{t("ip.email", "Email (optional, never shown)", "邮箱（选填，不会公开）")}<input class="input" name="email" type="email" placeholder="you@example.com"></label>
 <button class="btn primary">{t("ip.send", "Share my story", "发布面经")}</button><p class="error"></p></form>
-{t("ip.note", "Posts are reviewed before they appear; emails and names are never published. Please leave out anything confidential.", "面经经审核后展示；邮箱和姓名不会公开。请不要包含任何保密内容。", "p", "faint small")}</div></div></section>''')
+{t("ip.note", "Posts are reviewed before they appear; emails and names are never published. Please leave out anything confidential. Tip: sharing from the app after a live interview earns about 30 minutes of AI usage once approved.", "面经经审核后展示；邮箱和姓名不会公开。请不要包含任何保密内容。提示：在应用里完成实时面试后分享面经，审核通过可获约 30 分钟 AI 用量奖励。", "p", "faint small")}</div></div></section>''')
     # The template for /interviews/<id> pages (one indexable page per post — the "Google 面经" search landings).
     # {{…}} placeholders are filled by the server per post; excluded from the sitemap via TEMPLATES.
     page("interview-post", ("{{TITLE}}", "{{TITLE}}"), '''
@@ -563,6 +563,7 @@ def build() -> None:
 <h1 style="font-size:36px;margin:16px 0 8px">{{ROLE}} · {{COMPANY}}</h1>
 <div class="faint small">{{META}}</div>
 <div class="card" style="margin-top:26px"><div style="white-space:pre-wrap;line-height:1.8">{{BODY}}</div></div>
+{{QUESTIONS}}{{AUDIO}}
 <div class="callout"><a data-i18n="post.share" class="mail" href="/interviews.html">Had this interview? Share your story.</a></div></div>''',
          out="interview-post.html")
     t("post.back", "← All interview stories", "← 全部面经")

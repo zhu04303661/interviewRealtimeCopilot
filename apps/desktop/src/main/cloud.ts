@@ -88,11 +88,23 @@ export class Cloud {
     rmSync(this.providerFile, { force: true });
   }
 
-  /** Shares an interview story (面经) to the site's review queue; the account email is attached server-side. */
-  async shareStory(body: Record<string, unknown>): Promise<void> {
+  /** Shares an interview story (面经) to the site's review queue; the account email is attached server-side.
+   *  Resolves with the new post id, used by shareStoryAudio. */
+  async shareStory(body: Record<string, unknown>): Promise<number> {
     const saved = this.saved();
     if (!saved?.token) throw new Error('Sign in to your account first.');
-    await this.call('POST', '/api/v1/interviews', body, saved.token);
+    const { id } = await this.call('POST', '/api/v1/interviews', body, saved.token);
+    return id as number;
+  }
+
+  /** Attaches the interview recording to a story post (raw audio bytes; plays on the public page once approved). */
+  async shareStoryAudio(postId: number, bytes: Uint8Array, contentType: string): Promise<void> {
+    const saved = this.saved();
+    if (!saved?.token) throw new Error('Sign in to your account first.');
+    const response = await net.fetch(`${this.origin}/api/v1/interviews/audio/${postId}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${saved.token}`, 'Content-Type': contentType }, body: bytes as unknown as BodyInit,
+    }).catch(() => { throw new Error(`Cannot reach ${this.origin}. Check your internet connection.`); });
+    if (!response.ok) throw new Error(`Recording upload failed (${response.status}).`);
   }
 
   /** Opens the website signed in (one-time link), e.g. /pricing.html to subscribe. */

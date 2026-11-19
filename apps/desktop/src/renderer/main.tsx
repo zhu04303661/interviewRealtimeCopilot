@@ -306,9 +306,10 @@ function LibraryPage({ docs, refresh }: { docs: Doc[]; refresh: () => void }) {
 /** After a live interview: offer to share an anonymous 面经 on the site's story board — drafted from the
  *  transcript by the engine, reviewed by the user, then submitted for moderation. Nothing posts unreviewed. */
 function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) {
-  type Story = { company: string; role: string; round: string; lang: string; outcome: string; text: string };
-  const [story, setStory] = useState<Story>({ company: row.company, role: row.role, round: 'technical', lang: 'zh', outcome: '', text: '' });
+  type Story = { company: string; role: string; round: string; lang: string; outcome: string; text: string; questions: string[] };
+  const [story, setStory] = useState<Story>({ company: row.company, role: row.role, round: 'technical', lang: 'zh', outcome: '', text: '', questions: [] });
   const [phase, setPhase] = useState<'ask' | 'drafting' | 'edit' | 'sending' | 'done' | 'closed'>('ask');
+  const [withAudio, setWithAudio] = useState(false);
   const [error, setError] = useState('');
   if (row.topology === 'mock' || row.story_shared || phase === 'closed') return null;
   const set = (patch: Partial<Story>) => setStory((s) => ({ ...s, ...patch }));
@@ -326,7 +327,11 @@ function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) 
   const submit = async () => {
     setPhase('sending'); setError('');
     try {
-      await window.copilot.shareStory(story);
+      const postId = await window.copilot.shareStory(story);
+      if (withAudio) {
+        const rec = await window.copilot.loadRecording(sessionId).catch(() => null);
+        if (rec) await window.copilot.shareStoryAudio(postId, rec.data, rec.contentType);
+      }
       void window.copilot.request('POST', `/api/v3/sessions/${sessionId}/shared`).catch(() => undefined);
       setPhase('done');
     } catch (e) { setError((e as Error).message); setPhase('edit'); }
@@ -336,7 +341,8 @@ function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) 
       <div className="card-head"><h3>Share your story · 分享面经</h3></div>
       <div className="card-body">
         {phase === 'done'
-          ? <p>Sent for review — thank you! Once approved it appears anonymously on the story board. · 已提交审核，谢谢！通过后会匿名展示在面经墙。
+          ? <p>Sent for review — thank you! Once approved it appears anonymously on the story board, and your account earns
+            about 30 minutes of AI usage. · 已提交审核，谢谢！通过后面经会匿名展示在面经墙，你的账号会获得约 30 分钟的 AI 用量奖励。
             {' '}<button className="link small" onClick={() => window.copilot.cloudOpen('/interviews.html')}>View the board · 看面经墙</button></p>
           : phase === 'edit' || phase === 'sending' ? (
             <div>
@@ -355,7 +361,11 @@ function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) 
               </div>
               <label className="field"><span>Your story · 面经正文（可编辑）</span>
                 <textarea className="textarea" style={{ minHeight: 160 }} value={story.text} onChange={(e) => set({ text: e.target.value })} /></label>
-              <p className="muted small">Reviewed before it appears; your name and email are never shown. · 审核通过后展示，姓名和邮箱不会公开。</p>
+              <label className="row small" style={{ gap: 8, marginBottom: 12 }}>
+                <input type="checkbox" checked={withAudio} onChange={(e) => setWithAudio(e.target.checked)} />
+                <span>Attach the interview recording — it plays on the public page (your voice will be heard). · 附上本场面试的录音——会公开展示（别人能听到你的声音）。</span></label>
+              <p className="muted small">Reviewed before it appears; your name and email are never shown. Approved stories earn ~30 minutes of AI usage.
+                · 审核通过后展示，姓名和邮箱不会公开；通过的面经奖励约 30 分钟 AI 用量。</p>
               {error && <p className="error small">{error}</p>}
               <div className="row" style={{ justifyContent: 'flex-end' }}>
                 <button className="btn ghost" onClick={() => setPhase('ask')}>Back · 返回</button>
@@ -366,7 +376,8 @@ function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) 
           ) : (
             <div>
               <p className="muted">Help other candidates prepare: we can draft an anonymous story from this interview's transcript for you to review.
-                Nothing is shared until you approve it. · 帮其他求职者准备：可以基于这次面试的转写稿起草一条匿名面经，你确认后才会提交。</p>
+                Nothing is shared until you approve it; approved stories earn ~30 minutes of AI usage.
+                · 帮其他求职者准备：可以基于这次面试的转写稿起草一条匿名面经，你确认后才会提交；审核通过的分享奖励约 30 分钟 AI 用量。</p>
               {error && <p className="error small">{error}</p>}
               <div className="row">
                 <button className="btn primary" disabled={phase === 'drafting'} onClick={draft}>{phase === 'drafting' ? 'Drafting… · 起草中' : 'Draft my story · 起草面经'}</button>

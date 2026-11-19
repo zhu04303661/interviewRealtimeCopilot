@@ -26,7 +26,8 @@ interface Window {
     cloudSignOut(): Promise<void>;
     onSessionEnded(listener: (sessionId: string, topology: string) => void): void;
     cloudOpen(next: string): Promise<void>;
-    shareStory(body: { company: string; role: string; round: string; lang: string; outcome: string; text: string }): Promise<void>;
+    shareStory(body: { company: string; role: string; round: string; lang: string; outcome: string; text: string; questions: string[] }): Promise<number>;
+    shareStoryAudio(postId: number, bytes: Uint8Array, contentType: string): Promise<void>;
     contactSupport(): Promise<void>;
     defaultSettings(): Promise<DeviceSettings>;
     setSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;

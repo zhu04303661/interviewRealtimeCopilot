@@ -71,7 +71,8 @@ create table if not exists waitlist (email text not null, topic text not null, c
 create table if not exists wishes (id integer primary key, email text, text text not null, page text, created_at integer not null);
 create table if not exists interview_posts (id integer primary key, company text not null, role text not null,
   round text not null, lang text not null, outcome text, text text not null, email text,
-  approved integer not null default 0, created_at integer not null);
+  approved integer not null default 0, created_at integer not null,
+  user_id integer, questions text, audio integer not null default 0, rewarded integer not null default 0);
 create table if not exists events (ts integer not null, kind text not null, page text not null, source text not null, lang text not null);
 create index if not exists events_ts on events (ts);
 create table if not exists stripe_events (id text primary key, received_at integer not null);
@@ -102,11 +103,16 @@ def verify_stripe_signature(payload: bytes, header: str, secret: str, tolerance:
 
 class Store:
     def __init__(self, path: str) -> None:
+        self.path = path
         self.db = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
         if "is_admin" not in {row[1] for row in self.db.execute("pragma table_info(users)")}:
             self.db.execute("alter table users add column is_admin integer not null default 0")
+        posts_columns = {row[1] for row in self.db.execute("pragma table_info(interview_posts)")}
+        for column in ("user_id integer", "questions text", "audio integer not null default 0", "rewarded integer not null default 0"):
+            if column.split()[0] not in posts_columns:
+                self.db.execute(f"alter table interview_posts add column {column}")
 
     def user_by_email(self, email: str) -> sqlite3.Row | None:
         return self.db.execute("select * from users where email = ?", (email,)).fetchone()
@@ -358,6 +364,8 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         fields = {"company": str(body.get("company", "")).strip()[:100], "role": str(body.get("role", "")).strip()[:100],
                   "round": str(body.get("round", "")), "lang": str(body.get("lang", "")), "outcome": str(body.get("outcome", "")),
                   "email": str(body.get("email", "")).strip().lower()[:200], "text": str(body.get("text", "")).strip()}
+        questions = body.get("questions")
+        fields["questions"] = [str(q).strip()[:300] for q in questions if str(q).strip()][:20] if isinstance(questions, list) else []
         if not fields["company"] or not fields["role"]:
             return "Company and role are required."
         if fields["round"] not in ROUNDS or fields["lang"] not in ("en", "zh", "other"):
@@ -371,12 +379,13 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         fields["outcome"], fields["email"] = fields["outcome"] or None, fields["email"] or None
         return fields
 
-    def save_story(fields: dict) -> web.Response:
-        store.db.execute("insert into interview_posts (company, role, round, lang, outcome, text, email, approved, created_at) "
-                         "values (?, ?, ?, ?, ?, ?, ?, 0, ?)",
-                         (fields["company"], fields["role"], fields["round"], fields["lang"], fields["outcome"], fields["text"],
-                          fields["email"], int(time.time())))
-        return web.json_response({"ok": True})
+    def save_story(fields: dict, user_id: int | None = None) -> web.Response:
+        cursor = store.db.execute(
+            "insert into interview_posts (company, role, round, lang, outcome, text, email, approved, created_at, user_id, questions) "
+            "values (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+            (fields["company"], fields["role"], fields["round"], fields["lang"], fields["outcome"], fields["text"],
+             fields["email"], int(time.time()), user_id, json.dumps(fields["questions"], ensure_ascii=False) if fields["questions"] else None))
+        return web.json_response({"ok": True, "id": cursor.lastrowid})
 
     async def interview_submit(request: web.Request) -> web.Response:
         """Interview-experience posts (面经). Anonymous is fine; nothing is public until an admin approves it."""
@@ -397,7 +406,42 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         if isinstance(fields, str):
             return fail(422, fields)
         fields["email"] = user["email"]
-        return save_story(fields)
+        return save_story(fields, user["id"])
+
+    async def device_story_audio(request: web.Request) -> web.Response:
+        """The recording that goes with a story post: raw audio bytes, one file per post, only the
+        submitter may attach it. Played on the public page once the post is approved."""
+        user = device_user(request)
+        if not user:
+            return fail(401, "Sign in first.")
+        try:
+            pid = int(request.match_info["id"])
+        except ValueError:
+            return fail(404, "Not found.")
+        post = store.db.execute("select user_id from interview_posts where id = ?", (pid,)).fetchone()
+        if not post or post["user_id"] != user["id"]:
+            return fail(404, "Not found.")
+        content_type = request.headers.get("Content-Type", "")
+        data = await request.read()
+        if not content_type.startswith("audio/") or not data or len(data) > 32 * 1024 * 1024:
+            return fail(422, "Send the interview recording as audio (up to 32 MB).")
+        audio_dir = Path(store.path).parent / "audio"
+        audio_dir.mkdir(exist_ok=True)
+        ext = {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/mpeg": ".mp3", "audio/wav": ".wav"}.get(content_type, ".bin")
+        for old in audio_dir.glob(f"{pid}.*"):
+            old.unlink()
+        (audio_dir / f"{pid}{ext}").write_bytes(data)
+        store.db.execute("update interview_posts set audio = 1 where id = ?", (pid,))
+        return web.json_response({"ok": True})
+
+    async def interview_audio(request: web.Request) -> web.Response:
+        try:
+            pid = int(request.match_info["id"])
+        except ValueError:
+            return web.Response(status=404)
+        post = store.db.execute("select audio from interview_posts where id = ? and approved = 1", (pid,)).fetchone()
+        path = next((p for p in (Path(store.path).parent / "audio").glob(f"{pid}.*")), None) if post and post["audio"] else None
+        return web.FileResponse(path) if path and path.is_file() else web.Response(status=404)
 
     async def interview_list(request: web.Request) -> web.Response:
         """The public board: approved posts only, newest first; ?q= filters company/role. Snippets, not full text."""
@@ -437,9 +481,19 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
             bits.append(outcome[zh])
         title = (f"{row['role']} · {row['company']} 面经 — Interview Realtime Copilot" if zh
                  else f"{row['role']} interview at {row['company']} — Interview Realtime Copilot")
+        try:
+            questions = [q for q in json.loads(row["questions"] or "[]")][:20]
+        except ValueError:
+            questions = []
+        questions_html = (f'<div class="card" style="margin-top:16px"><h3 style="margin-top:0">'
+                          f'{"被问到的问题" if zh else "Questions they asked"}</h3><ol style="margin:0;padding-left:22px;line-height:1.9">'
+                          + "".join(f"<li>{e(q)}</li>" for q in questions) + "</ol></div>") if questions else ""
+        audio_html = (f'<div class="card" style="margin-top:16px"><b>{"面试录音（节选）" if zh else "Interview recording"}</b>'
+                      f'<audio controls preload="none" src="{"/zh" if zh else ""}/interviews/audio/{pid}" style="width:100%;margin-top:10px"></audio></div>'
+                      if row["audio"] else "")
         meta = {"company": e(row["company"]), "role": e(row["role"]), "title": e(title), "meta": e(" · ".join(bits)),
                 "desc": e(row["text"][:155].replace("\n", " ")),
-                "body": e(row["text"]).replace("\n", "<br>")}
+                "body": e(row["text"]).replace("\n", "<br>"), "questions": questions_html, "audio": audio_html}
         html = tpl_path.read_text()
         for key, value in meta.items():
             html = html.replace(f"{{{{{key.upper()}}}}}", value)
@@ -540,23 +594,31 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
                            "devices": scalar("select count(*) from device_tokens where user_id = ?", u["id"])})
         return web.json_response({"users": result})
 
+    STORY_REWARD_USD = 1.00  # roughly thirty minutes of realtime audio — the flywheel bounty for a shared 面经
+
     @admin_only
     async def admin_interview(request: web.Request) -> web.Response:
-        """Approve a post for the public board (or un-approve it), or remove spam entirely."""
+        """Approve a post for the public board (or un-approve it), or remove spam entirely.
+        Approving a signed-in user's post credits their account once with the story reward."""
         body = await request.json()
         pid = int(body.get("id") or 0)
         if body.get("remove"):
             store.db.execute("delete from interview_posts where id = ?", (pid,))
         else:
             store.db.execute("update interview_posts set approved = ? where id = ?", (1 if body.get("approved") else 0, pid))
+            if body.get("approved"):
+                post = store.db.execute("select user_id, rewarded from interview_posts where id = ?", (pid,)).fetchone()
+                if post and post["user_id"] and not post["rewarded"]:
+                    billing.grant(post["user_id"], STORY_REWARD_USD, f"interview-story-{pid}")
+                    store.db.execute("update interview_posts set rewarded = 1 where id = ?", (pid,))
         return web.json_response({"ok": True})
 
     @admin_only
     async def admin_messages(request: web.Request) -> web.Response:
         wishes = [dict(r) for r in store.db.execute("select id, email, text, page, created_at from wishes order by created_at desc limit 500")]
         waitlist = [dict(r) for r in store.db.execute("select email, topic, created_at from waitlist order by created_at desc limit 500")]
-        posts = [dict(r) for r in store.db.execute("select id, company, role, round, lang, outcome, email, approved, created_at, text "
-                                                 "from interview_posts order by created_at desc limit 500")]
+        posts = [dict(r) for r in store.db.execute("select id, company, role, round, lang, outcome, email, approved, created_at, text, "
+                                                 "audio, rewarded, user_id from interview_posts order by created_at desc limit 500")]
         return web.json_response({"wishes": wishes, "waitlist": waitlist, "posts": posts})
 
     @admin_only
@@ -597,6 +659,8 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         web.post("/api/waitlist", waitlist), web.post("/api/wish", wish),
         web.post("/api/interviews", interview_submit), web.get("/api/interviews", interview_list),
         web.get("/zh/interviews/{id}", interview_page), web.get("/interviews/{id}", interview_page),
+        web.get("/zh/interviews/audio/{id}", interview_audio), web.get("/interviews/audio/{id}", interview_audio),
+        web.post("/api/v1/interviews/audio/{id}", device_story_audio),
         web.post("/api/track", track), web.get("/api/admin/traffic", admin_traffic),
         web.get("/api/admin/overview", admin_overview), web.get("/api/admin/users", admin_users),
         web.get("/api/admin/messages", admin_messages), web.get("/api/admin/usage", admin_usage), web.post("/api/stripe/webhook", webhook),
