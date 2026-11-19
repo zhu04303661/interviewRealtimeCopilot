@@ -103,7 +103,6 @@ def verify_stripe_signature(payload: bytes, header: str, secret: str, tolerance:
 
 class Store:
     def __init__(self, path: str) -> None:
-        self.path = path
         self.db = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
@@ -409,39 +408,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         return save_story(fields, user["id"])
 
     async def device_story_audio(request: web.Request) -> web.Response:
-        """The recording that goes with a story post: raw audio bytes, one file per post, only the
-        submitter may attach it. Played on the public page once the post is approved."""
-        user = device_user(request)
-        if not user:
-            return fail(401, "Sign in first.")
-        try:
-            pid = int(request.match_info["id"])
-        except ValueError:
-            return fail(404, "Not found.")
-        post = store.db.execute("select user_id from interview_posts where id = ?", (pid,)).fetchone()
-        if not post or post["user_id"] != user["id"]:
-            return fail(404, "Not found.")
-        content_type = request.headers.get("Content-Type", "")
-        data = await request.read()
-        if not content_type.startswith("audio/") or not data or len(data) > 32 * 1024 * 1024:
-            return fail(422, "Send the interview recording as audio (up to 32 MB).")
-        audio_dir = Path(store.path).parent / "audio"
-        audio_dir.mkdir(exist_ok=True)
-        ext = {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/mpeg": ".mp3", "audio/wav": ".wav"}.get(content_type, ".bin")
-        for old in audio_dir.glob(f"{pid}.*"):
-            old.unlink()
-        (audio_dir / f"{pid}{ext}").write_bytes(data)
-        store.db.execute("update interview_posts set audio = 1 where id = ?", (pid,))
-        return web.json_response({"ok": True})
-
-    async def interview_audio(request: web.Request) -> web.Response:
-        try:
-            pid = int(request.match_info["id"])
-        except ValueError:
-            return web.Response(status=404)
-        post = store.db.execute("select audio from interview_posts where id = ? and approved = 1", (pid,)).fetchone()
-        path = next((p for p in (Path(store.path).parent / "audio").glob(f"{pid}.*")), None) if post and post["audio"] else None
-        return web.FileResponse(path) if path and path.is_file() else web.Response(status=404)
+        return fail(410, "Recording attachments were removed — stories are text and questions only.")
 
     async def interview_list(request: web.Request) -> web.Response:
         """The public board: approved posts only, newest first; ?q= filters company/role. Snippets, not full text."""
@@ -488,12 +455,9 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         questions_html = (f'<div class="card" style="margin-top:16px"><h3 style="margin-top:0">'
                           f'{"被问到的问题" if zh else "Questions they asked"}</h3><ol style="margin:0;padding-left:22px;line-height:1.9">'
                           + "".join(f"<li>{e(q)}</li>" for q in questions) + "</ol></div>") if questions else ""
-        audio_html = (f'<div class="card" style="margin-top:16px"><b>{"面试录音（节选）" if zh else "Interview recording"}</b>'
-                      f'<audio controls preload="none" src="{"/zh" if zh else ""}/interviews/audio/{pid}" style="width:100%;margin-top:10px"></audio></div>'
-                      if row["audio"] else "")
         meta = {"company": e(row["company"]), "role": e(row["role"]), "title": e(title), "meta": e(" · ".join(bits)),
                 "desc": e(row["text"][:155].replace("\n", " ")),
-                "body": e(row["text"]).replace("\n", "<br>"), "questions": questions_html, "audio": audio_html}
+                "body": e(row["text"]).replace("\n", "<br>"), "questions": questions_html}
         html = tpl_path.read_text()
         for key, value in meta.items():
             html = html.replace(f"{{{{{key.upper()}}}}}", value)
@@ -618,7 +582,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         wishes = [dict(r) for r in store.db.execute("select id, email, text, page, created_at from wishes order by created_at desc limit 500")]
         waitlist = [dict(r) for r in store.db.execute("select email, topic, created_at from waitlist order by created_at desc limit 500")]
         posts = [dict(r) for r in store.db.execute("select id, company, role, round, lang, outcome, email, approved, created_at, text, "
-                                                 "audio, rewarded, user_id from interview_posts order by created_at desc limit 500")]
+                                                 "rewarded, user_id from interview_posts order by created_at desc limit 500")]
         return web.json_response({"wishes": wishes, "waitlist": waitlist, "posts": posts})
 
     @admin_only
@@ -659,8 +623,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         web.post("/api/waitlist", waitlist), web.post("/api/wish", wish),
         web.post("/api/interviews", interview_submit), web.get("/api/interviews", interview_list),
         web.get("/zh/interviews/{id}", interview_page), web.get("/interviews/{id}", interview_page),
-        web.get("/zh/interviews/audio/{id}", interview_audio), web.get("/interviews/audio/{id}", interview_audio),
-        web.post("/api/v1/interviews/audio/{id}", device_story_audio),
+        web.post("/api/v1/interviews/audio/{id}", device_story_audio),  # retired — kept so old app builds get a clear 410
         web.post("/api/track", track), web.get("/api/admin/traffic", admin_traffic),
         web.get("/api/admin/overview", admin_overview), web.get("/api/admin/users", admin_users),
         web.get("/api/admin/messages", admin_messages), web.get("/api/admin/usage", admin_usage), web.post("/api/stripe/webhook", webhook),

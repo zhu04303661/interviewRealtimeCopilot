@@ -248,10 +248,7 @@ function registerIpc(): void {
   ipcMain.handle('cloud:open', (_event, next: unknown) => cloud.open(typeof next === 'string' && next.startsWith('/') ? next : '/account.html'));
   ipcMain.handle('cloud:share-story', (_event, body: unknown) =>
     body && typeof body === 'object' ? cloud.shareStory(body as Record<string, unknown>) : Promise.reject(new Error('Expected a story.')));
-  ipcMain.handle('cloud:share-story-audio', (_event, postId: unknown, bytes: unknown, contentType: unknown) =>
-    Number.isInteger(postId) && bytes instanceof Uint8Array && typeof contentType === 'string'
-      ? cloud.shareStoryAudio(postId as number, bytes, contentType)
-      : Promise.reject(new Error('Expected a recording.')));
+
   // OpenAI API key entered in Settings: stored only on this computer (owner-only file; on Windows the per-user
   // %APPDATA% folder's ACL does the same), read by the engine on every call.
   ipcMain.handle('apikey:status', () => {

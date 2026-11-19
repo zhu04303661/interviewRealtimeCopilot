@@ -149,25 +149,19 @@ async def test_device_interview_post(site):
     created = await site.post("/api/v1/interviews", json=story, headers=bearer)
     assert created.status == 200 and (await created.json())["id"] == 1
     assert (await site.post("/api/v1/interviews", json={**story, "round": "bogus"}, headers=bearer)).status == 422
-    # The interview recording attaches to the post; it only serves publicly once approved.
-    assert (await site.post("/api/v1/interviews/audio/1", data=b"fake-webm-audio", headers={**bearer, "Content-Type": "audio/webm"})).status == 200
-    assert (await site.post("/api/v1/interviews/audio/1", data=b"x", headers={**bearer, "Content-Type": "text/plain"})).status == 422
-    assert (await site.get("/interviews/audio/1")).status == 404
+    assert (await site.post("/api/v1/interviews/audio/1", data=b"x", headers={**bearer, "Content-Type": "audio/webm"})).status == 410  # retired
     await post(site, "/api/signup", {"email": "boss3@example.com", "password": "long-enough-1"})
     from irc_web.app import Store
     Store(site.server.app["db_path"]).db.execute("update users set is_admin = 1 where email = 'boss3@example.com'")
     post_ = (await (await site.get("/api/admin/messages")).json())["posts"][0]
     assert post_["email"] == "dev@example.com" and post_["company"] == "DeviceCo"  # account email, not the submitted one
-    assert post_["audio"] == 1 and post_["rewarded"] == 0
+    assert post_["rewarded"] == 0
     # Approving credits the submitter's account once — the flywheel bounty.
     await post(site, "/api/admin/interview", {"id": 1, "approved": True})
     await post(site, "/api/admin/interview", {"id": 1, "approved": True})  # second approve does not double-pay
     db = Store(site.server.app["db_path"]).db
     grants = db.execute("select amount_micro from credit_grants where user_id = 1").fetchall()
     assert [g[0] for g in grants] == [1_000_000]
-    assert (await site.get("/interviews/audio/1")).status == 200
-    html = await (await site.get("/interviews/1")).text()
-    assert "/interviews/audio/1" in html
 
 
 async def test_admin_dashboard_is_for_admins_only(site):

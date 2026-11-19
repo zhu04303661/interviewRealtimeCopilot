@@ -309,7 +309,6 @@ function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) 
   type Story = { company: string; role: string; round: string; lang: string; outcome: string; text: string; questions: string[] };
   const [story, setStory] = useState<Story>({ company: row.company, role: row.role, round: 'technical', lang: 'zh', outcome: '', text: '', questions: [] });
   const [phase, setPhase] = useState<'ask' | 'drafting' | 'edit' | 'sending' | 'done' | 'closed'>('ask');
-  const [withAudio, setWithAudio] = useState(false);
   const [error, setError] = useState('');
   if (row.topology === 'mock' || row.story_shared || phase === 'closed') return null;
   const set = (patch: Partial<Story>) => setStory((s) => ({ ...s, ...patch }));
@@ -327,11 +326,7 @@ function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) 
   const submit = async () => {
     setPhase('sending'); setError('');
     try {
-      const postId = await window.copilot.shareStory(story);
-      if (withAudio) {
-        const rec = await window.copilot.loadRecording(sessionId).catch(() => null);
-        if (rec) await window.copilot.shareStoryAudio(postId, rec.data, rec.contentType);
-      }
+      await window.copilot.shareStory(story);
       void window.copilot.request('POST', `/api/v3/sessions/${sessionId}/shared`).catch(() => undefined);
       setPhase('done');
     } catch (e) { setError((e as Error).message); setPhase('edit'); }
@@ -361,9 +356,6 @@ function ShareStory({ row, sessionId }: { row: SessionRow; sessionId: string }) 
               </div>
               <label className="field"><span>Your story · 面经正文（可编辑）</span>
                 <textarea className="textarea" style={{ minHeight: 160 }} value={story.text} onChange={(e) => set({ text: e.target.value })} /></label>
-              <label className="row small" style={{ gap: 8, marginBottom: 12 }}>
-                <input type="checkbox" checked={withAudio} onChange={(e) => setWithAudio(e.target.checked)} />
-                <span>Attach the interview recording — it plays on the public page (your voice will be heard). · 附上本场面试的录音——会公开展示（别人能听到你的声音）。</span></label>
               <p className="muted small">Reviewed before it appears; your name and email are never shown. Approved stories earn ~30 minutes of AI usage.
                 · 审核通过后展示，姓名和邮箱不会公开；通过的面经奖励约 30 分钟 AI 用量。</p>
               {error && <p className="error small">{error}</p>}

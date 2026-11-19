@@ -28,8 +28,7 @@ const api = {
   cloudOpen: (next: string) => ipcRenderer.invoke('cloud:open', next),
   shareStory: (body: { company: string; role: string; round: string; lang: string; outcome: string; text: string; questions: string[] }) =>
     ipcRenderer.invoke('cloud:share-story', body),
-  shareStoryAudio: (postId: number, bytes: Uint8Array, contentType: string) =>
-    ipcRenderer.invoke('cloud:share-story-audio', postId, bytes, contentType),
+
   contactSupport: () => ipcRenderer.invoke('support:email'),
   setApiKey: (key: string) => ipcRenderer.invoke('apikey:set', key),
   defaultSettings: () => ipcRenderer.invoke('settings:defaults'),

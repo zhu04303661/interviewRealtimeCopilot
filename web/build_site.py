@@ -563,7 +563,7 @@ def build() -> None:
 <h1 style="font-size:36px;margin:16px 0 8px">{{ROLE}} · {{COMPANY}}</h1>
 <div class="faint small">{{META}}</div>
 <div class="card" style="margin-top:26px"><div style="white-space:pre-wrap;line-height:1.8">{{BODY}}</div></div>
-{{QUESTIONS}}{{AUDIO}}
+{{QUESTIONS}}
 <div class="callout"><a data-i18n="post.share" class="mail" href="/interviews.html">Had this interview? Share your story.</a></div></div>''',
          out="interview-post.html")
     t("post.back", "← All interview stories", "← 全部面经")
