@@ -2,7 +2,7 @@
 
 > Interview Realtime Copilot 是 Mac 上的 AI 面试助手：实时转写并翻译面试官的话、自动识别问题，并基于你自己的简历给出回答提示。提供免费版。
 
-网站: https://copilot.xichiuk.com/zh/ · 下载: https://copilot.xichiuk.com/zh/download.html · 客服: linkyourfuture2026@outlook.com · 更新于 2026-11-16
+网站: https://copilot.xichiuk.com/zh/ · 下载: https://copilot.xichiuk.com/zh/download.html · 客服: linkyourfuture2026@outlook.com · 更新于 2026-11-19
 
 ## 常见问题
 

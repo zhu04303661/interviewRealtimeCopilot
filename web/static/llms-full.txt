@@ -2,7 +2,7 @@
 
 > Interview Realtime Copilot is an AI interview assistant for Mac: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.
 
-Website: https://copilot.xichiuk.com/ · Download: https://copilot.xichiuk.com/download.html · Support: linkyourfuture2026@outlook.com · Updated 2026-11-16
+Website: https://copilot.xichiuk.com/ · Download: https://copilot.xichiuk.com/download.html · Support: linkyourfuture2026@outlook.com · Updated 2026-11-19
 
 ## Frequently asked questions
 
