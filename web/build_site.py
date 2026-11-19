@@ -21,7 +21,7 @@ SITE = "https://copilot.xichiuk.com"
 APP_VERSION = json.loads((Path(__file__).parent.parent / "apps/desktop/package.json").read_text())["version"]
 PAGES: list[str] = []  # every page written, as a path under static/ (for the /zh/ copies and hreflang)
 PRIVATE = {"login.html", "account.html", "admin.html", "404.html"}  # no /zh/ copy, not in the sitemap
-TEMPLATES = {"interview-post.html"}  # zh copy exists (server fills it per post) but the template URL itself is not a page
+TEMPLATES = {"interview-post.html", "blog-post.html"}  # zh copies exist (server fills them per post) but the template URLs are not pages
 INTERNAL = re.compile(r'href="/(?!(?:login|account|admin)\.html)((?:[\w\-/]*\.html|[\w\-/]*/)?(?:[#?][^"]*)?)"')
 
 
@@ -81,6 +81,8 @@ DESCRIPTIONS = {
                 "Interview Realtime Copilot 与 Linkjob、Final Round AI、Interview Coder、Cluely 等 AI 面试助手在价格、平台、语言和隐私上的对比。"),
     "interviews": ("Interview stories shared by candidates — what companies actually asked, in English and Chinese. Share yours.",
                    "求职者分享的面试经历——公司实际问了什么。中英双语，欢迎分享你的面经。"),
+    "blog": ("Guides, release notes and lessons from building an AI interview assistant — in English and Chinese.",
+             "AI 面试助手相关的指南、更新记录与开发心得——中英双语。"),
     "privacy": ("What Interview Realtime Copilot stores on your Mac, what is processed during a session, and what the website keeps.",
                 "Interview Realtime Copilot 在你的 Mac 上保存什么、会话中处理什么，以及网站保留哪些信息。"),
     "terms": ("Terms of the Interview Realtime Copilot preview service.", "Interview Realtime Copilot 预览版服务条款。"),
@@ -146,7 +148,7 @@ def site_header() -> str:
     """Header in the HTML itself, so crawlers that do not run JavaScript can follow the navigation (site.js adds the behaviour)."""
     links = "".join(nav_link(f"nav.{k}", en, zh, href, f' data-nav="{name}"') for k, name, en, zh, href in [
         ("scenarios", "use-cases", "Use cases", "使用场景", "/use-cases.html"), ("demo", "demo", "Demo", "演示", "/demo.html"),
-        ("stories", "interviews", "Stories", "面经", "/interviews.html"),
+        ("stories", "interviews", "Stories", "面经", "/interviews.html"), ("blog", "blog", "Blog", "博客", "/blog.html"),
         ("pricing", "pricing", "Pricing", "价格", "/pricing.html"), ("download", "download", "Download", "下载", "/download.html"), ("docs", "docs", "Docs", "使用手册", "/docs/")])
     return ('<header class="nav"><div class="wrap"><a class="brand" href="/"><span class="logo">IR</span>Interview Realtime Copilot</a>'
             f'<nav class="links">{links}</nav><span class="spacer"></span><button class="menu-btn" aria-label="Menu" aria-expanded="false"><i></i><i></i><i></i></button>'
@@ -165,7 +167,7 @@ def site_footer() -> str:
         ("foot.guide.assistant", "Choosing an AI interview assistant", "如何选择 AI 面试助手", "/docs/ai-interview-assistant.html"),
         ("foot.guide.behavioral", "STAR answers for behavioral questions", "行为面试 STAR 法则", "/docs/behavioral-questions.html"),
         ("foot.guide.prep", "Last-minute interview prep", "面试前两小时准备", "/docs/last-minute-prep.html"),
-        ("foot.board", "Interview stories", "面经分享", "/interviews.html"),
+        ("foot.board", "Interview stories", "面经分享", "/interviews.html"), ("foot.blog", "Blog", "博客", "/blog.html"),
         ("foot.wishlist", "Wishlist", "许愿单", "/#wishlist"), ("foot.privacy", "Privacy", "隐私", "/privacy.html"), ("foot.terms", "Terms", "条款", "/terms.html")])
     return ('<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>' + links
             + f'<a href="mailto:{SUPPORT_EMAIL}">{t("foot.support", "Support", "联系客服")} · {SUPPORT_EMAIL}</a><span>© {TODAY[:4]}</span></div></footer>')
@@ -564,10 +566,34 @@ def build() -> None:
 <div class="faint small">{{META}}</div>
 <div class="card" style="margin-top:26px"><div style="white-space:pre-wrap;line-height:1.8">{{BODY}}</div></div>
 {{QUESTIONS}}
+{{COMMENTS}}
 <div class="callout"><a data-i18n="post.share" class="mail" href="/interviews.html">Had this interview? Share your story.</a></div></div>''',
          out="interview-post.html")
     t("post.back", "← All interview stories", "← 全部面经")
     t("post.share", "Had this interview? Share your story.", "你也面过这家？分享你的面经。")
+
+    page("blog", ("Blog — Interview Realtime Copilot", "博客 — Interview Realtime Copilot"), f'''
+<section class="section"><div class="wrap" style="max-width:860px"><span class="eyebrow">{t("bl.eyebrow", "Blog", "博客")}</span>
+<h1>{t("bl.h1", "Notes on interviews and the copilot", "关于面试和这款产品的笔记")}</h1>
+<p class="lede">{t("bl.lede", "Guides, release notes and things we learned building an interview assistant.", "使用指南、更新记录，以及做面试助手过程中学到的东西。")}</p>
+<div id="posts" style="margin-top:26px"><p class="muted" data-i18n="acc.loading">Loading…</p></div></div></section>''')
+    t("bl.empty", "Nothing published yet — check back soon.", "还没有文章——敬请期待。")
+    t("bl.error", "Could not load the posts right now. Please refresh in a moment.", "暂时加载不出来，请稍后刷新。")
+    t("cm.thanks", "Thank you — your comment was sent for review and will appear once approved.", "谢谢——留言已提交审核，通过后会显示出来。")
+    t("cm.error", "Could not post the comment right now. Please try again in a moment.", "留言暂时发不出去，请稍后再试。")
+
+    # The template for /blog/<slug> pages (one indexable page per published post).
+    # {{…}} placeholders are filled by the server per post; excluded from the sitemap via TEMPLATES.
+    page("blog-post", ("{{TITLE}}", "{{TITLE}}"), '''
+<div class="wrap" style="max-width:820px;padding:70px 28px">
+<nav><a data-i18n="blog.back" class="mail small" href="/blog.html">← Blog</a></nav>
+<h1 style="font-size:36px;margin:16px 0 8px">{{TITLE}}</h1>
+<div class="faint small">{{META}}</div>
+<article class="card post-body" style="margin-top:26px">{{BODY}}</article>
+{{COMMENTS}}</div>''',
+         out="blog-post.html",
+         desc=("An article from the Interview Realtime Copilot blog.", "Interview Realtime Copilot 博客上的一篇文章。"))
+    t("blog.back", "← All posts", "← 全部文章")
     t("ip.search", "Search company or role", "搜索公司或职位")
     t("ip.empty", "No stories yet — yours could be the first.", "还没有面经——你的可以是第一篇。")
     t("ip.thanks", "Thank you — your story was sent for review and will appear on the board once approved.", "谢谢——面经已提交审核，通过后会出现在列表里。")
@@ -621,7 +647,12 @@ def build() -> None:
                         ("ad.c.balance", "Remaining", "剩余"), ("ad.c.req", "Requests", "请求数"), ("ad.c.last", "Last active", "最近活跃"),
                         ("ad.wishes", "Wishlist", "许愿单"), ("ad.waitlist", "Notify-me sign-ups", "登记通知的邮箱"), ("ad.c.topic", "For", "关注"),
                         ("ad.c.text", "Wish", "心愿"), ("ad.c.when", "When", "时间"), ("ad.none", "Nothing yet.", "暂无。"), ("ad.anon", "(no email)", "（未留邮箱）"),
-                        ("ad.denied", "This page is for admin accounts. Sign in with an admin account.", "此页面仅限管理员账号，请用管理员账号登录。"), ("nav.admin", "Admin", "后台")]:
+                        ("ad.denied", "This page is for admin accounts. Sign in with an admin account.", "此页面仅限管理员账号，请用管理员账号登录。"), ("nav.admin", "Admin", "后台"),
+                        ("ad.blog", "Blog posts", "博客文章"), ("ad.comments", "Comments", "留言"), ("ad.c.post", "On page", "所在页面"), ("ad.c.name", "Name", "昵称"),
+                        ("ad.c.slug", "Slug", "Slug"), ("ad.c.title", "Title", "标题"), ("ad.edit", "Edit", "编辑"), ("ad.save", "Save post", "保存文章"),
+                        ("ad.publish", "Publish", "发布"), ("ad.unpublish", "Unpublish", "撤下"), ("ad.newpost", "New post", "新文章"),
+                        ("ad.blogfields", "Markdown is supported: ## headings, **bold**, `code`, - lists, [links](https://…). Raw HTML is escaped.",
+                         "支持 Markdown：## 标题、**粗体**、`代码`、- 列表、[链接](https://…)。HTML 会被转义。")]:
         t(key, en, zh)
 
     page("privacy", ("Privacy — Interview Realtime Copilot", "隐私 — Interview Realtime Copilot"), f'''
@@ -661,7 +692,8 @@ def build() -> None:
     rules = "Allow: /\nDisallow: /api/\nDisallow: /auth/\nDisallow: /account.html\nDisallow: /admin.html\nDisallow: /login.html\n"
     # AI search and answer engines are welcome (named explicitly so the intent is unambiguous); llms.txt gives them a summary.
     bots = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Applebot-Extended", "Bytespider", "Baiduspider"]
-    (STATIC / "robots.txt").write_text(f"User-agent: *\n{rules}\n" + "".join(f"User-agent: {bot}\n" for bot in bots) + f"{rules}\nSitemap: {SITE}/sitemap.xml\n")
+    (STATIC / "robots.txt").write_text(f"User-agent: *\n{rules}\n" + "".join(f"User-agent: {bot}\n" for bot in bots) + f"{rules}\n"
+                                       f"Sitemap: {SITE}/sitemap.xml\nSitemap: {SITE}/sitemap-posts.xml\n")
     docs = build_docs()
     public = [url_of(p) for p in PAGES if p not in PRIVATE and p not in TEMPLATES]
     alternates = lambda p: (f'<xhtml:link rel="alternate" hreflang="en" href="{SITE}/{p}"/><xhtml:link rel="alternate" hreflang="zh-CN" href="{SITE}/zh/{p}"/>'  # noqa: E731

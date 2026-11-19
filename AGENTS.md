@@ -54,4 +54,5 @@
 - Coding-round evaluation (real OpenAI, generated problem images, returned code is executed): `cd engine && uv run python evals/coding_screen.py`;
   C++ check: `cd engine/evals && uv run --project .. python coding_screen_cpp.py`.
 - China mirror (Shenzhen, nginx): `sh web/deploy/deploy-mirror.sh` (settings in web/deploy/mirror.env, SSH by key). It serves web/static and the
-  installer and proxies /api and /auth to the main site; deploy.sh reads the same file so the main site accepts the mirror origin.
+  installer and proxies /api, /auth, the server-rendered post pages (/interviews/<id>, /blog/<slug>) and /sitemap-posts.xml to the
+  main site (with X-Forwarded-Host, so canonical/sitemap URLs keep the mirror domain); deploy.sh reads the same file so the main site accepts the mirror origin.

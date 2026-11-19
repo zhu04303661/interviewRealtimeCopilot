@@ -60,10 +60,27 @@ $1
         proxy_set_header Connection \$http_connection;
         proxy_read_timeout 300s;
     }
-    # interview-post.html is the app's render template ({{…}} blanks), not a page — posts live at /interviews/<id>.
+    # interview-post.html / blog-post.html are the app's render templates ({{…}} blanks), not pages —
+    # posts live at /interviews/<id> and /blog/<slug>; sitemap-posts.xml lists them for Baidu.
     location = /interview-post.html { return 404; }
     location = /zh/interview-post.html { return 404; }
+    location = /blog-post.html { return 404; }
+    location = /zh/blog-post.html { return 404; }
     location ~ ^/(zh/)?interviews/ {
+        proxy_pass https://$MAIN;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $MAIN;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-For \$remote_addr;
+    }
+    location ~ ^/(zh/)?blog/ {
+        proxy_pass https://$MAIN;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $MAIN;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-For \$remote_addr;
+    }
+    location = /sitemap-posts.xml {
         proxy_pass https://$MAIN;
         proxy_ssl_server_name on;
         proxy_set_header Host $MAIN;

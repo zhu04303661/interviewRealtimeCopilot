@@ -24,3 +24,4 @@ Disallow: /admin.html
 Disallow: /login.html
 
 Sitemap: https://copilot.xichiuk.com/sitemap.xml
+Sitemap: https://copilot.xichiuk.com/sitemap-posts.xml

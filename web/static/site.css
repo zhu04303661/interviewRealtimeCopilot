@@ -330,3 +330,8 @@ select.input { appearance: none; background: rgba(0,0,0,.25) url('data:image/svg
 .post-row b { font-size: 17px; }
 .post-snip { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 @media (max-width: 640px) { .fields2 { grid-template-columns: minmax(0, 1fr); } }
+.post-body { padding: 26px 30px; line-height: 1.8; }
+.post-body h2 { font-size: 22px; margin: 26px 0 10px; } .post-body h3 { font-size: 18px; margin: 20px 0 8px; }
+.post-body p { margin: 12px 0; } .post-body ul { padding-left: 22px; margin: 12px 0; line-height: 1.9; }
+.post-body code { background: rgba(255,255,255,.07); padding: 1px 6px; border-radius: 6px; font-size: 14px; }
+.comment { border-top: 1px solid var(--line); padding: 12px 0; }

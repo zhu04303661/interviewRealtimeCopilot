@@ -76,7 +76,74 @@ create table if not exists interview_posts (id integer primary key, company text
 create table if not exists events (ts integer not null, kind text not null, page text not null, source text not null, lang text not null);
 create index if not exists events_ts on events (ts);
 create table if not exists stripe_events (id text primary key, received_at integer not null);
+create table if not exists blog_posts (id integer primary key, slug text unique not null,
+  title_en text not null, title_zh text, body_en text not null, body_zh text,
+  published integer not null default 0, created_at integer not null, updated_at integer not null);
+create table if not exists comments (id integer primary key, post_type text not null, post_id text not null,
+  name text, body text not null, email text, approved integer not null default 0, created_at integer not null);
+create index if not exists comments_post on comments (post_type, post_id, approved);
 """
+
+BLOG_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,80}$")
+
+
+def esc_text(s: object) -> str:
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def plain_text(markdown: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[#*`>\[\]()!]", " ", markdown or "")).strip()
+
+
+def render_markdown(text: str) -> str:
+    """A deliberately small, safe markdown subset for admin-written posts: ## and ### headings, **bold**,
+    `code`, [links](https://…), - bullet lists and blank-line paragraphs. Input is HTML-escaped first,
+    so no raw markup can ever reach the page."""
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def inline(s: str) -> str:
+        s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+        s = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", s)
+        return re.sub(r"\[([^\]]+)\]\((https?://[^)\s\"']+)\)", r'<a class="mail" href="\2" rel="noopener">\1</a>', s)
+
+    out: list[str] = []
+    buf: list[str] = []
+    in_list = False
+
+    def flush() -> None:
+        nonlocal in_list
+        if buf:
+            out.append("<p>" + "<br>".join(buf) + "</p>")
+            buf.clear()
+        if in_list:
+            out.append("</ul>")
+            in_list = False
+
+    for raw in escaped.split("\n"):
+        line = raw.strip()
+        if not line:
+            flush()
+        elif line.startswith("### "):
+            flush()
+            out.append(f"<h3>{inline(line[4:])}</h3>")
+        elif line.startswith("## "):
+            flush()
+            out.append(f"<h2>{inline(line[3:])}</h2>")
+        elif line.startswith("- "):
+            if buf:
+                out.append("<p>" + "<br>".join(buf) + "</p>")
+                buf.clear()
+            if not in_list:
+                out.append("<ul>")
+                in_list = True
+            out.append(f"<li>{inline(line[2:])}</li>")
+        else:
+            if in_list:
+                out.append("</ul>")
+                in_list = False
+            buf.append(inline(line))
+    flush()
+    return "".join(out)
 
 
 def hash_password(password: str, salt: bytes | None = None) -> str:
@@ -457,7 +524,8 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
                           + "".join(f"<li>{e(q)}</li>" for q in questions) + "</ol></div>") if questions else ""
         meta = {"company": e(row["company"]), "role": e(row["role"]), "title": e(title), "meta": e(" · ".join(bits)),
                 "desc": e(row["text"][:155].replace("\n", " ")),
-                "body": e(row["text"]).replace("\n", "<br>"), "questions": questions_html}
+                "body": e(row["text"]).replace("\n", "<br>"), "questions": questions_html,
+                "comments": comments_block("story", str(pid), zh)}
         html = tpl_path.read_text()
         for key, value in meta.items():
             html = html.replace(f"{{{{{key.upper()}}}}}", value)
@@ -472,6 +540,110 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
                               "datePublished": bits[0], "url": url, "description": row["text"][:155].replace("\n", " ")})
         html = html.replace("</head>", f'<script type="application/ld+json">{article}</script></head>')
         return web.Response(text=html, content_type="text/html")
+
+    def comments_block(post_type: str, post_id: str, zh: bool) -> str:
+        """Approved comments plus the submission form, rendered server-side into story and blog pages.
+        Comment text is escaped; names are optional and emails are never shown."""
+        e = esc_text
+        rows = store.db.execute("select name, body, created_at from comments where post_type = ? and post_id = ? and approved = 1 "
+                                "order by created_at limit 200", (post_type, post_id)).fetchall()
+        items = "".join(f'<div class="comment"><b>{e(r["name"] or ("匿名" if zh else "Anonymous"))}</b>'
+                        f' <span class="faint small">{time.strftime("%Y-%m-%d", time.gmtime(r["created_at"]))}</span>'
+                        f'<div style="margin-top:4px;white-space:pre-wrap">{e(r["body"])}</div></div>' for r in rows)
+        form = (f'<form id="comment-form" data-type="{post_type}" data-id="{e(post_id)}" style="margin-top:18px">'
+                f'<div class="inline-form"><input class="input" name="name" maxlength="40" '
+                f'placeholder="{"昵称（选填）" if zh else "Name (optional)"}">'
+                f'<input class="input" name="email" type="email" maxlength="254" '
+                f'placeholder="{"邮箱（选填，不公开）" if zh else "Email (optional, never shown)"}"></div>'
+                f'<textarea class="input" name="body" rows="3" maxlength="2000" required style="margin-top:10px" '
+                f'placeholder="{"写下你的留言……" if zh else "Your comment…"}"></textarea>'
+                f'<button class="btn primary" style="margin-top:10px">{"提交留言" if zh else "Post comment"}</button><p class="error"></p>'
+                f'<p class="faint small">{"留言经审核后显示；邮箱不会公开。" if zh else "Comments appear after review; your email is never shown."}</p></form>')
+        heading = ("留言" if zh else "Comments") + (f" ({len(rows)})" if rows else "")
+        empty = f'<p class="faint small">{"还没有留言——来说第一句。" if zh else "No comments yet — be the first."}</p>'
+        return f'<div class="card" style="margin-top:26px"><h3 style="margin-top:0">{e(heading)}</h3>{items or empty}{form}</div>'
+
+    async def comment_submit(request: web.Request) -> web.Response:
+        """Visitor comments under stories and blog posts. Anonymous is fine; nothing shows until an admin approves."""
+        if limited(request, f"comment:{client(request)}", 8, 3600):
+            return fail(429, "Too many attempts. Try again later.")
+        body = await request.json()
+        post_type, post_id = body.get("type"), str(body.get("id") or "")[:80]
+        text = str(body.get("body") or "").strip()
+        name = str(body.get("name") or "").strip()[:40] or None
+        email = str(body.get("email") or "").strip()[:254] or None
+        if post_type == "story":
+            try:
+                target = store.db.execute("select 1 from interview_posts where id = ? and approved = 1", (int(post_id),)).fetchone()
+            except ValueError:
+                target = None
+        elif post_type == "blog":
+            target = store.db.execute("select 1 from blog_posts where slug = ? and published = 1", (post_id,)).fetchone()
+        else:
+            target = None
+        if not target:
+            return fail(422, "That page does not exist.")
+        if not 2 <= len(text) <= 2000:
+            return fail(422, "Write a comment between 2 and 2000 characters.")
+        if email and not EMAIL.match(email):
+            return fail(422, "Enter a valid email address, or leave it empty.")
+        store.db.execute("insert into comments (post_type, post_id, name, body, email, approved, created_at) values (?, ?, ?, ?, ?, 0, ?)",
+                         (post_type, post_id, name, text, email, int(time.time())))
+        return web.json_response({"ok": True})
+
+    async def blog_list(request: web.Request) -> web.Response:
+        """Published posts for the /blog.html index; zh fields are optional and the page falls back to English."""
+        rows = [{"slug": r["slug"], "title_en": r["title_en"], "title_zh": r["title_zh"] or "", "created_at": r["created_at"],
+                 "snip_en": plain_text(r["body_en"])[:200], "snip_zh": plain_text(r["body_zh"] or "")[:200]}
+                for r in store.db.execute("select slug, title_en, title_zh, body_en, body_zh, created_at from blog_posts "
+                                          "where published = 1 order by created_at desc limit 100")]
+        return web.json_response({"posts": rows})
+
+    async def blog_page(request: web.Request) -> web.Response:
+        """One indexable page per published post — admin-written articles, same pattern as the story pages."""
+        zh = request.path.startswith("/zh/")
+        slug = request.match_info["slug"]
+        row = store.db.execute("select * from blog_posts where slug = ? and published = 1", (slug,)).fetchone()
+        tpl_path = STATIC / ("zh/blog-post.html" if zh else "blog-post.html")
+        if not row or not tpl_path.is_file():
+            return web.FileResponse(STATIC / "404.html", status=404)
+        e = esc_text
+        forwarded_host = request.headers.get("X-Forwarded-Host", "")
+        base = site(request) if f"https://{forwarded_host}" not in origins else f"https://{forwarded_host}"  # mirror canonical
+        title = (row["title_zh"] or row["title_en"]) if zh else row["title_en"]
+        source = (row["body_zh"] or row["body_en"]) if zh else row["body_en"]
+        meta = {"title": e(title), "meta": e(time.strftime("%Y-%m-%d", time.gmtime(row["created_at"])) + " · Interview Realtime Copilot"),
+                "desc": e(plain_text(source)[:155]), "body": render_markdown(source), "comments": comments_block("blog", slug, zh)}
+        html = tpl_path.read_text()
+        for key, value in meta.items():
+            html = html.replace(f"{{{{{key.upper()}}}}}", value)
+        url = f"{base}/{'zh/' if zh else ''}blog/{slug}"
+        html = re.sub(r'<link rel="canonical" href="[^"]*">', f'<link rel="canonical" href="{url}">', html)
+        html = re.sub(r'<meta property="og:url" content="[^"]*">', f'<meta property="og:url" content="{url}">', html)
+        html = re.sub(r'<meta property="og:title" content="[^"]*">', f'<meta property="og:title" content="{meta["title"]}">', html)
+        html = re.sub(r'<meta property="og:description" content="[^"]*">', f'<meta property="og:description" content="{meta["desc"]}">', html)
+        html = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{meta["desc"]}">', html)
+        html = re.sub(r'<title[^>]*>[^<]*</title>', f'<title>{meta["title"]}</title>', html)
+        article = json.dumps({"@context": "https://schema.org", "@type": "Article", "headline": title,
+                              "datePublished": time.strftime("%Y-%m-%d", time.gmtime(row["created_at"])),
+                              "dateModified": time.strftime("%Y-%m-%d", time.gmtime(row["updated_at"])),
+                              "url": url, "description": plain_text(source)[:155],
+                              "author": {"@type": "Organization", "name": "Interview Realtime Copilot", "url": origin}})
+        html = html.replace("</head>", f'<script type="application/ld+json">{article}</script></head>')
+        return web.Response(text=html, content_type="text/html")
+
+    async def posts_sitemap(request: web.Request) -> web.Response:
+        """Dynamic sitemap of approved story and published blog URLs — the static sitemap.xml only covers fixed pages.
+        Served under whatever host asked (the mirror sends X-Forwarded-Host), so each domain gets its own URLs."""
+        day = lambda ts: time.strftime("%Y-%m-%d", time.gmtime(ts))  # noqa: E731
+        forwarded_host = request.headers.get("X-Forwarded-Host", "")
+        base = site(request) if f"https://{forwarded_host}" not in origins else f"https://{forwarded_host}"
+        urls = "".join(f"<url><loc>{base}/{p}interviews/{r[0]}</loc><lastmod>{day(r[1])}</lastmod></url>"
+                       for r in store.db.execute("select id, created_at from interview_posts where approved = 1") for p in ("", "zh/"))
+        urls += "".join(f"<url><loc>{base}/{p}blog/{r[0]}</loc><lastmod>{day(r[1])}</lastmod></url>"
+                        for r in store.db.execute("select slug, updated_at from blog_posts where published = 1") for p in ("", "zh/"))
+        return web.Response(text='<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                                 + urls + "</urlset>", content_type="application/xml")
 
     async def webhook(request: web.Request) -> web.Response:
         payload = await request.read()
@@ -495,7 +667,7 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
     async def page(request: web.Request) -> web.StreamResponse:
         name = request.match_info.get("name") or "index.html"
         path = (STATIC / name).resolve()
-        if path.name == "interview-post.html":  # a template with {{…}} blanks, not a page — posts live at /interviews/<id>
+        if path.name in ("interview-post.html", "blog-post.html"):  # {{…}} render templates, not pages
             return web.FileResponse(STATIC / "404.html", status=404)
         if path.is_dir():  # /docs/ → docs/index.html
             path = path / "index.html"
@@ -578,12 +750,59 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         return web.json_response({"ok": True})
 
     @admin_only
+    async def admin_blog(request: web.Request) -> web.Response:
+        """Create, update, publish/unpublish or delete blog posts. Bodies are markdown, rendered safely
+        (render_markdown escapes all raw HTML)."""
+        body = await request.json()
+        pid = int(body.get("id") or 0)
+        if body.get("remove"):
+            row = store.db.execute("select slug from blog_posts where id = ?", (pid,)).fetchone()
+            store.db.execute("delete from blog_posts where id = ?", (pid,))
+            if row:  # its comments go with it
+                store.db.execute("delete from comments where post_type = 'blog' and post_id = ?", (row["slug"],))
+            return web.json_response({"ok": True})
+        slug = str(body.get("slug") or "").strip().lower()
+        fields = (str(body.get("title_en") or "").strip(), str(body.get("title_zh") or "").strip() or None,
+                  str(body.get("body_en") or "").strip(), str(body.get("body_zh") or "").strip() or None)
+        if not BLOG_SLUG.match(slug):
+            return fail(422, "Slug must be 2-80 lowercase letters, digits or dashes.")
+        if not fields[0] or not fields[2]:
+            return fail(422, "English title and body are required.")
+        now = int(time.time())
+        try:
+            if pid:
+                old = store.db.execute("select slug from blog_posts where id = ?", (pid,)).fetchone()
+                store.db.execute("update blog_posts set slug = ?, title_en = ?, title_zh = ?, body_en = ?, body_zh = ?, published = ?, "
+                                 "updated_at = ? where id = ?", (slug, *fields, 1 if body.get("published") else 0, now, pid))
+                if old and old["slug"] != slug:  # comments reference the slug
+                    store.db.execute("update comments set post_id = ? where post_type = 'blog' and post_id = ?", (slug, old["slug"]))
+            else:
+                store.db.execute("insert into blog_posts (slug, title_en, title_zh, body_en, body_zh, published, created_at, updated_at) "
+                                 "values (?, ?, ?, ?, ?, ?, ?, ?)", (slug, *fields, 1 if body.get("published") else 0, now, now))
+        except sqlite3.IntegrityError:
+            return fail(422, "That slug is already taken.")
+        return web.json_response({"ok": True})
+
+    @admin_only
+    async def admin_comment(request: web.Request) -> web.Response:
+        body = await request.json()
+        cid = int(body.get("id") or 0)
+        if body.get("remove"):
+            store.db.execute("delete from comments where id = ?", (cid,))
+        else:
+            store.db.execute("update comments set approved = ? where id = ?", (1 if body.get("approved") else 0, cid))
+        return web.json_response({"ok": True})
+
+    @admin_only
     async def admin_messages(request: web.Request) -> web.Response:
         wishes = [dict(r) for r in store.db.execute("select id, email, text, page, created_at from wishes order by created_at desc limit 500")]
         waitlist = [dict(r) for r in store.db.execute("select email, topic, created_at from waitlist order by created_at desc limit 500")]
         posts = [dict(r) for r in store.db.execute("select id, company, role, round, lang, outcome, email, approved, created_at, text, "
                                                  "rewarded, user_id from interview_posts order by created_at desc limit 500")]
-        return web.json_response({"wishes": wishes, "waitlist": waitlist, "posts": posts})
+        comments = [dict(r) for r in store.db.execute("select id, post_type, post_id, name, body, email, approved, created_at from comments "
+                                                     "order by created_at desc limit 500")]
+        blog = [dict(r) for r in store.db.execute("select * from blog_posts order by created_at desc limit 200")]
+        return web.json_response({"wishes": wishes, "waitlist": waitlist, "posts": posts, "comments": comments, "blog": blog})
 
     @admin_only
     async def admin_usage(request: web.Request) -> web.Response:
@@ -623,11 +842,15 @@ def build_app(*, db_path: str | None = None, stripe_api: str = "https://api.stri
         web.post("/api/waitlist", waitlist), web.post("/api/wish", wish),
         web.post("/api/interviews", interview_submit), web.get("/api/interviews", interview_list),
         web.get("/zh/interviews/{id}", interview_page), web.get("/interviews/{id}", interview_page),
+        web.get("/api/blog", blog_list), web.post("/api/comments", comment_submit),
+        web.get("/zh/blog/{slug}", blog_page), web.get("/blog/{slug}", blog_page),
+        web.get("/sitemap-posts.xml", posts_sitemap),
         web.post("/api/v1/interviews/audio/{id}", device_story_audio),  # retired — kept so old app builds get a clear 410
         web.post("/api/track", track), web.get("/api/admin/traffic", admin_traffic),
         web.get("/api/admin/overview", admin_overview), web.get("/api/admin/users", admin_users),
         web.get("/api/admin/messages", admin_messages), web.get("/api/admin/usage", admin_usage), web.post("/api/stripe/webhook", webhook),
         web.post("/api/admin/interview", admin_interview),
+        web.post("/api/admin/blog", admin_blog), web.post("/api/admin/comment", admin_comment),
         web.get("/", page), web.get("/{name:.+}", page),
     ])
     return app

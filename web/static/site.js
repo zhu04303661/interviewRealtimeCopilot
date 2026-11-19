@@ -156,17 +156,62 @@ const pages = {
           <td style="white-space:nowrap"><button class="btn" data-post-act="${p.approved ? 'hide' : 'show'}" data-id="${p.id}">${tr(p.approved ? 'ad.hide' : 'ad.show')}</button> <button class="btn" data-post-act="remove" data-id="${p.id}">${tr('ad.remove')}</button>
           ${p.rewarded ? ' <span class="faint small" title="reward credited">+$</span>' : ''}
           <details style="margin-top:6px"><summary class="faint small">${tr('ad.read')}</summary><div class="small" style="white-space:pre-wrap">${esc(p.text)}</div></details></td></tr>`))}
+        <h2>${tr('ad.comments')} (${m.comments.length})</h2>${table(['ad.c.when', 'ad.c.post', 'ad.c.name', 'ad.c.text', 'ad.c.board'], m.comments.map((c) => `<tr><td>${day(c.created_at)}</td>
+          <td><a class="mail" href="${c.post_type === 'blog' ? `/blog/${encodeURIComponent(c.post_id)}` : `/interviews/${encodeURIComponent(c.post_id)}`}">${esc(c.post_type === 'blog' ? 'blog:' + c.post_id : '#' + c.post_id)}</a></td>
+          <td>${esc(c.name || '')}${c.email ? `<br><a class="mail small" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</td>
+          <td style="white-space:pre-wrap;max-width:420px">${esc(c.body)}</td>
+          <td style="white-space:nowrap"><button class="btn" data-comment-act="${c.approved ? 'hide' : 'show'}" data-id="${c.id}">${tr(c.approved ? 'ad.hide' : 'ad.show')}</button> <button class="btn" data-comment-act="remove" data-id="${c.id}">${tr('ad.remove')}</button></td></tr>`))}
+        <h2>${tr('ad.blog')} (${m.blog.length})</h2>${table(['ad.c.when', 'ad.c.slug', 'ad.c.title', 'ad.c.board'], m.blog.map((b) => `<tr><td>${day(b.created_at)}</td>
+          <td><a class="mail" href="/blog/${encodeURIComponent(b.slug)}">${esc(b.slug)}</a></td><td>${esc(b.title_en)}${b.title_zh ? `<br><span class="faint small">${esc(b.title_zh)}</span>` : ''}</td>
+          <td style="white-space:nowrap"><button class="btn" data-blog-act="edit" data-id="${b.id}">${tr('ad.edit')}</button> <button class="btn" data-blog-act="${b.published ? 'unpublish' : 'publish'}" data-id="${b.id}">${tr(b.published ? 'ad.unpublish' : 'ad.publish')}</button> <button class="btn" data-blog-act="remove" data-id="${b.id}">${tr('ad.remove')}</button></td></tr>`))}
+        <form id="blog-form" class="card" style="margin-top:14px"><input type="hidden" name="pid">
+          <div class="inline-form"><label class="field" style="flex:1">Slug<input class="input" name="slug" required placeholder="my-first-post"></label>
+          <label class="field" style="flex:2">Title EN<input class="input" name="title_en" required></label>
+          <label class="field" style="flex:2">Title ZH<input class="input" name="title_zh"></label></div>
+          <label class="field">Body EN<textarea class="input" name="body_en" rows="8" required></textarea></label>
+          <label class="field">Body ZH<textarea class="input" name="body_zh" rows="8"></textarea></label>
+          <label class="row small" style="gap:8px"><input type="checkbox" name="published"> published · ${tr('ad.blogfields')}</label>
+          <button class="btn primary">${tr('ad.save')}</button> <button class="btn" type="button" id="blog-reset">${tr('ad.newpost')}</button><p class="error"></p></form>
         <h2>${tr('ad.waitlist')} (${m.waitlist.length})</h2>${table(['ad.c.when', 'ad.c.email', 'ad.c.topic'], m.waitlist.map((w) => `<tr><td>${day(w.created_at)}</td><td><a class="mail" href="mailto:${esc(w.email)}">${esc(w.email)}</a></td><td>${esc(w.topic)}</td></tr>`))}`;
       const q = document.getElementById('admin-q');
       q.addEventListener('change', async () => { query = q.value; users = await get(`/api/admin/users?q=${encodeURIComponent(query)}`); render(); });
     };
     root.addEventListener('click', async (event) => {
-      const button = event.target.closest('[data-post-act]');
+      const button = event.target.closest('[data-post-act], [data-comment-act], [data-blog-act], #blog-reset');
       if (!button) return;
-      const act = button.dataset.postAct, id = Number(button.dataset.id);
-      if (act === 'remove' && !confirm(tr('ad.removeSure'))) return;
-      await api('/api/admin/interview', act === 'remove' ? { id, remove: true } : { id, approved: act === 'show' });
+      if (button.id === 'blog-reset') { document.getElementById('blog-form').reset(); document.getElementById('blog-form').elements.pid.value = ''; return; }
+      const id = Number(button.dataset.id);
+      if (button.dataset.commentAct !== undefined) {
+        const act = button.dataset.commentAct;
+        if (act === 'remove' && !confirm(tr('ad.removeSure'))) return;
+        await api('/api/admin/comment', act === 'remove' ? { id, remove: true } : { id, approved: act === 'show' });
+      } else if (button.dataset.blogAct !== undefined) {
+        const act = button.dataset.blogAct, post_ = m.blog.find((b) => b.id === id);
+        if (!post_) return;
+        if (act === 'remove') { if (!confirm(tr('ad.removeSure'))) return; await api('/api/admin/blog', { id, remove: true }); }
+        else if (act === 'edit') {
+          const f = document.getElementById('blog-form').elements;
+          f.pid.value = post_.id; f.slug.value = post_.slug; f.title_en.value = post_.title_en; f.title_zh.value = post_.title_zh || '';
+          f.body_en.value = post_.body_en; f.body_zh.value = post_.body_zh || ''; f.published.checked = !!post_.published;
+          document.getElementById('blog-form').scrollIntoView({ behavior: 'smooth' }); return;
+        } else await api('/api/admin/blog', { ...post_, published: act === 'publish' });
+      } else {
+        const act = button.dataset.postAct;
+        if (act === 'remove' && !confirm(tr('ad.removeSure'))) return;
+        await api('/api/admin/interview', act === 'remove' ? { id, remove: true } : { id, approved: act === 'show' });
+      }
       m = await get('/api/admin/messages'); render();
+    });
+    root.addEventListener('submit', async (event) => {
+      if (event.target.id !== 'blog-form') return;
+      event.preventDefault();
+      const f = event.target.elements, button = event.target.querySelector('button.primary');
+      button.disabled = true;
+      try {
+        await api('/api/admin/blog', { id: Number(f.pid.value) || 0, slug: f.slug.value, title_en: f.title_en.value, title_zh: f.title_zh.value,
+                                       body_en: f.body_en.value, body_zh: f.body_zh.value, published: f.published.checked });
+        m = await get('/api/admin/messages'); render();
+      } catch (error) { event.target.querySelector('.error').textContent = error.message; button.disabled = false; }
     });
     render(); window.addEventListener('language', render);
   },
@@ -251,6 +296,17 @@ const pages = {
         form.innerHTML = `<div class="notice">${tr('ip.thanks')}</div>`;
       } catch (error) { form.querySelector('.error').textContent = error.message; button.disabled = false; }
     });
+  },
+  async blog() {
+    const root = document.getElementById('posts'), prefix = fixedLang === 'zh' ? '/zh' : '';
+    try {
+      const { posts } = await api('/api/blog');
+      root.innerHTML = posts.length ? posts.map((p) => {
+        const zhTitle = fixedLang === 'zh' && p.title_zh;
+        return `<a class="post-row card" href="${prefix}/blog/${encodeURIComponent(p.slug)}"><b>${esc(zhTitle ? p.title_zh : p.title_en)}</b>
+          <div class="faint small">${day(p.created_at).slice(0, 12)}</div><p class="post-snip">${esc((zhTitle ? p.snip_zh : p.snip_en) || p.snip_en)}…</p></a>`;
+      }).join('') : `<div class="notice">${tr('bl.empty')}</div>`;
+    } catch { root.innerHTML = `<div class="notice warn">${tr('bl.error')}</div>`; }
   },
   async account() {
     const { user } = await api('/api/me');
@@ -366,6 +422,16 @@ window.addEventListener('DOMContentLoaded', () => {
     try {
       await api('/api/wish', { text: form.text.value, email: form.email.value, page: location.pathname });
       form.innerHTML = `<div class="notice">${tr('wish.thanks')}</div>`;
+    } catch (error) { form.querySelector('.error').textContent = error.message; button.disabled = false; }
+  }));
+  // Comment forms on story and blog post pages (server-rendered; the post ref lives in data attributes).
+  document.querySelectorAll('#comment-form').forEach((form) => form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = form.querySelector('button'), f = form.elements;
+    button.disabled = true;
+    try {
+      await api('/api/comments', { type: form.dataset.type, id: form.dataset.id, name: f.name.value, body: f.body.value, email: f.email.value });
+      form.innerHTML = `<div class="notice">${tr('cm.thanks')}</div>`;
     } catch (error) { form.querySelector('.error').textContent = error.message; button.disabled = false; }
   }));
   const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });

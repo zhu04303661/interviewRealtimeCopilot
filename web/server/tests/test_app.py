@@ -138,6 +138,60 @@ async def test_interview_posts_review_board_and_pages(site):
     assert (await site.get("/interviews/1")).status == 404
 
 
+async def test_blog_posts_and_comments(site):
+    """Admin-written blog posts render at /blog/<slug>; comments under posts and stories show after review."""
+    post_ = {"slug": "launch-notes", "title_en": "Launch notes", "title_zh": "发布记录",
+             "body_en": "## What shipped\n\n- a thing\n- **another**\n\nText with [a link](https://example.com/x) and `code`."}
+    assert (await post(site, "/api/admin/blog", post_)).status == 401  # signed-out
+    await post(site, "/api/signup", {"email": "blogger@example.com", "password": "long-enough-1"})
+    assert (await post(site, "/api/admin/blog", post_)).status == 403  # not an admin
+    from irc_web.app import Store
+    Store(site.server.app["db_path"]).db.execute("update users set is_admin = 1")
+    assert (await post(site, "/api/admin/blog", {**post_, "slug": "bad slug!"})).status == 422
+    assert (await post(site, "/api/admin/blog", post_)).status == 200  # created as draft
+    assert (await (await site.get("/api/blog")).json())["posts"] == []  # drafts are hidden
+    assert (await site.get("/blog/launch-notes")).status == 404
+    assert (await post(site, "/api/admin/blog", {**post_, "id": 1, "published": True})).status == 200
+    posts = (await (await site.get("/api/blog")).json())["posts"]
+    assert [p["slug"] for p in posts] == ["launch-notes"] and posts[0]["title_zh"] == "发布记录"
+    assert "body_en" not in posts[0]  # the index leaks only a snippet
+    html = await (await site.get("/blog/launch-notes")).text()
+    assert "Launch notes" in html and "<h2>What shipped</h2>" in html and "<b>another</b>" in html
+    assert 'href="https://example.com/x"' in html and "<code>code</code>" in html and "{{" not in html and "comment-form" in html
+    zh = await (await site.get("/zh/blog/launch-notes")).text()
+    assert "发布记录" in zh and "/zh/blog/launch-notes" in zh and "留言" in zh
+    assert (await site.get("/blog-post.html")).status == 404  # the template itself is not a page
+    # Markdown never lets raw HTML through.
+    await post(site, "/api/admin/blog", {**post_, "id": 1, "body_en": "x <script>alert(1)</script>", "published": True})
+    html = await (await site.get("/blog/launch-notes")).text()
+    assert "<script>alert" not in html and "&lt;script&gt;" in html
+    # Comments: submit → hidden → approve → visible; bodies are escaped.
+    assert (await post(site, "/api/comments", {"type": "blog", "id": "launch-notes", "body": "Helpful write-up!", "name": "Reader"})).status == 200
+    assert (await post(site, "/api/comments", {"type": "blog", "id": "nope", "body": "hi"})).status == 422  # unpublished target
+    assert (await post(site, "/api/comments", {"type": "blog", "id": "launch-notes", "body": "x"})).status == 422
+    assert "Helpful" not in await (await site.get("/blog/launch-notes")).text()  # unapproved is hidden
+    comments = (await (await site.get("/api/admin/messages")).json())["comments"]
+    assert comments[0]["name"] == "Reader" and comments[0]["approved"] == 0 and comments[0]["post_id"] == "launch-notes"
+    await post(site, "/api/admin/comment", {"id": comments[0]["id"], "approved": True})
+    html = await (await site.get("/blog/launch-notes")).text()
+    assert "Helpful write-up!" in html and "Reader" in html and "Comments (1)" in html
+    # The same comments table serves story pages.
+    await post(site, "/api/interviews", {"company": "Co", "role": "SDE", "round": "hr", "lang": "en", "outcome": "",
+                                       "text": "A short phone screen about the team and the role scope."})
+    await post(site, "/api/admin/interview", {"id": 1, "approved": True})
+    await post(site, "/api/comments", {"type": "story", "id": "1", "body": "<img onerror=x>", "name": ""})
+    await post(site, "/api/admin/comment", {"id": 2, "approved": True})
+    story_html = await (await site.get("/interviews/1")).text()
+    assert "&lt;img onerror=x&gt;" in story_html and "Anonymous" in story_html
+    xml = await (await site.get("/sitemap-posts.xml")).text()
+    assert "/blog/launch-notes" in xml and "/zh/interviews/1" in xml
+    # Deleting a post takes its comments with it.
+    await post(site, "/api/admin/blog", {"id": 1, "remove": True})
+    assert (await site.get("/blog/launch-notes")).status == 404
+    remaining = (await (await site.get("/api/admin/messages")).json())["comments"]
+    assert [c["post_type"] for c in remaining] == ["story"]
+
+
 async def test_device_interview_post(site):
     """The desktop app submits with its Bearer token (no Origin); the account email is attached."""
     story = {"company": "DeviceCo", "role": "SRE", "round": "hr", "lang": "en", "outcome": "",
