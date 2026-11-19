@@ -1,10 +1,10 @@
 # Interview Realtime Copilot
 
-> Interview Realtime Copilot is an AI interview assistant for Mac: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.
+> Interview Realtime Copilot is an AI interview assistant for Mac and Windows: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.
 
 Key facts:
 - Category: AI interview assistant / interview copilot (中文：AI 面试助手、实时面试辅助).
-- Platform: macOS 14.2 or later on Apple Silicon. Windows is planned.
+- Platform: macOS 14.2 or later on Apple Silicon, and 64-bit Windows 10 (2004+) or Windows 11.
 - Live interviews: transcribes the interviewer, translates English and Chinese, detects each finished question, hints a short answer from the user's own resume and notes.
 - Coding rounds: reads the problem from a screenshot and returns runnable code with complexity and edge cases.
 - Practice: a spoken AI interviewer asks the questions extracted from the user's preparation notes.
@@ -19,11 +19,14 @@ Key facts:
 - [Use cases](https://copilot.xichiuk.com/use-cases.html): Six interview moments the copilot handles: video interviews, interviewing in a second language, coding rounds, rehearsing prepared answers, getting stuck mid-answer, and debriefs.
 - [Demo](https://copilot.xichiuk.com/demo.html): Watch a live interview question get transcribed, translated, recognised and answered in seconds — the cockpit you see during a real interview.
 - [Pricing](https://copilot.xichiuk.com/pricing.html): Free plan with a monthly AI allowance; Pro is £25 a month or £169 a year with 20 times the allowance. Cancel anytime; local tax added at checkout.
-- [Download](https://copilot.xichiuk.com/download.html): Download Interview Realtime Copilot for Mac (Apple Silicon, macOS 14.2 or later). Sign in with your website account and start a practice interview in minutes.
+- [Download](https://copilot.xichiuk.com/download.html): Download Interview Realtime Copilot for macOS (Apple Silicon, 14.2+) or Windows (64-bit). Sign in with your website account and start a practice interview in minutes.
+- [Compare](https://copilot.xichiuk.com/compare.html): How Interview Realtime Copilot compares with other AI interview assistants — Linkjob, Final Round AI, Interview Coder and Cluely — on price, platforms, languages and privacy.
 
 ## Guides
 - [How to get through an English interview when English is not your first language](https://copilot.xichiuk.com/docs/english-interview.html): A practical method for understanding every question and answering clearly — with and without an AI interview assistant.
+- [Interviewing for an overseas remote job from your home country](https://copilot.xichiuk.com/docs/overseas-remote-interview.html): Timezone math, English small talk and an unfamiliar meeting link — what is different about remote interviews for overseas companies, and how to prepare.
 - [What is an AI interview assistant, and how do you choose one?](https://copilot.xichiuk.com/docs/ai-interview-assistant.html): What these tools do during a live interview, what to check before trusting one, and where they do not help.
+- [Behavioral interview questions: how to answer with STAR and sound prepared](https://copilot.xichiuk.com/docs/behavioral-questions.html): The questions are predictable — “tell me about a time…”. What makes answers land is the structure behind them.
 - [Interview tomorrow and no time to prepare: a two-hour plan](https://copilot.xichiuk.com/docs/last-minute-prep.html): What to do, in order, when the interview is close and preparation time is short.
 
 ## Help Center

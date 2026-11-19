@@ -4,6 +4,8 @@ https://copilot.xichiuk.com/use-cases.html
 https://copilot.xichiuk.com/zh/use-cases.html
 https://copilot.xichiuk.com/demo.html
 https://copilot.xichiuk.com/zh/demo.html
+https://copilot.xichiuk.com/compare.html
+https://copilot.xichiuk.com/zh/compare.html
 https://copilot.xichiuk.com/pricing.html
 https://copilot.xichiuk.com/zh/pricing.html
 https://copilot.xichiuk.com/download.html
@@ -44,8 +46,12 @@ https://copilot.xichiuk.com/docs/settings.html
 https://copilot.xichiuk.com/zh/docs/settings.html
 https://copilot.xichiuk.com/docs/english-interview.html
 https://copilot.xichiuk.com/zh/docs/english-interview.html
+https://copilot.xichiuk.com/docs/overseas-remote-interview.html
+https://copilot.xichiuk.com/zh/docs/overseas-remote-interview.html
 https://copilot.xichiuk.com/docs/ai-interview-assistant.html
 https://copilot.xichiuk.com/zh/docs/ai-interview-assistant.html
+https://copilot.xichiuk.com/docs/behavioral-questions.html
+https://copilot.xichiuk.com/zh/docs/behavioral-questions.html
 https://copilot.xichiuk.com/docs/last-minute-prep.html
 https://copilot.xichiuk.com/zh/docs/last-minute-prep.html
 https://copilot.xichiuk.com/docs/troubleshooting.html

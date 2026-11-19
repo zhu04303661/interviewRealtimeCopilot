@@ -1,6 +1,6 @@
 # Interview Realtime Copilot
 
-> Interview Realtime Copilot is an AI interview assistant for Mac: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.
+> Interview Realtime Copilot is an AI interview assistant for Mac and Windows: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.
 
 Website: https://copilot.xichiuk.com/ · Download: https://copilot.xichiuk.com/download.html · Support: linkyourfuture2026@outlook.com · Updated 2026-11-19
 
@@ -32,7 +32,7 @@ There is a free plan with a monthly AI allowance, enough for about two practice 
 
 ### Which computers does it run on?
 
-Macs with Apple Silicon (M1 to M4) running macOS 14.2 or later. A Windows version is planned.
+Macs with Apple Silicon (M1 to M4) running macOS 14.2 or later, and 64-bit PCs on Windows 10 (2004+) or Windows 11.
 
 ## Use cases
 
@@ -91,16 +91,16 @@ https://copilot.xichiuk.com/docs/install.html
 
 Download the app, open it the first time, and sign in with your website account.
 
-1. Download the DMG from the Download page and open it.
-2. Drag Interview Realtime Copilot into Applications.
-3. Open it. Preview builds are not yet notarised by Apple, so macOS blocks the first launch: open System Settings → Privacy & Security and click “Open Anyway”.
+1. Download the installer for your system from the Download page — the DMG on macOS, the setup file on Windows.
+2. On macOS, drag Interview Realtime Copilot into Applications. On Windows, run the setup file — it installs for your user, no administrator rights needed.
+3. Open it. On macOS, preview builds are not yet notarised: System Settings → Privacy & Security → “Open Anyway”. On Windows, if SmartScreen appears, click “More info → Run anyway”.
 4. Sign in with your email and password, or choose “Create an account”. It is the same account as on the website.
 
-Downloading from mainland China can be slow because the server is in the UK. Using a faster network or proxy helps.
+In mainland China, use the China site — copilot.xichigroup.com.cn — for much faster pages and downloads.
 
 ### Your workspace
 
-Goals, documents, transcripts, debriefs and recordings are stored on your Mac, in a workspace that belongs to your account. Signing out keeps them; signing in again opens them.
+Goals, documents, transcripts, debriefs and recordings are stored on your computer, in a workspace that belongs to your account. Signing out keeps them; signing in again opens them.
 
 ## Set up permissions
 
@@ -116,7 +116,11 @@ The microphone hears you; System Audio Recording hears the interviewer in your m
 
 Settings → Privacy & Stealth shows the state of each permission with a button to grant it. Preflight, the check before every session, lets you test the microphone level.
 
-After changing a permission in System Settings, quit and reopen the app so macOS applies it.
+### On Windows
+
+Windows asks for the microphone the first time a session starts. For Live, meeting audio is captured through the screen-and-audio sharing prompt the app shows — allow it with system audio enabled so the copilot can hear the meeting.
+
+On macOS, after changing a permission in System Settings, quit and reopen the app so macOS applies it.
 
 ## Plans and AI allowance
 
@@ -330,6 +334,35 @@ Interview Realtime Copilot shows every interviewer sentence with a Chinese trans
 
 Use the hints as a prompt for your own words. Reading a script aloud sounds unnatural; glancing at three bullets does not.
 
+## Interviewing for an overseas remote job from your home country
+
+https://copilot.xichiuk.com/docs/overseas-remote-interview.html
+
+Timezone math, English small talk and an unfamiliar meeting link — what is different about remote interviews for overseas companies, and how to prepare.
+
+The work is the same; the interview is not. You are interviewed in a second language, at an odd hour, over a meeting link you may not have used — and remote teams judge communication almost as much as skill, because communication is the job when nobody shares an office.
+
+### Before the interview
+
+1. Confirm the time in writing with the timezone spelled out — “Wednesday 9 AM Pacific” — never “your morning”. Overseas teams book in their timezone; write it down in yours.
+2. Test the meeting link a day early and install the desktop client rather than using the browser. From mainland China, check the link loads on your normal network; our China site (copilot.xichigroup.com.cn) downloads the app without a proxy.
+3. Write a 60-second self-introduction in English and say it out loud ten times. The first two minutes set the tone for the whole call.
+4. Learn the English names of your own work: systems, tools, metrics. These are the words you cannot paraphrase mid-sentence.
+5. Prepare two questions to ask them — how the team works across timezones, what the first month looks like. Remote teams evaluate whether you communicate like someone easy to work with.
+
+### During the interview
+
+- Small talk is part of the test, not noise. Have two easy topics ready — your weekend, your workspace — and answer them warmly and briefly.
+- Connection problems are normal. Keep the line ready: “Sorry, I think the connection dropped for a second — could you say that again?”
+- Slow is fine. Pause for two seconds before answering rather than filling silence — on a laggy call, pauses read as thoughtfulness.
+- Ask for the question in text if you need it — “Could you paste that in the chat?” — especially for multi-part questions.
+
+### Where the copilot helps
+
+Interview Realtime Copilot shows every interviewer sentence with a Chinese translation as it is spoken and hints short answers in natural English built from your own resume — so a missed phrase never turns into a wrong answer, and what you say still comes from your real experience. Sign in and downloads work directly from mainland China through the China site.
+
+Hints are a prompt, not a script. Overseas interviewers probe with follow-ups; the experience must be yours or the next question exposes it.
+
 ## What is an AI interview assistant, and how do you choose one?
 
 https://copilot.xichiuk.com/docs/ai-interview-assistant.html
@@ -355,6 +388,38 @@ An AI interview assistant — some people call it an interview copilot, 面试�
 - Check the rules of each interview and use it within them.
 
 Interview Realtime Copilot is built around these points: answers from your own materials, question detection that survives pauses, English–Chinese translation, spoken practice, and local storage.
+
+## Behavioral interview questions: how to answer with STAR and sound prepared
+
+https://copilot.xichiuk.com/docs/behavioral-questions.html
+
+The questions are predictable — “tell me about a time…”. What makes answers land is the structure behind them.
+
+Behavioral rounds measure how you worked, not what you know. Interviewers score each answer against a rubric — ownership, conflict, impact — so a rambling true story scores worse than a structured ordinary one.
+
+### The STAR shape, in one minute
+
+1. Situation — one sentence. Where, when, what team. Resist the urge to give background.
+2. Task — one sentence. What was yours to fix, not the team's.
+3. Action — most of your time. Three verbs: what you decided, what you did, what you changed when it went wrong.
+4. Result — one number or one change that lasted. “Deploys went from weekly to daily” beats “it went well”.
+
+### The eight questions that cover most rounds
+
+| Question | What it probes |
+|---|---|
+| Tell me about yourself | Not a story — a 60-second arc: now, before, why here. |
+| A conflict with a teammate | Whether you escalate or resolve; never “the other person was wrong”. |
+| A time you failed | A real failure, what you changed afterwards. Humble-bragging fails here. |
+| Your most challenging project | How you break down something too big; one deep story beats five shallow ones. |
+| Disagreeing with your manager | Disagree with data, commit once decided. |
+| Learning something fast | Your method, not your talent: how you found the 20% that mattered. |
+| Why this company | Read their materials; name something specific, not “your great culture”. |
+| Going beyond your job | Ownership without being asked — the rubric line every company shares. |
+
+### Practice that transfers
+
+Written STAR answers and spoken ones are different skills — the spoken version is half the length and needs signposts (“…and the result was”). Say each story out loud until it fits in ninety seconds. Interview Realtime Copilot turns your preparation notes into a spoken mock interview and reviews each answer in the debrief, so the structure is practised, not just drafted.
 
 ## Interview tomorrow and no time to prepare: a two-hour plan
 
@@ -382,10 +447,12 @@ Fixes for the problems people meet most often.
 
 | Problem | What to do |
 |---|---|
-| The Computer meter does not move in Live | Allow System Audio Recording for the app, quit and reopen it, and check the meeting's sound plays through this Mac. |
+| The Computer meter does not move in Live (macOS) | Allow System Audio Recording for the app, quit and reopen it, and check the meeting's sound plays through this Mac. |
+| The Computer meter does not move in Live (Windows) | Restart Live and allow the screen-and-audio sharing prompt with “share system audio” enabled. |
 | The Mic meter does not move | Allow the microphone in System Settings → Privacy & Security → Microphone; check the input device in macOS Sound settings. |
 | “Your monthly AI allowance is used up” | Subscribe in Settings → Account, or wait for next month's allowance. |
 | macOS says the app cannot be opened | System Settings → Privacy & Security → Open Anyway (preview builds are not notarised yet). |
+| Windows says “Windows protected your PC” | Click More info → Run anyway (preview builds are not code-signed yet). |
 | Cannot reach the account service | Check your internet connection or proxy; the app keeps you signed in and retries. |
 | A continuous question is split into pieces | Usually a very long pause; the copilot still answers the combined question. Tell us if it keeps happening. |
 

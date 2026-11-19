@@ -62,20 +62,22 @@ def write_chinese_copies() -> None:
 
 TODAY = datetime.date.today().isoformat()
 LDS: dict[str, object] = {}  # page path -> function(lang) returning its JSON-LD nodes
-KEYWORDS = {"en": "AI interview assistant, interview copilot, real-time interview help, interview answer generator, coding interview AI, mock interview, interview translation",
-            "zh": "AI面试助手, 实时面试辅助, 面试神器, 面试外挂, 英文面试, 跨语言面试, 面试翻译, 编程面试, 面试题答案, 模拟面试"}
+KEYWORDS = {"en": "AI interview assistant, interview copilot, real-time interview help, interview answer generator, coding interview AI, mock interview, interview translation, English interview assistant, overseas job interview, behavioral interview, Linkjob alternative, Final Round AI alternative",
+            "zh": "AI面试助手, 实时面试辅助, 面试神器, 面试外挂, 英文面试, 外企面试, 海外远程面试, 跨语言面试, 面试翻译, 编程面试, 行为面试, STAR法则, 模拟面试"}
 # One description per page (search-result snippet); Help Center pages use their lead instead.
 DESCRIPTIONS = {
-    "index": ("Interview Realtime Copilot is an AI interview assistant for Mac: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.",
-              "Interview Realtime Copilot 是 Mac 上的 AI 面试助手：实时转写并翻译面试官的话、自动识别问题，并基于你自己的简历给出回答提示。提供免费版。"),
+    "index": ("Interview Realtime Copilot is an AI interview assistant for Mac and Windows: it transcribes and translates the interviewer live, detects each question and hints an answer from your own resume. Free plan.",
+              "Interview Realtime Copilot 是 Mac 和 Windows 上的 AI 面试助手：实时转写并翻译面试官的话、自动识别问题，并基于你自己的简历给出回答提示。提供免费版。"),
     "use-cases": ("Six interview moments the copilot handles: video interviews, interviewing in a second language, coding rounds, rehearsing prepared answers, getting stuck mid-answer, and debriefs.",
                   "它解决的六个面试时刻：视频面试、用第二语言面试、技术面与编程题、演练准备好的问答、回答到一半卡住，以及面试后的复盘。"),
     "demo": ("Watch a live interview question get transcribed, translated, recognised and answered in seconds — the cockpit you see during a real interview.",
              "看一道面试问题如何在几秒内被转写、翻译、识别并给出回答提示——这就是真实面试中你看到的窗口。"),
     "pricing": ("Free plan with a monthly AI allowance; Pro is £25 a month or £169 a year with 20 times the allowance. Cancel anytime; local tax added at checkout.",
                 "免费版含每月 AI 额度；Pro 每月 £25 或每年 £169，额度为免费版的 20 倍。随时可取消，结账时加收当地税费。"),
-    "download": ("Download Interview Realtime Copilot for Mac (Apple Silicon, macOS 14.2 or later). Sign in with your website account and start a practice interview in minutes.",
-                 "下载 Interview Realtime Copilot Mac 版（Apple 芯片，macOS 14.2 及以上）。用网站账号登录，几分钟内开始一次语音模拟面试。"),
+    "download": ("Download Interview Realtime Copilot for macOS (Apple Silicon, 14.2+) or Windows (64-bit). Sign in with your website account and start a practice interview in minutes.",
+                 "下载 Interview Realtime Copilot macOS 版（Apple 芯片，14.2 及以上）或 Windows 版（64 位）。用网站账号登录，几分钟内开始一次语音模拟面试。"),
+    "compare": ("How Interview Realtime Copilot compares with other AI interview assistants — Linkjob, Final Round AI, Interview Coder and Cluely — on price, platforms, languages and privacy.",
+                "Interview Realtime Copilot 与 Linkjob、Final Round AI、Interview Coder、Cluely 等 AI 面试助手在价格、平台、语言和隐私上的对比。"),
     "privacy": ("What Interview Realtime Copilot stores on your Mac, what is processed during a session, and what the website keeps.",
                 "Interview Realtime Copilot 在你的 Mac 上保存什么、会话中处理什么，以及网站保留哪些信息。"),
     "terms": ("Terms of the Interview Realtime Copilot preview service.", "Interview Realtime Copilot 预览版服务条款。"),
@@ -101,8 +103,8 @@ HOME_FAQ = [
      "There is a free plan with a monthly AI allowance, enough for about two practice sessions. Pro costs £25 a month or £169 a year and includes 20 times the free allowance. Local tax is added at checkout.",
      "免费版含每月 AI 额度，约可做两次语音练习。Pro 每月 £25 或每年 £169，额度为免费版的 20 倍。结账时加收当地税费。"),
     ("Which computers does it run on?", "支持哪些电脑？",
-     "Macs with Apple Silicon (M1 to M4) running macOS 14.2 or later. A Windows version is planned.",
-     "搭载 Apple 芯片（M1 至 M4）、运行 macOS 14.2 及以上的 Mac。Windows 版在计划中。"),
+     "Macs with Apple Silicon (M1 to M4) running macOS 14.2 or later, and 64-bit PCs on Windows 10 (2004+) or Windows 11.",
+     "搭载 Apple 芯片（M1 至 M4）、运行 macOS 14.2 及以上的 Mac，以及 64 位的 Windows 10（2004 及以上）或 Windows 11 电脑。"),
 ]
 
 
@@ -153,8 +155,11 @@ def site_footer() -> str:
     links = "".join(nav_link(k, en, zh, href) for k, en, zh, href in [
         ("nav.scenarios", "Use cases", "使用场景", "/use-cases.html"), ("nav.demo", "Demo", "演示", "/demo.html"), ("nav.pricing", "Pricing", "价格", "/pricing.html"),
         ("nav.download", "Download", "下载", "/download.html"), ("nav.docs", "Docs", "使用手册", "/docs/"),
+        ("foot.compare", "Compare tools", "产品对比", "/compare.html"),
         ("foot.guide.english", "English interview guide", "英文面试指南", "/docs/english-interview.html"),
+        ("foot.guide.overseas", "Overseas job interviews", "海外远程面试", "/docs/overseas-remote-interview.html"),
         ("foot.guide.assistant", "Choosing an AI interview assistant", "如何选择 AI 面试助手", "/docs/ai-interview-assistant.html"),
+        ("foot.guide.behavioral", "STAR answers for behavioral questions", "行为面试 STAR 法则", "/docs/behavioral-questions.html"),
         ("foot.guide.prep", "Last-minute interview prep", "面试前两小时准备", "/docs/last-minute-prep.html"),
         ("foot.wishlist", "Wishlist", "许愿单", "/#wishlist"), ("foot.privacy", "Privacy", "隐私", "/privacy.html"), ("foot.terms", "Terms", "条款", "/terms.html")])
     return ('<footer><div class="wrap"><span class="brand"><span class="logo">IR</span>Interview Realtime Copilot</span><span class="spacer"></span>' + links
@@ -353,7 +358,7 @@ def write_llms() -> None:
 
 Key facts:
 - Category: AI interview assistant / interview copilot (中文：AI 面试助手、实时面试辅助).
-- Platform: macOS 14.2 or later on Apple Silicon. Windows is planned.
+- Platform: macOS 14.2 or later on Apple Silicon, and 64-bit Windows 10 (2004+) or Windows 11.
 - Live interviews: transcribes the interviewer, translates English and Chinese, detects each finished question, hints a short answer from the user's own resume and notes.
 - Coding rounds: reads the problem from a screenshot and returns runnable code with complexity and edge cases.
 - Practice: a spoken AI interviewer asks the questions extracted from the user's preparation notes.
@@ -369,6 +374,7 @@ Key facts:
 - [Demo]({SITE}/demo.html): {DESCRIPTIONS['demo'][0]}
 - [Pricing]({SITE}/pricing.html): {DESCRIPTIONS['pricing'][0]}
 - [Download]({SITE}/download.html): {DESCRIPTIONS['download'][0]}
+- [Compare]({SITE}/compare.html): {DESCRIPTIONS['compare'][0]}
 
 ## Guides
 {guides}
@@ -391,7 +397,7 @@ def build() -> None:
 <span class="pill"><b>{t("hero.new", "NEW", "新")}</b>{t("hero.pill", "Spoken practice with your own prepared questions", "用你自己的准备题做语音模拟面试")}</span>
 <h1>{t("hero.h1a", "Answer every interview question", "每一道面试题，")}<br><span class="grad-text">{t("hero.h1b", "with calm confidence.", "都能从容作答。")}</span></h1>
 {t("hero.lead", "Interview Realtime Copilot listens to the interviewer, translates as they speak, spots each question and streams a concise answer built from your own resume and notes.", "Interview Realtime Copilot 实时聆听面试官、同步翻译、识别每一个问题，并基于你自己的简历和准备资料给出简洁的回答提示。", "p", "lead")}
-<div class="cta"><a class="btn primary lg" href="/download.html">{t("cta.download", "Download for macOS", "下载 macOS 版")}</a><a class="btn lg" href="/demo.html">{t("cta.demo", "Watch the demo", "观看演示")}</a></div>
+<div class="cta"><a class="btn primary lg" href="/download.html">{t("cta.download", "Download the app", "下载应用")}</a><a class="btn lg" href="/demo.html">{t("cta.demo", "Watch the demo", "观看演示")}</a></div>
 <div class="trust">{t("trust.1", "Local-first: your files stay on your Mac", "本地优先：文件只存在你的 Mac")}{t("trust.2", "Hidden from screen sharing", "共享屏幕时不可见")}{t("trust.3", "Powered by a realtime AI engine", "超强实时 AI 引擎驱动")}</div>
 </div>{COCKPIT}</div></section>
 
@@ -455,6 +461,33 @@ def build() -> None:
 <ul class="checks"><li>{t("demo.1", "Live caption and translation", "实时字幕与翻译")}</li><li>{t("demo.2", "Question card when the interviewer finishes", "面试官说完即生成问题卡片")}</li><li>{t("demo.3", "Bilingual one-minute hint from your resume", "基于简历的一分钟双语提示")}</li></ul>
 <div class="cta"><a class="btn primary lg" href="/download.html">{t("cta.try", "Try it yourself", "亲自试用")}</a></div></div>{COCKPIT}</div></section>''')
 
+    page("compare", ("AI interview assistant comparison — Interview Realtime Copilot vs Linkjob, Final Round AI and more", "AI 面试助手对比 — Interview Realtime Copilot 与 Linkjob、Final Round AI 等"), f'''
+<section class="hero"><div class="wrap center"><span class="eyebrow">{t("cmp.eyebrow", "Compare", "产品对比")}</span>
+<h1>{t("cmp.h1a", "Choosing an AI", "如何选择")}<br><span class="grad-text">{t("cmp.h1b", "interview assistant.", "AI 面试助手。")}</span></h1>
+{t("cmp.lead", "The honest version: what each tool charges, what it runs on, and where Interview Realtime Copilot fits — written by the people who build it, so read accordingly.", "实话实说版：各工具的收费、支持的平台，以及 Interview Realtime Copilot 的位置。这篇文章由我们撰写，请带着这个前提阅读。", "p", "lead")}</div></section>
+<section style="padding-top:0"><div class="wrap"><div class="doc-table"><table><thead><tr>
+<th>{t("cmp.c.tool", "Tool", "工具")}</th><th>{t("cmp.c.price", "Listed price*", "官网标价*")}</th><th>{t("cmp.c.os", "Platforms", "平台")}</th><th>{t("cmp.c.lang", "Languages", "语言")}</th><th>{t("cmp.c.free", "Free option", "免费额度")}</th></tr></thead><tbody>
+<tr><td><b>Interview Realtime Copilot</b></td><td>{t("cmp.r1.price", "Free plan · £25/mo · £169/yr", "免费版 · £25/月 · £169/年")}</td><td>macOS · Windows</td><td>{t("cmp.r1.lang", "English ↔ 中文 live translation and bilingual hints", "中英实时互译与双语提示")}</td><td>{t("cmp.r1.free", "Monthly free AI allowance", "每月免费 AI 额度")}</td></tr>
+<tr><td>Linkjob AI</td><td>{t("cmp.r2.price", "~$99.99/mo · ~$30/mo yearly · $999.99 lifetime", "约 $99.99/月 · 年付约 $30/月 · $999.99 买断")}</td><td>Windows · macOS · Linux</td><td>{t("cmp.r2.lang", "Multilingual (English-first)", "多语言（以英文为主）")}</td><td>{t("cmp.r2.free", "30-minute trial", "30 分钟试用")}</td></tr>
+<tr><td>Final Round AI</td><td>{t("cmp.r3.price", "Free plan · ~$25–148/mo · ~$500/yr", "免费版 · 约 $25–148/月 · 约 $500/年")}</td><td>{t("cmp.r3.os", "Web + desktop", "网页 + 桌面端")}</td><td>{t("cmp.r3.lang", "English-first", "以英文为主")}</td><td>{t("cmp.r3.free", "Free plan", "免费版")}</td></tr>
+<tr><td>Interview Coder</td><td>{t("cmp.r4.price", "Free tier · $299/mo · $799 lifetime", "免费档 · $299/月 · $799 买断")}</td><td>macOS · Windows</td><td>{t("cmp.r4.lang", "English; coding interviews only", "英文；仅编程面试")}</td><td>{t("cmp.r4.free", "Free tier", "免费档")}</td></tr>
+<tr><td>Cluely</td><td>{t("cmp.r5.price", "~$20/mo · ~$150/mo stealth tier", "约 $20/月 · 隐形档约 $150/月")}</td><td>macOS · Windows</td><td>{t("cmp.r5.lang", "English; general meetings", "英文；通用会议助手")}</td><td>{t("cmp.r5.free", "Free tier", "免费档")}</td></tr>
+</tbody></table></div>
+{t("cmp.src", "*Prices and features are from each product's public pages in November 2026 and change often — check their sites before deciding. Our prices exclude tax; theirs may too.", "*价格与功能来自各产品 2026 年 11 月的公开页面，经常变动，购买前请以官网为准。我方价格不含税，对方可能同样不含税。", "p", "faint small")}</div></section>
+<section><div class="wrap"><div class="center reveal"><span class="eyebrow">{t("cmp.fit.eyebrow", "Where we fit", "我们的位置")}</span><h2>{t("cmp.fit.h2", "What is actually different here", "真正不同的地方")}</h2></div><div class="bento">
+<div class="tile wide reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="url(#ig)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></div>{t("cmp.fit.1t", "The only one built for English–Chinese interviews", "唯一为中英双语面试打造", "h3")}{t("cmp.fit.1p", "Every interviewer line is translated as it is spoken and every hint comes in both languages. Built for people whose experience is in Chinese but whose interview is in English.", "面试官的每句话实时翻译成中文，每条提示双语给出。为经历在中文里、面试在英文里的人设计。", "p")}</div>
+<div class="tile wide reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="url(#ig)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>{t("cmp.fit.2t", "A third of the price of the nearest rival", "价格约为同类产品的三分之一", "h3")}{t("cmp.fit.2p", "A free monthly allowance on every account, then £25 a month — Linkjob and Interview Coder charge three to twelve times that. A China site (copilot.xichigroup.com.cn) serves pages and downloads directly for mainland users.", "每个账号都有每月免费额度，之后 £25 一月——Linkjob 和 Interview Coder 的收费是它的三到十二倍。国内站（copilot.xichigroup.com.cn）直接提供页面和下载。", "p")}</div>
+<div class="tile wide reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="url(#ig)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 012-2h12v16H6a2 2 0 00-2 2z"/><path d="M8 7h6M8 11h6"/></svg></div>{t("cmp.fit.3t", "Practice and debrief in the same app", "同一应用内练习与复盘", "h3")}{t("cmp.fit.3p", "A spoken AI interviewer rehearses your prepared questions before the real call, and every session ends with a question-by-question debrief and recording — most tools only cover the live moment.", "正式通话前由 AI 面试官演练你准备的题目；每场会话逐题复盘并保留录音——多数工具只覆盖实时那一刻。", "p")}</div>
+<div class="tile wide reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="url(#ig)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7z"/></svg></div>{t("cmp.fit.4t", "Where rivals are ahead", "对手领先的地方", "h3")}{t("cmp.fit.4p", "We are a newer, smaller product: no Linux or mobile app, no phone-call mode, a smaller community and less public testing. If you interview on a phone or Linux today, look at Linkjob first.", "我们是更新、更小的产品：没有 Linux 和手机端、没有电话模式、社区更小、公开测试更少。如果你今天要在手机或 Linux 上面试，先看 Linkjob。", "p")}</div>
+</div></div></section>
+<section><div class="wrap split"><div class="reveal"><span class="eyebrow">{t("cmp.pick.eyebrow", "How to choose", "选择方法")}</span><h2>{t("cmp.pick.h2", "Five checks before you pay anyone", "付款前检查的五件事")}</h2>
+<ul class="checks"><li>{t("cmp.pick.1", "Does it answer from your own resume and notes? Generic answers fail follow-up questions.", "回答是否基于你的简历和资料？通用答案经不起追问。")}</li>
+<li>{t("cmp.pick.2", "Try the free option on a mock call first — never discover the product during the real interview.", "先用免费额度做一场模拟面试——不要在正式面试中第一次使用。")}</li>
+<li>{t("cmp.pick.3", "Check it stays hidden from screen sharing in your meeting app, with your own recording.", "在你自己的会议软件里录屏，确认共享时不可见。")}</li>
+<li>{t("cmp.pick.4", "Compare the effective monthly price after tax and annual lock-ins, not the headline number.", "比较含税和年付折算后的实际月价，而不是宣传数字。")}</li>
+<li>{t("cmp.pick.5", "No tool is 100% undetectable — anyone claiming that is marketing. Check the interview's rules and use it within them.", "没有工具是 100% 不可检测的——这样宣称的都是营销。了解面试规则，在规则内使用。")}</li></ul></div>
+<div class="glass reveal">{t("cmp.try.t", "Try before you compare", "先试再比", "h3")}{t("cmp.try.p", "Download it, run the free spoken practice and watch the live translation. If a rival's free tier does the same job better for you, use it.", "下载后先做一场免费的语音练习，看看实时翻译。如果竞品的免费版更适合你，就用它。", "p", "muted")}<div class="cta"><a class="btn primary" href="/download.html">{t("cta.download", "Download the app", "下载应用")}</a><a class="btn" href="/docs/ai-interview-assistant.html">{t("cmp.try.guide", "The choosing guide", "查看选择指南")}</a></div></div></div></section>''')
+
     plan_cta = lambda plan, en, zh: f'<button class="btn primary" data-plan="{plan}">{t(f"plan.{plan}.cta", en, zh)}</button>'  # noqa: E731
     page("pricing", ("Pricing — Interview Realtime Copilot", "价格 — Interview Realtime Copilot"),
          ld=lambda lang: [faq_ld([(STRINGS[lang][f"faq.{n}q"], STRINGS[lang][f"faq.{n}a"]) for n in (1, 2, 3, 4)])], body=f'''
@@ -464,24 +497,24 @@ def build() -> None:
 <div class="plans">
 <div class="plan">{t("plan.free.name", "Free", "免费版", "h3")}<div class="price">£0</div>{t("plan.free.sub", "Try it on your next practice.", "在下一次练习中试试。", "p", "muted small")}
 <ul><li>{t("plan.free.1", "A monthly AI allowance — about 2 practice sessions", "每月 AI 额度，约可做 2 次语音练习")}</li><li>{t("plan.free.2", "Live translation and hints", "实时翻译与提示")}</li><li>{t("plan.free.3", "Prepared-question extraction", "自动提取准备题")}</li><li>{t("plan.free.4", "A debrief after each session", "每场会话的复盘")}</li></ul>
-<a class="btn" href="/download.html">{t("cta.download", "Download for macOS", "下载 macOS 版")}</a></div>
+<a class="btn" href="/download.html">{t("cta.download", "Download the app", "下载应用")}</a></div>
 <div class="plan">{t("plan.monthly.name", "Pro monthly", "Pro 月付", "h3")}<div class="price">£25<small>{t("per.month", " / month", " / 月")}</small></div>{t("plan.monthly.sub", "For an active job search.", "适合正在求职。", "p", "muted small")}
 <ul><li>{t("plan.pro.1", "20× the free AI allowance every month — hours of live interviews", "每月 AI 额度为免费版的 20 倍，足够数小时实时面试")}</li><li>{t("plan.pro.2", "Spoken practice and debriefs", "语音练习与复盘")}</li><li>{t("plan.pro.3", "Solve screen and auto-capture", "截屏解答与自动截屏")}</li><li>{t("plan.pro.4", "Recordings and full debriefs", "录音与完整复盘")}</li></ul>
 {plan_cta("monthly", "Subscribe monthly", "订阅月付")}</div>
 <div class="plan featured"><span class="tag">{t("plan.best", "BEST VALUE", "最划算")}</span>{t("plan.yearly.name", "Pro yearly", "Pro 年付", "h3")}<div class="price">£169<small>{t("per.year", " / year", " / 年")}</small></div>{t("plan.yearly.sub", "Save 43% — about £14 a month.", "节省 43%，约每月 £14。", "p", "muted small")}
-<ul><li>{t("plan.y.1", "Everything in Pro monthly", "包含 Pro 月付全部功能")}</li><li>{t("plan.y.2", "Early access to Windows", "抢先体验 Windows 版")}</li><li>{t("plan.y.3", "Priority support", "优先支持")}</li></ul>
+<ul><li>{t("plan.y.1", "Everything in Pro monthly", "包含 Pro 月付全部功能")}</li><li>{t("plan.y.2", "macOS and Windows apps", "支持 macOS 和 Windows")}</li><li>{t("plan.y.3", "Priority support", "优先支持")}</li></ul>
 {plan_cta("yearly", "Subscribe yearly", "订阅年付")}</div></div>{t("pr.tax", "Prices are in pounds sterling and exclude tax; your local VAT or sales tax is added at checkout.", "价格以英镑计，不含税；结账时会按你所在地区加收增值税或销售税。", "p", "faint small")}<p class="error" id="checkout-error"></p></div></section>
 <section style="padding-top:0"><div class="wrap"><h2 class="center">{t("faq.h2", "Questions", "常见问题")}</h2><div class="faq">
 <details><summary>{t("faq.1q", "Do I need to set anything up for the AI?", "AI 需要我自己配置什么吗？")}</summary>{t("faq.1a", "No. Sign in and the realtime AI engine is ready. Every plan includes a monthly allowance (Pro has 20 times the free one); when it runs out, the app tells you and you can upgrade.", "不需要。登录即可使用实时 AI 引擎。每个套餐都含每月额度（Pro 是免费版的 20 倍），用完时应用会提示你升级。", "p")}</details>
 <details><summary>{t("faq.2q", "Where is my data stored?", "我的数据存在哪里？")}</summary>{t("faq.2a", "On your Mac: documents, transcripts, debriefs and recordings. Only the audio and text needed for a live answer are processed by our AI engine during a session.", "在你的 Mac 上：资料、字幕、复盘和录音。只有会话中生成回答所需的音频和文字会交给我们的 AI 引擎处理。", "p")}</details>
 <details><summary>{t("faq.3q", "Can I cancel?", "可以取消吗？")}</summary>{t("faq.3a", "Yes, anytime from your account page. Pro stays active until the end of the paid period.", "可以，随时在账号页取消，已付费周期内仍可使用 Pro。", "p")}</details>
-<details><summary>{t("faq.4q", "Which platforms are supported?", "支持哪些系统？")}</summary>{t("faq.4a", "macOS 14.2 or later today; Windows is coming.", "目前支持 macOS 14.2 及以上，Windows 即将推出。", "p")}</details>
+<details><summary>{t("faq.4q", "Which platforms are supported?", "支持哪些系统？")}</summary>{t("faq.4a", "macOS 14.2 or later on Apple Silicon, and 64-bit Windows 10 (2004+) or Windows 11.", "Apple 芯片 Mac（macOS 14.2 及以上），以及 64 位 Windows 10（2004+）或 Windows 11。", "p")}</details>
 <details><summary>{t("faq.5q", "How do I get help?", "遇到问题怎么联系你们？")}</summary><p>{t("faq.5a", "Email us at", "请发邮件至")} <a class="mail" href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>{t("faq.5b", " — we usually reply within one business day.", "，我们通常在一个工作日内回复。")}</p></details>
 </div></div></section>''')
 
     page("download", ("Download — Interview Realtime Copilot", "下载 — Interview Realtime Copilot"), f'''
 <section class="hero"><div class="wrap split"><div><span class="eyebrow">{t("dl.eyebrow", "Download", "下载")}</span><h1>{t("dl.h1", "Get the desktop app.", "下载桌面应用。")}</h1>
-{t("dl.lead", "The copilot runs on your Mac, next to your meeting app.", "应用在你的 Mac 上运行，配合会议软件使用。", "p", "lead")}
+{t("dl.lead", "The copilot runs on your computer, next to your meeting app.", "应用在你的电脑上运行，配合会议软件使用。", "p", "lead")}
 <div class="card" style="margin-top:26px">{t("dl.mac", "macOS 14.2 or later · Apple Silicon (M1–M4)", "macOS 14.2 及以上 · Apple 芯片（M1–M4）", "h3")}<p class="muted small" id="mac-status" data-i18n="dl.checking">{"Checking for the current build…"}</p><div id="mac-download"></div>
 {t("dl.key", "Just sign in with your website account — the realtime AI engine is ready, with a monthly allowance on every plan.", "用网站账号登录即可——实时 AI 引擎即刻可用，每个套餐都包含每月额度。", "p", "notice small")}
 {t("dl.gatekeeper", "Preview builds are not yet notarised by Apple: after the first launch, open System Settings → Privacy & Security and click “Open Anyway”.", "测试版尚未经 Apple 公证：首次启动后，打开「系统设置 → 隐私与安全性」，点击「仍要打开」。", "p", "faint small")}</div>
