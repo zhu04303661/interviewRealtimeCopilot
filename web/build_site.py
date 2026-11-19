@@ -146,6 +146,7 @@ def site_header() -> str:
     """Header in the HTML itself, so crawlers that do not run JavaScript can follow the navigation (site.js adds the behaviour)."""
     links = "".join(nav_link(f"nav.{k}", en, zh, href, f' data-nav="{name}"') for k, name, en, zh, href in [
         ("scenarios", "use-cases", "Use cases", "使用场景", "/use-cases.html"), ("demo", "demo", "Demo", "演示", "/demo.html"),
+        ("stories", "interviews", "Stories", "面经", "/interviews.html"),
         ("pricing", "pricing", "Pricing", "价格", "/pricing.html"), ("download", "download", "Download", "下载", "/download.html"), ("docs", "docs", "Docs", "使用手册", "/docs/")])
     return ('<header class="nav"><div class="wrap"><a class="brand" href="/"><span class="logo">IR</span>Interview Realtime Copilot</a>'
             f'<nav class="links">{links}</nav><span class="spacer"></span><button class="menu-btn" aria-label="Menu" aria-expanded="false"><i></i><i></i><i></i></button>'
@@ -442,6 +443,11 @@ def build() -> None:
 <form class="glass reveal wish-form"><label class="field">{t("wish.text", "Your wish", "你的心愿")}<textarea class="input" name="text" rows="5" required minlength="5" maxlength="3000" data-i18n-placeholder="wish.placeholder"></textarea></label>
 <label class="field">{t("wish.email", "Email (optional, so we can reply)", "邮箱（选填，方便我们回复）")}<input class="input" name="email" type="email" placeholder="you@example.com"></label>
 <button class="btn primary">{t("wish.send", "Send my wish", "提交心愿")}</button><p class="error"></p></form></div></section>
+
+<section><div class="wrap"><div class="final reveal"><span class="eyebrow">{t("st.eyebrow", "Interview stories", "面经")}</span>
+<h2>{t("st.h2", "What did they actually ask? Read real interview stories.", "他们到底问了什么？看真实面经。")}</h2>
+{t("st.p", "Candidates share the company, the round, the questions and how it went. Preparing for a specific company? Start here — and add your own story after your interview.", "求职者分享公司、轮次、被问到的题和过程。在准备某家公司？从这里开始——面完也欢迎分享你的经历。", "p", "lead")}
+<div class="cta" style="justify-content:center"><a class="btn lg" href="/interviews.html">{t("st.cta", "Read interview stories", "去看面经")}</a></div></div></div></section>
 
 <section><div class="wrap"><div class="final reveal"><h2>{t("final.h2", "Walk into your next interview prepared.", "带着准备，走进下一场面试。")}</h2>
 {t("final.p", "Start free with two practice sessions a month. Upgrade when the interviews get real.", "每月 2 次免费练习，面试真正来临时再升级。", "p", "lead")}
