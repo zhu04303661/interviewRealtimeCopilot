@@ -181,17 +181,22 @@ function createVoice() {
 }
 
 /**
- * End-of-turn detection for one capture lane: an adaptive noise floor and
- * speech threshold on 100 ms frames. After speech, ~0.8 s of quiet ends the
- * turn, so the engine transcribes whole utterances instead of fixed slices.
+ * End-of-turn detection for one capture lane: an adaptive noise floor plus a
+ * hysteresis speech threshold on 100 ms frames. Speech is entered above ~2.2×
+ * the floor and left only below ~1.4×, so soft syllables, fricatives and breaths
+ * inside a sentence do not read as silence. Only after `quietMs` of real quiet
+ * does the turn end — conversational mid-sentence pauses are often past 1 s,
+ * especially for non-native speakers and remote interview audio.
  */
-export function createTurnDetector(onTurnEnd: () => void, { quietMs = 800, frameMs = 100 } = {}) {
+export function createTurnDetector(onTurnEnd: () => void, { quietMs = 1500, frameMs = 100 } = {}) {
   let floor = 200;
   let speaking = false;
   let quiet = 0;
   return (rms: number) => {
-    floor = rms < floor ? floor * 0.9 + rms * 0.1 : floor * 0.995 + rms * 0.005;  // falls fast, rises slowly
-    const voiced = rms > Math.max(350, floor * 2.5);
+    // Falls fast, rises slowly — and barely at all during speech, so a long
+    // utterance cannot lift the noise estimate up into its own quiet syllables.
+    floor = rms < floor ? floor * 0.9 + rms * 0.1 : floor * (speaking ? 0.999 : 0.995) + rms * (speaking ? 0.001 : 0.005);
+    const voiced = rms > (speaking ? Math.max(160, floor * 1.4) : Math.max(300, floor * 2.2));
     if (voiced) { speaking = true; quiet = 0; return; }
     if (!speaking) return;
     quiet += frameMs;
@@ -282,7 +287,7 @@ function Cockpit() {
         const send = (frame: ArrayBuffer) => { if (ws.readyState === WebSocket.OPEN) ws.send(frame); };
         const finalize = (lane: number) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ v: 1, type: 'finalize', stream: lane })); };
         // Interviewers pause mid-question more than candidates do; their lane waits longer before ending a turn.
-        const turns = [createTurnDetector(() => finalize(0), { quietMs: 900 }), createTurnDetector(() => finalize(1), { quietMs: 1200 })];
+        const turns = [createTurnDetector(() => finalize(0), { quietMs: 1400 }), createTurnDetector(() => finalize(1), { quietMs: 1800 })];
         try {
           const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
           recorder.addStream(mic);
