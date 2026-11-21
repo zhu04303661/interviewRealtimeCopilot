@@ -10,6 +10,7 @@
 // Needs: uv, curl and tar (Windows 10+ ships both), and NSIS's makensis for the installer
 //   (Windows: `winget install NSIS.NSIS` or `choco install nsis`; Linux: `apt install nsis`; macOS: `brew install makensis`).
 // Optional: IRC_WIN_PYTHON_URL (a python-build-standalone install_only archive) overrides the Python download;
+//   IRC_WIN_ELECTRON_ZIP (a local electron-v*-win32-<arch>.zip path) skips the Electron download;
 //   ELECTRON_MIRROR is honoured for the Electron download.
 // The result is not code-signed: SmartScreen shows "Windows protected your PC" → More info → Run anyway.
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -54,7 +55,8 @@ const electronGet = await import('@electron/get')
   .catch(() => import(pathToFileURL(join(root, 'node_modules/electron/node_modules/@electron/get/dist/index.js')).href));
 if (process.env.HTTPS_PROXY || process.env.https_proxy) { process.env.ELECTRON_GET_USE_PROXY ??= '1'; electronGet.initializeProxy(); }
 const electronVersion = JSON.parse(readFileSync(join(root, 'node_modules/electron/package.json'), 'utf8')).version;
-const electronZip = await electronGet.downloadArtifact({ version: electronVersion, artifactName: 'electron', platform: 'win32', arch });
+const electronZip = process.env.IRC_WIN_ELECTRON_ZIP
+  ?? await electronGet.downloadArtifact({ version: electronVersion, artifactName: 'electron', platform: 'win32', arch });
 execFileSync(py312[0], [...py312.slice(1), '-m', 'zipfile', '-e', electronZip, app], { stdio: 'inherit' });
 renameSync(join(app, 'electron.exe'), join(app, exeName));
 rmSync(join(resources, 'default_app.asar'), { force: true });
