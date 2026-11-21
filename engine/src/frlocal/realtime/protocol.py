@@ -3,7 +3,8 @@
 Client → engine
     text   ``{"v": 1, "type": "hello", "jwt", "session_id", "streams": [...], "last_seen_seq"?}``
            ``{"v": 1, "type": "ping"}``
-           ``{"v": 1, "type": "finalize", "stream": <index>}``   end of a spoken turn (client VAD)
+           ``{"v": 1, "type": "finalize", "stream": <index>}``   end of a spoken turn (legacy client VAD;
+           the engine's own lane VADs detect turns — this is honored but no longer required)
            ``{"v": 1, "type": "answer_request", "utterance", "gate_seq"?}``
     binary ``[u8 stream index][u32 LE sequence][PCM16 mono 16 kHz …]``
 

@@ -180,30 +180,6 @@ function createVoice() {
   };
 }
 
-/**
- * End-of-turn detection for one capture lane: an adaptive noise floor plus a
- * hysteresis speech threshold on 100 ms frames. Speech is entered above ~2.2×
- * the floor and left only below ~1.4×, so soft syllables, fricatives and breaths
- * inside a sentence do not read as silence. Only after `quietMs` of real quiet
- * does the turn end — conversational mid-sentence pauses are often past 1 s,
- * especially for non-native speakers and remote interview audio.
- */
-export function createTurnDetector(onTurnEnd: () => void, { quietMs = 1500, frameMs = 100 } = {}) {
-  let floor = 200;
-  let speaking = false;
-  let quiet = 0;
-  return (rms: number) => {
-    // Falls fast, rises slowly — and barely at all during speech, so a long
-    // utterance cannot lift the noise estimate up into its own quiet syllables.
-    floor = rms < floor ? floor * 0.9 + rms * 0.1 : floor * (speaking ? 0.999 : 0.995) + rms * (speaking ? 0.001 : 0.005);
-    const voiced = rms > (speaking ? Math.max(160, floor * 1.4) : Math.max(300, floor * 2.2));
-    if (voiced) { speaking = true; quiet = 0; return; }
-    if (!speaking) return;
-    quiet += frameMs;
-    if (quiet >= quietMs) { speaking = false; quiet = 0; onTurnEnd(); }
-  };
-}
-
 const rmsOf = (samples: Int16Array) => {
   let sum = 0;
   for (let i = 0; i < samples.length; i += 2) sum += samples[i] * samples[i];
@@ -225,7 +201,7 @@ async function testAudioStream(base64: string): Promise<MediaStream> {
 
 /** Streams a MediaStream's audio as 100 ms PCM16 frames on lane ``stream``. */
 async function captureLane(stream: MediaStream, lane: number, send: (frame: ArrayBuffer) => void,
-  onLevel: (lane: number, level: number) => void, onRms: (rms: number) => void = () => {}): Promise<() => void> {
+  onLevel: (lane: number, level: number) => void): Promise<() => void> {
   const context = new AudioContext();
   await context.audioWorklet.addModule('./pcm-worklet.js');
   const source = context.createMediaStreamSource(stream);
@@ -234,7 +210,6 @@ async function captureLane(stream: MediaStream, lane: number, send: (frame: Arra
   node.port.onmessage = ({ data }: MessageEvent<ArrayBuffer>) => {
     const rms = rmsOf(new Int16Array(data));
     onLevel(lane, Math.min(1, rms / 6000));
-    onRms(rms);
     const frame = new Uint8Array(5 + data.byteLength);
     const view = new DataView(frame.buffer);
     view.setUint8(0, lane);
@@ -285,25 +260,22 @@ function Cockpit() {
         if (general) streams.push({ stream_id: 'interviewer', source: 'system', role: 'interviewer', encoding: 'pcm16', sample_rate: 16000 });
         ws.send(JSON.stringify({ v: 1, type: 'hello', jwt: session.jwt, session_id: session.sessionId, streams }));
         const send = (frame: ArrayBuffer) => { if (ws.readyState === WebSocket.OPEN) ws.send(frame); };
-        const finalize = (lane: number) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ v: 1, type: 'finalize', stream: lane })); };
-        // Interviewers pause mid-question more than candidates do; their lane waits longer before ending a turn.
-        const turns = [createTurnDetector(() => finalize(0), { quietMs: 1400 }), createTurnDetector(() => finalize(1), { quietMs: 1800 })];
+        // Turn ends are detected engine-side by the per-lane Silero VAD — the app streams audio and levels only.
         try {
           const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
           recorder.addStream(mic);
           recorder.start();
-          stops.push(await captureLane(mic, 0, send, onLevel, turns[0]));
+          stops.push(await captureLane(mic, 0, send, onLevel));
           if (general && session.testSystemAudio) {
             const testStream = await testAudioStream(session.testSystemAudio);
             recorder.addStream(testStream);
-            stops.push(await captureLane(testStream, 1, send, onLevel, turns[1]));
+            stops.push(await captureLane(testStream, 1, send, onLevel));
           } else if (general && await window.copilot.startSystemAudio()) {
             // macOS: frames from the Core Audio tap helper, already 16 kHz PCM16. (Windows: the getDisplayMedia branch below.)
             let sequence = 0;
             window.copilot.onSystemAudio((pcm) => {
               const rms = rmsOf(new Int16Array(pcm.buffer, pcm.byteOffset, pcm.byteLength >> 1));
               onLevel(1, Math.min(1, rms / 6000));
-              turns[1](rms);
               const frame = new Uint8Array(5 + pcm.byteLength);
               new DataView(frame.buffer).setUint8(0, 1);
               new DataView(frame.buffer).setUint32(1, sequence++, true);
@@ -317,7 +289,7 @@ function Cockpit() {
             display.getVideoTracks().forEach((t) => t.stop());
             if (!display.getAudioTracks().length) throw new Error(window.copilot.platform === 'darwin' ? 'No system audio. Allow Screen & System Audio Recording. · 无系统声音，请授权屏幕与系统录音。'
               : 'No computer audio. Check that an output device (speakers or headphones) is enabled. · 无电脑声音，请确认已启用扬声器或耳机。');
-            stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send, onLevel, turns[1]));
+            stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send, onLevel));
           }
           dispatch({ type: 'transcription.state', seq: 0, data: { state: 'ok' } });
         } catch (error) {

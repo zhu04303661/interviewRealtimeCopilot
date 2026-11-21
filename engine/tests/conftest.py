@@ -43,6 +43,16 @@ def openai_key(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
 
+@pytest.fixture(autouse=True)
+def _no_lane_vad(monkeypatch):
+    """Session tests send constant-value fake PCM, which the real Silero gate would correctly drop
+    as silence; keep session-level tests deterministic by disabling lane gating (vad.py is covered
+    by its own scripted-probability tests)."""
+    from frlocal.realtime import session
+
+    monkeypatch.setattr(session, "_shared_vad", lambda: None)
+
+
 @dataclass
 class Backend:
     base: str

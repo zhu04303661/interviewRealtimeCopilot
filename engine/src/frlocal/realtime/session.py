@@ -32,13 +32,30 @@ from typing import Any
 from ..config import Settings
 from ..openai import OpenAI, ProviderError
 from ..retrieval import Source, build_context_documents, prepare_sources
-from . import coach, understanding
+from . import coach, understanding, vad
 from .asr import TranscriptionHints, TranscriptionStream
 from .live import LiveConversation
 from .voice_agent import RealtimeVoiceAgent
 from .protocol import STREAM_ROLES, encode_frame, valid_stream_declarations
 
 log = logging.getLogger(__name__)
+
+_vad: vad.SileroVad | None = None
+_vad_tried = False
+
+
+def _shared_vad() -> vad.SileroVad | None:
+    """The process-wide Silero session (each lane keeps its own recurrent carry). Lanes fall back
+    to plain forwarding when the model or onnxruntime is unavailable."""
+    global _vad, _vad_tried
+    if not _vad_tried:
+        _vad_tried = True
+        try:
+            _vad = vad.SileroVad()
+            log.info("Silero VAD loaded — lanes gate non-speech audio and detect turn ends locally")
+        except Exception as error:
+            log.warning("Silero VAD unavailable, lanes forward all audio: %s", error)
+    return _vad
 
 # Reads prepared documents: (username, document_id) -> (metadata, text|None) | None
 DocumentReader = Callable[[str, str], Awaitable[tuple[dict, str | None] | None]]
@@ -89,6 +106,7 @@ class Lane:
     source: str
     stream_id: str
     asr: TranscriptionStream
+    gate: vad.VadGate | None = None       # neural VAD: forwards speech only and detects turn ends
     last_sequence: int = -1
     retry_at: float = 0.0
 
@@ -245,8 +263,11 @@ class InterviewSession:
 
     def _start_lanes(self, streams: list[dict]) -> None:
         roles = STREAM_ROLES[self.topology]
-        self.lanes = [Lane(role=role, source=str(declared.get("source") or ""), stream_id=str(declared.get("stream_id") or role),
-                           asr=self._new_asr(role)) for role, declared in zip(roles, streams, strict=True)]
+        lanes = [Lane(role=role, source=str(declared.get("source") or ""), stream_id=str(declared.get("stream_id") or role),
+                      asr=self._new_asr(role)) for role, declared in zip(roles, streams, strict=True)]
+        for lane in lanes:  # the gate emits to whatever asr is current, so reconnect retries keep working
+            lane.gate = vad.make_gate(lambda pcm, lane=lane: lane.asr.append(pcm), lambda lane=lane: lane.asr.end_turn(), _shared_vad())
+        self.lanes = lanes
 
     def _on_status(self, role: str, state: str, message: str | None) -> None:
         lane = next((lane for lane in self.lanes if lane.role == role), None)
@@ -266,7 +287,7 @@ class InterviewSession:
             return
         if lane.asr.closed and time.monotonic() >= lane.retry_at:
             lane.asr = self._new_asr(lane.role)
-        lane.asr.append(pcm)
+        (lane.gate.feed if lane.gate else lane.asr.append)(pcm)
 
     def end_of_turn(self, stream_index: Any) -> None:
         if self._live is not None:
