@@ -183,7 +183,8 @@ class WorkspaceApi:
             return raw(state["prefs"])
         if key == "PUT v3/me/prefs":
             state["prefs"].update(pick(await json_fields(request), [
-                "language", "coding_language", "default_language", "default_coding_language", "default_playbook_id"]))
+                "language", "coding_language", "default_language", "default_coding_language", "default_playbook_id",
+                "default_assist_language", "ui_language"]))
             workspace.changed()
             return raw(state["prefs"])
         if key == "GET v3/me/consents":

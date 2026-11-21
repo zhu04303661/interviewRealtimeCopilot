@@ -115,7 +115,7 @@ try {
   // Defaults
   await open('Defaults');
   const select = (title, value) => main.evaluate(`(() => { const s = ${settingRow(title)}.querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, ${JSON.stringify(value)}); s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-  await select('Answer language', 'zh-CN');
+  await select('Interview language', 'zh-CN');
   await select('Coding language', 'C++');
   await pause(500);
   const prefs = await main.evaluate(`window.copilot.request('GET', '/api/v3/me/prefs')`);
@@ -182,7 +182,7 @@ try {
   await main.waitFor(`document.querySelectorAll('.side-goal').length > 0`, 15000, 'goal in sidebar');
   await main.evaluate(`document.querySelector('.side-goal').click()`);
   await main.waitFor(`document.body.innerText.includes('Goal context')`, 10000, 'goal page');
-  check(await main.evaluate(clickText('Practice · 练习')), 'no Practice button');
+  check(await main.evaluate(clickText('Practice')), 'no Practice button');
   await main.waitFor(`!!document.querySelector('.preflight')`, 5000, 'preflight');
   const sections = await main.evaluate(`[...document.querySelectorAll('.preflight .setting-group')].map((h) => h.textContent.split(' · ')[0]).join(', ')`);
   check(sections === 'Practice scenario, Knowledge sources, Answers, Audio check', `practice preflight sections: ${sections}`);

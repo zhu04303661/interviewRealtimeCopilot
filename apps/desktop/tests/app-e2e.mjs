@@ -154,7 +154,7 @@ try {
   await main.evaluate(`window.copilot.startSession({ topology: 'mock', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: ${JSON.stringify(ids)}, language: 'en-US' })`);
   let cockpit = await find((u) => u.endsWith('/cockpit.html'));
   const sessionStarted = Date.now();
-  const total = Number(await cockpit.waitFor(`(document.body.innerText.match(/练习题 \\d+\\/(\\d+)/) || [])[1]`, 120000, 'practice question panel'));
+  const total = Number(await cockpit.waitFor(`(document.body.innerText.match(/Practice questions \\d+\\/(\\d+)/) || [])[1]`, 120000, 'practice question panel'));
   const first = await cockpit.waitFor(`${entries('Interviewer')}[0]?.querySelector('.text')?.textContent`, 60000, 'first spoken question');
   log(`practice: first question after ${((Date.now() - sessionStarted) / 1000).toFixed(1)} s; ${total} prepared questions so far; interviewer: "${first.slice(0, 120)}"`);
   check(Number(await cockpit.waitFor(`Number(document.body.dataset.voiceChunks ?? 0) > 3 && document.body.dataset.voiceChunks`, 20000, 'interviewer voice')) > 3, 'no voice');

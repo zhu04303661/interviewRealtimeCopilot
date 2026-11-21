@@ -78,7 +78,7 @@ try {
   await main.evaluate(`window.copilot.startSession({ topology: 'mock', goalId: ${JSON.stringify(goal.goal_id)}, documentIds: [], language: 'en-US' })`);
   const cockpit = await find((u) => u.endsWith('/cockpit.html'));
   log('cockpit opened');
-  log('practice questions:', await cockpit.waitFor(`(document.body.innerText.match(/练习题 \\d+\\/(\\d+)/) || [])[1]`, 90000));
+  log('practice questions:', await cockpit.waitFor(`(document.body.innerText.match(/Practice questions \\d+\\/(\\d+)/) || [])[1]`, 90000));
   log('interviewer:', await cockpit.waitFor(`(() => { const e = [...document.querySelectorAll('.c-entry')].find((x) => x.querySelector('.stamp')?.textContent.startsWith('Interviewer')); return e?.querySelector('.text')?.textContent; })()`, 60000));
   log('translation:', await cockpit.waitFor(`document.querySelector('.c-entry .zh')?.textContent`, 30000));
   if (fakeAudio) {

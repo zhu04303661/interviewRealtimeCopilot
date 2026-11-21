@@ -12,7 +12,9 @@ import { Cloud } from './cloud';
 import { Engine } from './engine';
 import { DEFAULTS, type Settings, SettingsStore, type ShortcutId } from './settings';
 
-// Automated tests: a WAV file stands in for the microphone (no real device).
+// Automated tests: a WAV file stands in for the microphone (no real device), and the UI
+// language is pinned to English so text-based selectors keep working on any host locale.
+if (process.env.IRC_E2E === '1') app.commandLine.appendSwitch('lang', 'en-US');
 if (process.env.IRC_FAKE_AUDIO) {
   app.commandLine.appendSwitch('use-fake-device-for-media-stream');
   app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
@@ -62,7 +64,7 @@ function startSystemAudio(): boolean {
   child.stderr!.on('data', (line: Buffer) => {
     const text = line.toString().trim();
     console.log(`[system-audio] ${text}`);
-    if (text.startsWith('error:')) cockpit?.webContents.send('cockpit:command', `error:${text.slice(7)} · 无法采集电脑声音，请在“录屏与系统录音”中允许本应用。`);
+    if (text.startsWith('error:')) cockpit?.webContents.send('cockpit:command', 'error:system-audio');
   });
   child.on('exit', () => { if (systemAudio === child) systemAudio = null; });
   return true;
@@ -189,8 +191,9 @@ function registerIpc(): void {
     testSystemAudioPath = path;
   });
   ipcMain.handle('session:start', async (_event, request: { topology: 'general' | 'mock'; goalId: string; documentIds: string[]; language: string;
-    codingLanguage?: string | null; playbookId?: string | null; practiceMode?: string }) => {
+    assist?: string | null; codingLanguage?: string | null; playbookId?: string | null; practiceMode?: string }) => {
     const config: Record<string, unknown> = { language: request.language, document_ids: request.documentIds };
+    if (request.assist) config.assist = request.assist;
     if (request.codingLanguage) config.coding_language = request.codingLanguage;
     if (request.playbookId) config.playbook_id = request.playbookId;
     if (request.practiceMode) config.practice_mode = request.practiceMode;

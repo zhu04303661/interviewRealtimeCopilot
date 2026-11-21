@@ -6,6 +6,7 @@
 import type React from 'react';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { resolveUiLang, setUiLang, t, useUiLang } from './i18n';
 import './styles.css';
 
 type Entry =
@@ -71,7 +72,7 @@ function reduce(state: State, frame: Frame): State {
     case 'error':
       return { ...state, status: data.message ?? 'Something went wrong.' };
     case 'session.ended':
-      return { ...state, ended: true, status: 'Session ended · 会话已结束' };
+      return { ...state, ended: true, status: 'Session ended' };
     default:
       return state;
   }
@@ -87,7 +88,7 @@ function Hint({ text }: { text: string }) {
   const flushCode = () => {
     const source = (code ?? []).join('\n');
     blocks.push(<div className="c-code" key={blocks.length}>
-      <div className="c-code-head"><span>{codeLanguage || 'code'}</span><button onClick={() => void navigator.clipboard.writeText(source)}>Copy · 复制</button></div>
+      <div className="c-code-head"><span>{codeLanguage || 'code'}</span><button onClick={() => void navigator.clipboard.writeText(source)}>{t('Copy')}</button></div>
       <pre><code>{source}</code></pre></div>);
     code = null;
   };
@@ -222,7 +223,8 @@ async function captureLane(stream: MediaStream, lane: number, send: (frame: Arra
 }
 
 function Cockpit() {
-  const [state, dispatch] = useReducer(reduce, { entries: [], translations: {}, plan: null, status: 'Connecting… · 正在连接…', ended: false, interim: '' });
+  useUiLang();
+  const [state, dispatch] = useReducer(reduce, { entries: [], translations: {}, plan: null, status: 'Connecting…', ended: false, interim: '' });
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(Date.now());
   const socket = useRef<WebSocket | null>(null);
@@ -287,8 +289,8 @@ function Cockpit() {
           } else if (general) {
             const display = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
             display.getVideoTracks().forEach((t) => t.stop());
-            if (!display.getAudioTracks().length) throw new Error(window.copilot.platform === 'darwin' ? 'No system audio. Allow Screen & System Audio Recording. · 无系统声音，请授权屏幕与系统录音。'
-              : 'No computer audio. Check that an output device (speakers or headphones) is enabled. · 无电脑声音，请确认已启用扬声器或耳机。');
+            if (!display.getAudioTracks().length) throw new Error(window.copilot.platform === 'darwin' ? t('No system audio. Allow Screen & System Audio Recording.')
+              : t('No computer audio. Check that an output device (speakers or headphones) is enabled.'));
             stops.push(await captureLane(new MediaStream(display.getAudioTracks()), 1, send, onLevel));
           }
           dispatch({ type: 'transcription.state', seq: 0, data: { state: 'ok' } });
@@ -303,7 +305,7 @@ function Cockpit() {
         if (frame.type === 'say.audio.clear' || frame.type === 'session.ended') voice.stop();
         dispatch(frame);
       };
-      ws.onclose = () => { if (!closed) dispatch({ type: 'error', seq: 0, data: { message: 'Disconnected · 连接已断开' } }); };
+      ws.onclose = () => { if (!closed) dispatch({ type: 'error', seq: 0, data: { message: 'Disconnected' } }); };
     })();
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => { closed = true; clearInterval(timer); voice.stop(); stops.forEach((s) => s()); socket.current?.close(); };
@@ -322,11 +324,14 @@ function Cockpit() {
   const [notice, setNotice] = useState('');
   const solvedSeqs = useRef(new Set<number>());
   useEffect(() => {
+    void window.copilot.request('GET', '/api/v3/me/prefs')
+      .then((prefs: Record<string, any>) => setUiLang(resolveUiLang(prefs?.ui_language))).catch(() => {});
     void window.copilot.getSettings().then(setAppearance);
     window.copilot.onSettings(setAppearance);
     window.copilot.onCockpitCommand((command) => {
       if (command === 'toggle-results') setResultsHidden((hidden) => !hidden);
-      else if (command === 'solving') setNotice('Reading your screen… · 正在读取屏幕…');
+      else if (command === 'solving') setNotice(t('Reading your screen…'));
+      else if (command === 'error:system-audio') setNotice(t('System audio unavailable — allow this app in Screen & System Audio Recording settings.'));
       else if (command.startsWith('error:')) setNotice(command.slice(6));
     });
   }, []);
@@ -361,24 +366,23 @@ function Cockpit() {
     <div className="cockpit" style={panelStyle}>
       <header className="c-header">
         <span className={`dot ${live ? '' : 'off'}`} />
-        <span className="c-status">{live ? (session.topology === 'mock' ? 'Practice' : 'Listening') : 'Ended'}</span>
-        <span className="c-sub">{live ? (session.topology === 'mock' ? '语音练习' : '实时面试') : '已结束'}</span>
+        <span className="c-status">{live ? (session.topology === 'mock' ? t('Practice') : t('Listening')) : t('Ended')}</span>
         <span className="spacer" />
-        {(session.topology === 'mock' ? [[0, 'Mic · 麦克风']] : [[0, 'Mic · 麦克风'], [1, 'Computer · 电脑']]).map(([lane, label]) => (
-          <span key={lane} className="meter" title={label as string}><span className="meter-label">{(label as string).split(' ')[0]}</span>
+        {(session.topology === 'mock' ? [[0, 'Mic']] : [[0, 'Mic'], [1, 'Computer']]).map(([lane, label]) => (
+          <span key={lane} className="meter" title={t(label as string)}><span className="meter-label">{t(label as string)}</span>
             <span className="meter-bar"><span style={{ width: `${Math.round(levels[lane as number] * 100)}%` }} /></span></span>))}
       </header>
-      {state.status && <div className="c-banner">{state.status}</div>}
+      {state.status && <div className="c-banner">{t(state.status)}</div>}
       {notice && <div className="c-banner">{notice}</div>}
       {state.plan && (
         <div className="c-plan">
           <div className="head" onClick={() => setPlanOpen(!planOpen)}>
-            <span>Practice questions · 练习题 {asked.size}/{state.plan.questions.length}</span><span>{planOpen ? '▾' : '▸'}</span>
+            <span>{t('Practice questions')} {asked.size}/{state.plan.questions.length}</span><span>{planOpen ? '▾' : '▸'}</span>
           </div>
           {planOpen && <>
             <div className="c-modes">
-              {[['sequential', 'Order · 顺序'], ['random', 'Random · 随机'], ['ai', 'AI · 临场']].map(([mode, label]) => (
-                <button key={mode} className={state.plan!.mode === mode ? 'active' : ''} onClick={() => request(mode, 'practice.mode')}>{label}</button>))}
+              {[['sequential', 'Order'], ['random', 'Random'], ['ai', 'AI']].map(([mode, label]) => (
+                <button key={mode} className={state.plan!.mode === mode ? 'active' : ''} onClick={() => request(mode, 'practice.mode')}>{t(label)}</button>))}
             </div>
             <ol>
               {state.plan.questions.map((q) => (
@@ -392,23 +396,23 @@ function Cockpit() {
         </div>
       )}
       <div className="c-feed" ref={feed} style={resultsHidden ? { display: 'none' } : undefined}>
-        {state.entries.length === 0 && <div className="c-empty"><b>You're covered.</b><br />Listening for the interviewer's first question. · 正在聆听面试官的第一个问题。</div>}
+        {state.entries.length === 0 && <div className="c-empty"><b>{t("You're covered.")}</b><br />{t("Listening for the interviewer's first question.")}</div>}
         {state.entries.map((e) => {
           if (e.kind === 'line') {
             const voice = e.who === 'interviewer' && e.key.startsWith('s');
             return (
               <div className={`c-entry ${e.who === 'me' ? 'me' : ''} ${voice ? 'c-voice' : ''}`} key={e.key}>
-                <span className={`stamp ${e.who === 'me' ? 'me' : ''}`}>{e.who === 'me' ? 'You · 我' : 'Interviewer · 面试官'}</span>
+                <span className={`stamp ${e.who === 'me' ? 'me' : ''}`}>{e.who === 'me' ? t('You') : t('Interviewer')}</span>
                 <div className="text">{e.text}</div>
                 {e.zh && <div className="zh">{e.zh}</div>}
                 <button className="c-action" disabled={answering} onClick={() => e.who === 'me' ? request(e.text, 'continue', e.seq) : request(e.text, 'general', e.seq)}>
-                  {e.who === 'me' ? 'Expand answer · 补充回答' : 'Suggest answer · 生成回答'}</button>
+                  {e.who === 'me' ? t('Expand answer') : t('Suggest answer')}</button>
               </div>
             );
           }
           if (e.kind === 'question') return (
             <div className="c-question" key={e.key} data-intent={e.intent} data-decision={e.decision}>
-              <span className="stamp">{e.decision === 'await_more' ? 'Question · 问题 (listening…)' : 'Question · 问题'}</span>
+              <span className="stamp">{e.decision === 'await_more' ? t('Question (listening…)') : t('Question')}</span>
               <div className="text" style={{ marginTop: 6 }}>{e.text}</div>
               {e.zh && <div className="zh" style={{ marginTop: 4, color: 'var(--c-text-2)' }}>{e.zh}</div>}
             </div>
@@ -417,17 +421,17 @@ function Cockpit() {
             <div className={`c-answer ${e.superseded ? 'superseded' : ''}`} key={e.key}>
               <Hint text={e.text} />
               {!e.done && <span className="typing" />}
-              {e.done && e.grounded && <div className="source">From your materials · 基于你的资料</div>}
+              {e.done && e.grounded && <div className="source">{t('From your materials')}</div>}
             </div>
           );
         })}
-        {state.interim && <div className="c-entry"><span className="stamp">Interviewer · 面试官</span><div className="text" style={{ opacity: .7 }}>{state.interim}<span className="typing" /></div></div>}
+        {state.interim && <div className="c-entry"><span className="stamp">{t('Interviewer')}</span><div className="text" style={{ opacity: .7 }}>{state.interim}<span className="typing" /></div></div>}
       </div>
       <footer className="c-footer">
-        <button className="c-btn" onClick={solve} title={window.copilot.platform === 'darwin' ? '⌥S' : 'Alt+S'}>Solve screen · 截屏解答</button>
+        <button className="c-btn" onClick={solve} title={window.copilot.platform === 'darwin' ? '⌥S' : 'Alt+S'}>{t('Solve screen')}</button>
         <span className="spacer" />
         <span className="timer">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</span>
-        <button className="c-btn end" disabled={ending} onClick={end}>{ending ? 'Saving… · 保存中…' : 'End · 结束'}</button>
+        <button className="c-btn end" disabled={ending} onClick={end}>{ending ? t('Saving…') : t('End')}</button>
       </footer>
     </div>
   );

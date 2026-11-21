@@ -227,7 +227,10 @@ def test_translations_must_be_in_the_other_language():
     question = "How did CFO estimation work, and what are its limits?"
     assert not useful_translation("CFO estimation worked how, and what were its limits?", question)  # reworded English
     assert useful_translation("CFO 估计是如何工作的？它有哪些局限？", question)
-    assert useful_translation("How does the scheduler work?", "调度器是如何工作的？")
+    # Chinese assistance: an English gloss of a Chinese utterance adds nothing, and vice versa for English assistance.
+    assert not useful_translation("How does the scheduler work?", "调度器是如何工作的？")
+    assert useful_translation("How does the scheduler work?", "调度器是如何工作的？", assist="en")
+    assert not useful_translation("调度器怎么工作？", "How does the scheduler work?", assist="en")
     assert not useful_translation("调度器怎么工作？", "调度器是如何工作的？")
 
 

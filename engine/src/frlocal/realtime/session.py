@@ -71,15 +71,19 @@ def is_filler(text: str) -> bool:
 CJK = re.compile(r"[\u4e00-\u9fff]")
 
 
-def useful_translation(translation: str, original: str) -> bool:
-    """A translation worth showing: present, not the original repeated, and in the other language
-    (English and other Latin-script speech → Chinese, Chinese → English)."""
+def useful_translation(translation: str, original: str, assist: str = "zh") -> bool:
+    """A translation worth showing: present, not the original repeated, written in the
+    candidate's assistance language, and translating something that is not already in it
+    (Chinese assistance → CJK text over non-Chinese audio; English → no CJK)."""
     def squash(value: str) -> str:
         return re.sub(r"\W+", "", value).lower()
     if not translation.strip() or squash(translation) == squash(original):
         return False
-    source_is_chinese = len(CJK.findall(original)) > len(re.findall(r"[A-Za-z]", original)) / 4
-    return not CJK.search(translation) if source_is_chinese else bool(CJK.search(translation))
+    def is_chinese(value: str) -> bool:
+        return len(CJK.findall(value)) > len(re.findall(r"[A-Za-z]", value)) / 4
+    if is_chinese(original) == (assist != "en"):
+        return False  # the utterance is already in the assistance language
+    return is_chinese(translation) == (assist != "en")
 
 
 # Share of a microphone line's words that, when all heard from the interviewer
@@ -156,6 +160,10 @@ class InterviewSession:
             **config, "goal": coach.goal_brief(goal),
             "interviewer_source": "backend_driven" if topology == "mock" else "external_audio",
         }
+        # The interview's spoken language vs the language the candidate reads translations and
+        # hints in: 中文面试 zh+zh, English-only en+en, English interview + Chinese help en+zh.
+        self._spoken = str(self.config.get("language") or "en").split("-")[0].lower()
+        self._assist = str(self.config.get("assist") or "zh").split("-")[0].lower()
         self._goal = goal or {}
         self.ended = False
         self.segments: list[Segment] = []
@@ -353,15 +361,18 @@ class InterviewSession:
             try:
                 result = await understanding.analyze(
                     self.openai, self.settings.models.understanding, latest=segment.text, pending=pending_text,
-                    recent=recent, goal=self.config["goal"], timeout=self.settings.limits.understanding_timeout_s)
+                    recent=recent, goal=self.config["goal"], timeout=self.settings.limits.understanding_timeout_s,
+                    assist=self._assist)
             except (TimeoutError, ProviderError, ValueError) as error:
                 log.info("Interviewer understanding failed, using the heuristic: %s", error)
                 result = None
-            if result and useful_translation(result.translation, segment.text):
+            if result and useful_translation(result.translation, segment.text, self._assist):
                 self.emit("transcript.translation", {
                     "segment_id": segment.segment_id, "text": result.translation, "language": result.language,
-                    "target_language": "en" if result.language == "zh" else "zh"})
-            elif result:  # the combined call sometimes rewords instead of translating
+                    "target_language": self._assist})
+            elif result and result.language != self._assist:
+                # The combined call sometimes rewords instead of translating; a dedicated call translates reliably.
+                # (Skipped when the utterance is already in the assistance language — nothing to translate.)
                 self._spawn(self._translate_say(segment.segment_id, segment.text))
             if number != self._pending.analysis or self.ended:
                 return  # a newer utterance arrived; its analysis decides
@@ -436,7 +447,9 @@ class InterviewSession:
                 context, refs = await self._context(f"{question} {said}" if said else question)
                 if self._prepared_answer:
                     context["prepared_answer_for_current_question"] = self._prepared_answer
-                body = coach.answer_request(self.settings.models.coaching, context, question, self.settings.limits, said=said)
+                languages = [self._spoken] + ([self._assist] if self._assist != self._spoken else [])
+                body = coach.answer_request(self.settings.models.coaching, context, question, self.settings.limits,
+                                            said=said, languages=languages)
                 produced = False
                 async for delta in self.openai.stream(body, timeout=self.settings.limits.answer_timeout_s, key=self.key):
                     produced = True
@@ -813,14 +826,14 @@ class InterviewSession:
         try:
             result = await understanding.analyze(
                 self.openai, self.settings.models.understanding, latest=text, pending=text, recent=recent,
-                goal=self.config["goal"], timeout=self.settings.limits.understanding_timeout_s)
+                goal=self.config["goal"], timeout=self.settings.limits.understanding_timeout_s, assist=self._assist)
         except (ProviderError, ValueError, TimeoutError) as error:
             log.info("Interviewer understanding failed, using the heuristic: %s", error)
             result = understanding.heuristic(text)
-        if useful_translation(result.translation, text):
+        if useful_translation(result.translation, text, self._assist):
             self.emit("transcript.translation", {"segment_id": say_id, "text": result.translation, "language": result.language,
-                                                 "target_language": "en" if result.language == "zh" else "zh"})
-        else:
+                                                 "target_language": self._assist})
+        elif result.language != self._assist:
             # The combined call sometimes echoes the original; a dedicated call translates reliably.
             self._spawn(self._translate_say(say_id, text))
         if result.is_question and not self.ended:
@@ -831,11 +844,11 @@ class InterviewSession:
     async def _translate_say(self, say_id: str, text: str) -> None:
         try:
             translation = await understanding.translate(self.openai, self.settings.models.understanding, text,
-                                                        timeout=self.settings.limits.understanding_timeout_s)
+                                                        timeout=self.settings.limits.understanding_timeout_s, target=self._assist)
         except Exception as error:
             log.info("Could not translate the interviewer's question: %s", error)
             return
-        if not useful_translation(translation, text):
+        if not useful_translation(translation, text, self._assist):
             return
         self.emit("transcript.translation", {"segment_id": say_id, "text": translation, "language": "", "target_language": ""})
 
