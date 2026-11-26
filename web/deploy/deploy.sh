@@ -10,7 +10,7 @@ ssh_() { ssh -i "$key" -o BatchMode=yes "$target" "$@"; }
 rsync -az --delete -e "ssh -i $key -o BatchMode=yes" --exclude '.venv' --exclude '__pycache__' --exclude '*.sqlite3' --exclude 'tests' \
   web/server web/static "$target:/tmp/irc-web-upload/"
 scp -q -i "$key" web/deploy/irc-web.service "$target:/tmp/irc-web-upload/"
-ssh_ "HOST=$host MIRROR_ORIGIN=${MIRROR_ORIGIN:-} MIRROR_IP=${MIRROR_IP:-} sh -s" <<'REMOTE'
+ssh_ "HOST=$host MIRROR_ORIGIN=${MIRROR_ORIGIN:-} MIRROR_IP=${MIRROR_IP:-} EXTRA_ORIGINS=${EXTRA_ORIGINS:-} sh -s" <<'REMOTE'
 set -eu
 sudo id ircweb >/dev/null 2>&1 || sudo useradd --system --home /var/lib/irc-web --shell /usr/sbin/nologin ircweb
 sudo mkdir -p /opt/irc-web /var/lib/irc-web
@@ -34,7 +34,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable -q irc-web
 sudo systemctl restart irc-web
 if [ -n "$MIRROR_ORIGIN" ]; then  # accept the mirror's pages as same-site
-  sudo sed -i '/^IRC_WEB_MIRRORS=/d' /etc/irc-web.env && printf 'IRC_WEB_MIRRORS=%s\n' "$MIRROR_ORIGIN" | sudo tee -a /etc/irc-web.env >/dev/null
+  sudo sed -i '/^IRC_WEB_MIRRORS=/d' /etc/irc-web.env && printf 'IRC_WEB_MIRRORS=%s\n' "$MIRROR_ORIGIN${EXTRA_ORIGINS:+,$EXTRA_ORIGINS}" | sudo tee -a /etc/irc-web.env >/dev/null
   sudo systemctl restart irc-web
 fi
 site=/etc/caddy/sites/irc-web.conf
